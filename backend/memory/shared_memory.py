@@ -88,6 +88,17 @@ class SharedMemory:
     forecast_assumptions: list = field(default_factory=list)
     forecast_monthly: list = field(default_factory=list)  # [{month, base, bull, bear}]
 
+    # ── Market Research ───────────────────────────────────────────
+    market_visibility_score: int = 0         # 0–100 (0 = no online presence)
+    market_sentiment: str = "unknown"        # "positive" | "neutral" | "negative" | "unknown"
+    market_news: list = field(default_factory=list)       # [{title, url, source, snippet, date}]
+    market_competitors: list = field(default_factory=list) # [str] competitor names
+    market_opportunities: list = field(default_factory=list) # [str] market opportunities
+    market_risks: list = field(default_factory=list)      # [str] market-level risks
+    market_context_summary: str = ""         # compact string injected into specialist agent prompts
+    market_search_performed: bool = False    # True once quick scan has run
+    market_total_results: int = 0            # total search results found across all queries
+
     def add_finding(self, finding):
         self.findings.append(finding)
 
@@ -108,23 +119,36 @@ class SharedMemory:
             return "No findings recorded yet."
         lines = []
         for finding in self.findings:
-            lines.append(
-                "[" + finding.severity.upper() + "] " + finding.agent + " -- " + finding.title + "\n"
-                "  Financial Impact: " + finding.financial_impact + "\n"
-                "  Benchmark: " + finding.benchmark_reference + "\n"
-                "  Recommendation: " + finding.recommendation
+             lines.append(
+                f"[{finding.severity.upper()}] {finding.title} ({finding.agent}): "
+                f"{finding.detail} | Impact: {finding.financial_impact} | "
+                f"Recommendation: {finding.recommendation}"
             )
         return "\n".join(lines)
 
-    def to_context_summary(self) -> str:
-        """Return a compact string for injecting into agent prompts."""
+    def to_context_summary(self):
+        """Compact summary injected into CEO synthesis prompt."""
         parts = [
-            "Business: " + self.business_name,
-            "Industry: " + (self.industry or self.industry_key),
-            "Revenue: " + self.currency + " " + "{:,.0f}".format(self.annual_revenue),
-            "Headcount: " + str(self.headcount),
-            "Findings so far: " + str(len(self.findings)),
+            f"Business: {self.business_name} | Industry: {self.industry} | "
+            f"Revenue: {self.currency} {self.annual_revenue:,.0f} | Headcount: {self.headcount}",
+            f"Health: {self.business_health_score}/100 | "
+            f"Profitability: {self.profitability_score}/100 | "
+            f"Efficiency: {self.efficiency_score}/100 | "
+            f"Risk: {self.risk_score}/100",
+            f"Total findings: {len(self.findings)} "
+            f"(Critical: {len(self.get_findings_by_severity('critical'))}, "
+            f"High: {len(self.get_findings_by_severity('high'))})",
         ]
         if self.primary_concern:
-            parts.append("Client concern: " + self.primary_concern)
-        return "  |  ".join(parts)
+            parts.append(f"Primary concern: {self.primary_concern}")
+        if self.business_model_summary:
+            parts.append(f"Business model: {self.business_model_summary}")
+        if self.market_context_summary:
+            parts.append(f"Market context: {self.market_context_summary}")
+        return "\n".join(parts)
+
+    def to_dict(self):
+        """Serialise findings to plain dicts for JSON output."""
+        d = self.__dict__.copy()
+        d["findings"] = [f.__dict__ for f in self.findings]
+        return d

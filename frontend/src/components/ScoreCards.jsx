@@ -114,6 +114,30 @@ function ValuationCard({ low, mid, high, currency }) {
   )
 }
 
+function MarketCard({ score, sentiment }) {
+  if (!score && score !== 0) return null
+  const color = score >= 70 ? 'text-emerald-400' : score >= 40 ? 'text-amber-400' : 'text-red-400'
+  const badge = score >= 70 ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20'
+    : score >= 40 ? 'bg-amber-400/10 text-amber-400 border-amber-400/20'
+    : 'bg-red-400/10 text-red-400 border-red-400/20'
+  const sentimentLabel = sentiment
+    ? sentiment.charAt(0).toUpperCase() + sentiment.slice(1)
+    : '—'
+  return (
+    <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5 card-hover flex flex-col items-center text-center">
+      <div className="relative mb-3">
+        <ScoreRing score={score} size={80} />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`text-lg font-bold ${color}`}>{score}</span>
+        </div>
+      </div>
+      <div className="text-white text-sm font-semibold mb-1">Market Visibility</div>
+      <div className={`text-xs border rounded-full px-2 py-0.5 ${badge}`}>{score}/100</div>
+      <div className="text-slate-600 text-xs mt-2">Sentiment: {sentimentLabel}</div>
+    </div>
+  )
+}
+
 export default function ScoreCards({ scores, report }) {
   const cards = [
     { label: 'Business Health', key: 'business_health', subtitle: 'Overall' },
@@ -125,12 +149,16 @@ export default function ScoreCards({ scores, report }) {
   const showCredit    = report && report.credit_score > 0
   const showFraud     = report && report.fraud_risk_level && report.fraud_risk_level !== 'unknown'
   const showValuation = report && report.valuation_mid > 0
+  const showMarket    = report && report.market_search_performed
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-4">
       {cards.map(function(c) {
         return <ScoreCard key={c.key} label={c.label} score={scores[c.key] || 0} subtitle={c.subtitle} />
       })}
+      {showMarket && (
+        <MarketCard score={report.market_visibility_score ?? 0} sentiment={report.market_sentiment} />
+      )}
       {showCredit && (
         <CreditCard score={report.credit_score} grade={report.credit_grade} />
       )}

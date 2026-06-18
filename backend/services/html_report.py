@@ -1,5 +1,5 @@
 """
-Interactive HTML Report Generator — Business Forensics AI
+Interactive HTML Report Generator — Imara
 Self-contained: all CSS, JS, and SVG charts are inlined.
 No external dependencies — works offline, can be emailed.
 """
@@ -618,7 +618,7 @@ def generate_html_report(report: dict) -> str:
 <div class="report-header">
   <span class="report-date">{today}</span>
   <h1>{biz}</h1>
-  <div class="sub">{industry}{" · " + country if country else ""} · Business Forensics AI</div>
+  <div class="sub">{industry}{" · " + country if country else ""} · Imara</div>
 </div>
 
 <nav class="report-nav">

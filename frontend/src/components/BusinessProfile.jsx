@@ -89,7 +89,7 @@ export default function BusinessProfile({ onComplete, onDemo }) {
           <span className="text-gold text-xs font-semibold tracking-wider">AI-POWERED DIAGNOSIS</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3 leading-tight">
-          Business Forensics AI
+          Imara
         </h1>
         <p className="text-slate-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
           11 specialist AI agents analyse your financial data and produce a board-ready consulting report — in minutes.

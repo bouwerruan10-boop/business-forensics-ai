@@ -1,5 +1,5 @@
 """
-Business Forensics AI -- FastAPI backend
+Imara -- FastAPI backend
 Endpoints:
   POST /api/analyze         -- upload files + business profile, trigger full analysis
   GET  /api/status/{id}     -- poll analysis progress
@@ -60,7 +60,7 @@ def verify_api_key(request: Request):
 
 
 app = FastAPI(
-    title="Business Forensics AI",
+    title="Imara",
     description="AI-powered multi-agent business consulting platform",
     version="2.0.0",
 )
@@ -100,7 +100,7 @@ class SimulateRequest(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "Business Forensics AI v2.0"}
+    return {"status": "ok", "service": "Imara v2.0"}
 
 
 @app.post("/api/analyze")

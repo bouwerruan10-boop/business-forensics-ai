@@ -5,6 +5,7 @@ import Simulator from './Simulator'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
+import MarketIntelligence from './MarketIntelligence'
 
 function Section({ id, title, subtitle, children }) {
   return (
@@ -201,7 +202,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
       {/* Credit Readiness & Fraud Risk */}
       {(report.credit_score > 0 || (report.fraud_risk_level && report.fraud_risk_level !== 'unknown')) && (
         <Section
-          id="credit"
+             id="credit"
           title="Credit Readiness & Fraud Risk"
           subtitle="SA lender creditworthiness assessment and fraud anomaly detection"
         >
@@ -217,6 +218,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Indicative business valuation range and 12-month scenario forecasts"
         >
           <ValuationPanel report={report} />
+        </Section>
+      )}
+
+      {/* Market Intelligence */}
+      {(report.market_search_performed || report.market_visibility_score > 0) && (
+        <Section
+          id="market"
+          title="Market Intelligence"
+          subtitle="Live brand visibility, public sentiment, news coverage, and competitor landscape"
+        >
+          <MarketIntelligence report={report} />
         </Section>
       )}
 

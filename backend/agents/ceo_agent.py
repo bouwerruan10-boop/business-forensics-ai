@@ -9,6 +9,7 @@ import json
 import re
 from agents.base_agent import BaseAgent
 from agents.specialist_agents import ALL_AGENTS
+from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
 from memory.shared_memory import SharedMemory, AgentFinding
 from config import MODEL, MAX_TOKENS
 
@@ -51,7 +52,13 @@ generic business language."""
             progress_callback("CEO Agent", "Analysing business model from uploaded data...")
         self._build_business_model(business_data, memory)
 
-        # Phase 2: Specialist agents
+        # Phase 1b: Market quick scan — runs first so all specialists get market context
+        if progress_callback:
+            progress_callback("Market Research Agent", "Scanning market presence and industry trends...")
+        market_scout = MarketResearchAgent()
+        market_scout.analyze(business_data, memory)
+
+        # Phase 2: Specialist agents (now enriched with market_context_summary)
         for AgentClass in ALL_AGENTS:
             agent = AgentClass()
             if progress_callback:
@@ -59,6 +66,14 @@ generic business language."""
             findings = agent.analyze(business_data, memory)
             for f in findings:
                 memory.add_finding(f)
+
+        # Phase 2b: Market deep dive — full intelligence after all specialists
+        if progress_callback:
+            progress_callback("Market Intelligence Agent", "Conducting deep market research and competitor analysis...")
+        market_deep = MarketDeepDiveAgent()
+        market_findings = market_deep.analyze(business_data, memory)
+        for f in market_findings:
+            memory.add_finding(f)
 
         # Phase 3: Cross-agent synthesis
         if progress_callback:
@@ -409,6 +424,17 @@ Return ONLY valid JSON.
             "forecast_bear_12m": memory.forecast_bear_12m,
             "forecast_assumptions": memory.forecast_assumptions,
             "forecast_monthly": memory.forecast_monthly,
+
+            # Market Intelligence
+            "market_visibility_score": memory.market_visibility_score,
+            "market_sentiment": memory.market_sentiment,
+            "market_news": memory.market_news,
+            "market_competitors": memory.market_competitors,
+            "market_opportunities": memory.market_opportunities,
+            "market_risks": memory.market_risks,
+            "market_context_summary": memory.market_context_summary,
+            "market_search_performed": memory.market_search_performed,
+            "market_total_results": memory.market_total_results,
 
             # Legacy compat
             "summary": executive_summary,

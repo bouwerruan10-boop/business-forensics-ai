@@ -12,13 +12,13 @@ export default function Navbar({ phase, onAdmin, onNewAnalysis, analysisId, show
         <div className="w-2 h-2 rounded-full bg-gold flex-shrink-0" />
         <div className="flex items-baseline gap-2 min-w-0">
           <span className="font-bold text-sm tracking-wider text-white hidden sm:block">
-            BUSINESS FORENSICS AI
+            IMARA
           </span>
           <span className="font-bold text-sm tracking-wider text-white sm:hidden">
-            BF AI
+            IMARA
           </span>
           <span className="text-xs text-slate-500 hidden md:block">
-            Virtual Consulting Firm
+            Know where you stand
           </span>
         </div>
       </div>
