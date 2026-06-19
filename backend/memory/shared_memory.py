@@ -56,6 +56,9 @@ class SharedMemory:
     imara_band: str = ""                     # "A" | "B" | "C" | "D" | "E"
     imara_label: str = ""                    # e.g. "Investment Ready"
     imara_components: list = field(default_factory=list)  # [{label, value, weight}]
+    imara_color: str = ""                    # canonical band hex (single source of truth)
+    imara_completeness: int = 0              # 0-100: how many components were produced
+    imara_confidence: str = "low"            # "high" | "medium" | "low"
 
     # Client context
     primary_concern: str = ""   # client's stated focus area from profile form

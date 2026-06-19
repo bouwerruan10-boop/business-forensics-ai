@@ -74,9 +74,19 @@ def on_startup():
     init_db()
 
 
+# CORS — restrict to the Vercel frontend (+ preview deploys) and local dev,
+# instead of a wildcard. Override with CORS_ORIGINS (comma-separated) for custom domains.
+# Note: "*" with allow_credentials=True is rejected by browsers anyway.
+_default_origins = (
+    "https://business-forensics-ai.vercel.app,"
+    "http://localhost:3000,http://localhost:5173"
+)
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -100,7 +110,12 @@ class SimulateRequest(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "Imara v2.0"}
+    # RAILWAY_GIT_COMMIT_SHA is injected by Railway at build time; "dev" locally.
+    return {
+        "status": "ok",
+        "service": "Imara v2.0",
+        "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "dev")[:8],
+    }
 
 
 @app.post("/api/analyze")

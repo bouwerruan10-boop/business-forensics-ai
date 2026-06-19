@@ -891,6 +891,17 @@ def _hex(c) -> str:
     return "%02X%02X%02X" % (int(c.red * 255), int(c.green * 255), int(c.blue * 255))
 
 
+def _wrap_flowables(flowables):
+    """Wrap a list of flowables so it can be placed inside a single table cell.
+    ReportLab table cells accept a list of flowables directly, so we return the
+    list as-is (filtering out any None entries for safety)."""
+    if flowables is None:
+        return []
+    if not isinstance(flowables, (list, tuple)):
+        return [flowables]
+    return [fl for fl in flowables if fl is not None]
+
+
 def _imara_band_colors(score):
     if score >= 80:
         return GOLD, colors.HexColor("#FBF4DE")
@@ -912,6 +923,14 @@ def _imara_score_block(story, report):
     label = report.get("imara_label", "")
     components = report.get("imara_components", []) or []
     col, bg = _imara_band_colors(score)
+    canon = report.get("imara_color")
+    if canon:
+        try:
+            col = colors.HexColor(canon)
+        except Exception:
+            pass
+    confidence = (report.get("imara_confidence") or "").capitalize()
+    completeness = report.get("imara_completeness")
 
     _section_header(story, "IMARA SCORE™  ·  BANKABILITY & INVESTABILITY")
 
@@ -924,6 +943,10 @@ def _imara_score_block(story, report):
             [Paragraph("Band " + str(band) + "  ·  " + str(label),
                        _style(fontSize=9, fontName="Helvetica-Bold",
                               textColor=col, alignment=TA_CENTER))],
+            [Paragraph(
+                ("Confidence: " + confidence + ("  ·  " + str(completeness) + "% of signals"
+                 if completeness is not None else "")) if confidence else "",
+                _style(fontSize=7, textColor=MID_GRAY, alignment=TA_CENTER))],
         ],
         colWidths=[CONTENT_W * 0.30],
     )

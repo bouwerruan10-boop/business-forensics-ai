@@ -1,75 +1,69 @@
 # Imara — Handoff Document
 _Last updated: 2026-06-19_
 
-## What Was Just Shipped (this session)
+## Current State (both ends live on commit acf49b6 + this hardening pass staged)
+- **Frontend**: Vercel (`business-forensics-ai.vercel.app`) — auto-deploys from GitHub `main`.
+- **Backend**: Railway service `web` in project `strong-creativity` — auto-deploys from `main`,
+  Dockerfile build, healthcheck `/api/health`. **Account is on a LIMITED TRIAL (~$4.97 / 30 days)
+  — the service is suspended when it lapses. Add a plan to keep it online.**
 
-### 1. Imara Score™ — branded composite hero metric
-A single 0–100 bankability / investability rating synthesising every specialist
-agent output, weighted toward what a lender or investor assesses. Components are
-dropped if not produced this run and the remaining weights are re-normalised, so
-the score is always 0–100.
+## Shipped this session
+### A. Imara Score™ (composite hero metric)
+Weighted 0–100 bankability/investability score from all agent outputs, re-normalised over the
+components actually produced. `_calculate_imara_score` runs in CEO Phase 4. Fields on SharedMemory
+and the report dict: `imara_score`, `imara_band`, `imara_label`, `imara_color`,
+`imara_completeness`, `imara_confidence`, `imara_components`. Rendered as a hero in the dashboard,
+shared report, PDF (all 3 audiences), and HTML.
 
-| Component | Source | Base weight |
+### B. CRITICAL repair — `specialist_agents.py`
+A prior Edit-tool truncation had committed a broken file (HEAD `81dfa01`) that **failed the Railway
+healthcheck** and kept the old build live. Four agent classes were missing; all reconstructed
+(`FraudDetectionAgent`, `CreditReadinessAgent`, `ValuationAgent`, `ForecastAgent`) with SA-specific
+prompts. The repair commit (`acf49b6`) passed the healthcheck and is live.
+
+### C. Hardening pass (this commit)
+1. **CI** — `.github/workflows/ci.yml`: backend (install, compileall, import app, **pytest**) +
+   frontend (`npm run build`). Catches truncation/missing-helper/import/build breakage pre-merge.
+2. **Tests** — `backend/tests/test_hardening.py` (11 tests, no API key): Imara scoring + confidence,
+   sub-score cap, the 4 agents' JSON extraction + fallback, app boot.
+3. **Imara confidence** — `imara_confidence` + `imara_completeness` so a thin score (few components)
+   isn't shown as solid as a complete one. Single source of truth: backend emits `imara_color`;
+   PDF/HTML/React consume it.
+4. **Pipeline resilience** — every agent phase wrapped in try/except (one agent failing no longer
+   sinks the analysis).
+5. **Sub-score robustness** — per-category penalty capped so finding VOLUME can't collapse scores.
+6. **Security** — CORS restricted from `*` to the Vercel domain + `*.vercel.app` + localhost
+   (env `CORS_ORIGINS`); frontend sends `X-API-Key` when `VITE_API_KEY` set.
+7. **Version visibility** — `/api/health` returns the deploy commit (`RAILWAY_GIT_COMMIT_SHA`).
+
+### Two pre-existing bugs fixed
+- `_wrap_flowables` was **called but never defined** → PDF export 500'd on any report with findings. Added.
+- `client.js` used a relative `/api` that Vercel's SPA rewrite swallowed and **never read
+  `VITE_API_URL`** → real analyses through the deployed frontend couldn't reach the backend.
+  Now wired to `VITE_API_URL` (this is why the CORS change was needed).
+
+## New / relevant environment variables
+| Variable | Where | Purpose |
 |---|---|---|
-| Profitability | `profitability_score` | 25% |
-| Credit Readiness | `credit_score` | 20% |
-| Risk & Compliance | `risk_score` | 15% |
-| Operational Efficiency | `efficiency_score` | 10% |
-| Financial Integrity | `100 − fraud_risk_score` | 10% |
-| Market Visibility | `market_visibility_score` | 10% |
-| Tax Compliance | `100 − sa_tax_risk_score` | 5% |
-| Legal Compliance | `100 − sa_legal_risk_score` | 5% |
+| `CORS_ORIGINS` | Railway (optional) | Comma-separated allowed origins. Default covers Vercel + localhost. |
+| `API_SECRET_KEY` | Railway (optional) | Enable the `/api/analyze` key gate. |
+| `VITE_API_KEY` | Vercel (optional) | If set, frontend sends `X-API-Key`. Pair with `API_SECRET_KEY`. |
+| `VITE_API_URL` | Vercel (prod) | Railway backend URL. Now actually used by the client. |
+| `RAILWAY_GIT_COMMIT_SHA` | Railway (auto) | Surfaced in `/api/health`. |
 
-Bands: A 80–100 *Investment Ready* · B 65–79 *Bankable* · C 50–64 *Developing* ·
-D 35–49 *At Risk* · E 0–34 *Distressed*.
-
-- `memory/shared_memory.py` — added `imara_score`, `imara_band`, `imara_label`, `imara_components`.
-- `agents/ceo_agent.py` — `_calculate_imara_score()` runs in Phase 4 (after `_score_business`); fields exposed in the report dict.
-- `frontend/src/components/ImaraScoreHero.jsx` — NEW gold-accented hero (score ring, band, label, component breakdown). Rendered above the score cards in `Dashboard.jsx` (and therefore in `SharedReport`, which reuses Dashboard).
-- `services/report_generator.py` — Imara Score hero block added to the PDF (all 3 audiences), top of the scorecard page.
-- `services/html_report.py` — Imara Score hero block added to the top of the HTML report Overview tab.
-
-### 2. CRITICAL REPAIR — `agents/specialist_agents.py` was corrupted
-A previous session's Edit-tool truncation had committed a broken file to HEAD
-(`81dfa01`): a duplicate `ALL_AGENTS` block spliced into `ForecastAgent`'s prompt
-(syntax error), and FOUR agent classes missing entirely — `FraudDetectionAgent`,
-`CreditReadinessAgent`, `ValuationAgent`, `ForecastAgent`. The backend could not
-import. All four were reconstructed from the surviving `ForecastAgent` fragment,
-the SharedMemory field contracts, and house style. `name` strings match exactly
-what `ceo_agent._score_business()` expects. Verified: file parses, all 15 agents
-resolve, single `ALL_AGENTS`, JSON-extraction + fallback paths tested.
-
-The four reconstructed prompts were then refined with SA-specific grounding
-(VAT/EMP201 fraud vectors; prime-rate DSCR + SEFA/IDC/NEF funder fit; SA SME
-2.5x–5x EBITDA deal reality; SA macro drivers — energy/load-shedding, prime, CPI,
-rand). **JSON output contracts were left unchanged**, so parsing is unaffected.
-NOTE: prompts are faithful reconstructions, not byte-identical to the lost originals.
-
-## Current Agent Count (15 in ALL_AGENTS)
-Financial → Accounting → Auditor → Operations → Logistics → Sales → Marketing →
-HR → Procurement → Strategy → LegalRisk → **Fraud** → **Credit** → **Valuation** →
-**Forecast**. (SATaxAgent / SALegalAgent remain excluded — phases 2c/2d.)
-
-## Known Issues / Incomplete Items
-- `npm run build` was NOT run in-session: the mounted `node_modules` has Windows
-  rollup binaries, not Linux. JSX validated via esbuild instead. Build on Windows.
-- `App.jsx` line ~72 still sets `setPhase('upload')` on error (harmless stale ref).
-- `BusinessProfile.jsx` and `FileUpload.jsx` are dead code (replaced by SmartIntake).
-- A stale `.git/index.lock` may exist from a sandbox session — `push_imara.bat`
-  now deletes it before staging.
-
-## Suggested Next Features
-1. Email delivery — send the PDF to the client via SendGrid/Resend.
-2. Client portal links — generate shareable `SharedReport` links from the dashboard.
-3. Report branding / white-labelling — firm logo + name on the PDF.
-4. Stripe payment gate (replace the `API_SECRET_KEY` gate).
-5. SARS eFiling pre-fill from tax uploads.
-6. Afrikaans / Zulu report summaries.
+## Staged next (deliberately NOT done blind — see IMARA_HARDENING_PLAN.md)
+1. Rewrite all 17 agents to Anthropic strict **structured outputs** (Nov 2025) — kills the brittle
+   two-call free-text+reparse, ~halves cost. Do agent-by-agent with live eval.
+2. **Parallelise** Phase-2 agents (independent) — minutes → seconds.
+3. **AHP / back-tested calibration** of the Imara Score weights against real lending outcomes.
 
 ## Critical Rules (Never Break)
-1. Write large Python files via bash heredoc — the Edit tool truncates on this Windows mount. (This is what corrupted `specialist_agents.py`. It also truncated `Dashboard.jsx` this session — recovered from git.) Prefer Python string-replace patching for surgical edits.
-2. Git writes from the user's Windows terminal via `push_imara.bat` — the sandbox can read git but cannot manage `.git` lock files on this mount.
-3. Profile values always win over Claude-extracted values in `_build_business_model()`.
-4. SATaxAgent and SALegalAgent stay out of `ALL_AGENTS` — phases 2c/2d.
-5. `primary_concern` must appear in CEO Phases 1, 3, and 5 prompts.
-6. Imara agent `name` strings must match the sets in `ceo_agent._score_business()`.
+1. **Write large files via bash heredoc**, not the Edit/Write tools — they truncate on this Windows
+   mount. This corrupted `specialist_agents.py` AND `Dashboard.jsx` AND `client.js` this project.
+   The CI smoke-check now catches it, but prevention beats detection. Prefer Python string-replace
+   patching for surgical backend edits.
+2. **Git writes from Windows** via `push_imara.bat` (clears the stale sandbox lock first).
+3. Profile values beat extracted values in `_build_business_model()`.
+4. SATaxAgent / SALegalAgent stay out of `ALL_AGENTS` (phases 2c/2d).
+5. `primary_concern` must appear in CEO Phases 1, 3, 5.
+6. Imara agent `name` strings must match the sets in `_score_business()`.

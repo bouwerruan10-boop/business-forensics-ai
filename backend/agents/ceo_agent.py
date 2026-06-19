@@ -56,40 +56,58 @@ generic business language."""
         if progress_callback:
             progress_callback("Market Research Agent", "Scanning market presence and industry trends...")
         market_scout = MarketResearchAgent()
-        market_scout.analyze(business_data, memory)
+        try:
+            market_scout.analyze(business_data, memory)
+        except Exception as exc:
+            print(f"[pipeline] Market scout failed, skipping: {exc}")
 
         # Phase 2: Specialist agents (now enriched with market_context_summary)
+        # Each agent is isolated — one agent failing must not sink the whole analysis.
         for AgentClass in ALL_AGENTS:
             agent = AgentClass()
             if progress_callback:
                 progress_callback(agent.name, f"{agent.name} conducting investigation...")
-            findings = agent.analyze(business_data, memory)
-            for f in findings:
-                memory.add_finding(f)
+            try:
+                findings = agent.analyze(business_data, memory)
+                for f in findings:
+                    memory.add_finding(f)
+            except Exception as exc:
+                print(f"[pipeline] {agent.name} failed, skipping: {exc}")
+                if progress_callback:
+                    progress_callback(agent.name, f"{agent.name} skipped (error)")
 
         # Phase 2b: Market deep dive — full intelligence after all specialists
         if progress_callback:
             progress_callback("Market Intelligence Agent", "Conducting deep market research and competitor analysis...")
         market_deep = MarketDeepDiveAgent()
-        market_findings = market_deep.analyze(business_data, memory)
-        for f in market_findings:
-            memory.add_finding(f)
+        try:
+            market_findings = market_deep.analyze(business_data, memory)
+            for f in market_findings:
+                memory.add_finding(f)
+        except Exception as exc:
+            print(f"[pipeline] MarketDeepDiveAgent failed, skipping: {exc}")
 
         # Phase 2c: SA Tax Compliance Agent
         if progress_callback:
             progress_callback("SA Tax Compliance Agent", "Reviewing SARS tax obligations — VAT, CIT, PAYE, provisional tax...")
         sa_tax = SATaxAgent()
-        sa_tax_findings = sa_tax.analyze(business_data, memory)
-        for f in sa_tax_findings:
-            memory.add_finding(f)
+        try:
+            sa_tax_findings = sa_tax.analyze(business_data, memory)
+            for f in sa_tax_findings:
+                memory.add_finding(f)
+        except Exception as exc:
+            print(f"[pipeline] SATaxAgent failed, skipping: {exc}")
 
         # Phase 2d: SA Corporate Law & BBBEE Agent
         if progress_callback:
             progress_callback("SA Corporate Law & BBBEE Agent", "Reviewing Companies Act, BBBEE, POPIA, CIPC compliance...")
         sa_legal = SALegalAgent()
-        sa_legal_findings = sa_legal.analyze(business_data, memory)
-        for f in sa_legal_findings:
-            memory.add_finding(f)
+        try:
+            sa_legal_findings = sa_legal.analyze(business_data, memory)
+            for f in sa_legal_findings:
+                memory.add_finding(f)
+        except Exception as exc:
+            print(f"[pipeline] SALegalAgent failed, skipping: {exc}")
 
         # Phase 3: Cross-agent synthesis
         if progress_callback:
@@ -286,10 +304,13 @@ Return ONLY valid JSON.
         risk_findings = [f for f in findings if f.agent in risk_agents]
         credit_findings = [f for f in findings if f.agent in credit_agents]
 
-        fin_penalty = sum(_sev_weight(f) for f in fin_findings)
-        ops_penalty = sum(_sev_weight(f) for f in ops_findings)
-        risk_penalty = sum(_sev_weight(f) for f in risk_findings)
-        credit_penalty = sum(_sev_weight(f) for f in credit_findings)
+        # Cap each category's penalty so sheer finding VOLUME can't collapse a score —
+        # a score should reflect business health, not how many findings the LLM emitted.
+        _CAP = 60
+        fin_penalty = min(_CAP, sum(_sev_weight(f) for f in fin_findings))
+        ops_penalty = min(_CAP, sum(_sev_weight(f) for f in ops_findings))
+        risk_penalty = min(_CAP, sum(_sev_weight(f) for f in risk_findings))
+        credit_penalty = min(_CAP, sum(_sev_weight(f) for f in credit_findings))
 
         memory.profitability_score = min(100, max(10, 100 - fin_penalty))
         memory.efficiency_score = min(100, max(10, 100 - ops_penalty))
@@ -341,15 +362,21 @@ Return ONLY valid JSON.
 
         s = memory.imara_score
         if s >= 80:
-            memory.imara_band, memory.imara_label = "A", "Investment Ready"
+            memory.imara_band, memory.imara_label, memory.imara_color = "A", "Investment Ready", "#C9A84C"
         elif s >= 65:
-            memory.imara_band, memory.imara_label = "B", "Bankable"
+            memory.imara_band, memory.imara_label, memory.imara_color = "B", "Bankable", "#34d399"
         elif s >= 50:
-            memory.imara_band, memory.imara_label = "C", "Developing"
+            memory.imara_band, memory.imara_label, memory.imara_color = "C", "Developing", "#fbbf24"
         elif s >= 35:
-            memory.imara_band, memory.imara_label = "D", "At Risk"
+            memory.imara_band, memory.imara_label, memory.imara_color = "D", "At Risk", "#fb923c"
         else:
-            memory.imara_band, memory.imara_label = "E", "Distressed"
+            memory.imara_band, memory.imara_label, memory.imara_color = "E", "Distressed", "#ef4444"
+
+        # Data-completeness / confidence: of the 8 possible components, how many were
+        # actually produced this run. A thin score should never look as solid as a full one.
+        produced = sum(1 for (label, value, weight, include) in candidates if include)
+        memory.imara_completeness = int(round(produced / 8 * 100))
+        memory.imara_confidence = "high" if produced >= 7 else "medium" if produced >= 4 else "low"
 
         # Breakdown with re-normalised (effective) weights for transparency
         memory.imara_components = [
@@ -440,6 +467,9 @@ Return ONLY valid JSON.
             "imara_score": memory.imara_score,
             "imara_band": memory.imara_band,
             "imara_label": memory.imara_label,
+            "imara_color": memory.imara_color,
+            "imara_completeness": memory.imara_completeness,
+            "imara_confidence": memory.imara_confidence,
             "imara_components": memory.imara_components,
 
             # Narrative (McKinsey SCR)

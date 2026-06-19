@@ -53,6 +53,15 @@ export default function ImaraScoreHero({ report }) {
   const label = report.imara_label || ''
   const components = Array.isArray(report.imara_components) ? report.imara_components : []
   const c = bandColor(score)
+  const ringColor = report.imara_color || c.ring
+  const confidence = report.imara_confidence || null
+  const completeness = report.imara_completeness
+  const confLabel = confidence ? confidence.charAt(0).toUpperCase() + confidence.slice(1) : null
+  const confClass = confidence === 'high'
+    ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20'
+    : confidence === 'medium'
+    ? 'bg-amber-400/10 text-amber-400 border-amber-400/20'
+    : 'bg-slate-400/10 text-slate-400 border-slate-400/20'
 
   return (
     <div className="relative overflow-hidden bg-navy-card border border-gold/20 rounded-2xl p-6 sm:p-8 mb-6">
@@ -63,7 +72,7 @@ export default function ImaraScoreHero({ report }) {
         <div className="flex flex-col items-center justify-center text-center lg:w-64 shrink-0">
           <div className="text-gold text-xs font-semibold tracking-[0.2em] uppercase mb-3">Imara Score™</div>
           <div className="relative">
-            <HeroRing score={score} color={c.ring} />
+            <HeroRing score={score} color={ringColor} />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className={`text-5xl font-bold leading-none ${c.text}`}>{score}</span>
               <span className="text-slate-500 text-xs mt-1">out of 100</span>
@@ -74,6 +83,12 @@ export default function ImaraScoreHero({ report }) {
             <span className="opacity-50">·</span>
             <span>{label}</span>
           </div>
+          {confidence && (
+            <div className={`mt-2 inline-flex items-center gap-1.5 border rounded-full px-2.5 py-0.5 text-[11px] ${confClass}`}>
+              <span>Confidence: {confLabel}</span>
+              {typeof completeness === 'number' && <span className="opacity-60">· {completeness}% of signals</span>}
+            </div>
+          )}
         </div>
 
         {/* Breakdown */}

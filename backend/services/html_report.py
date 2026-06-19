@@ -121,7 +121,9 @@ def generate_html_report(report: dict) -> str:
             if s >= 35: return ORANGE
             return RED
 
-        icol = _imara_col(imara_score)
+        icol = report.get("imara_color") or _imara_col(imara_score)
+        imara_conf = (report.get("imara_confidence") or "").capitalize()
+        imara_compl = report.get("imara_completeness")
         comp_rows = ""
         for c in _imc:
             v = int(round(c.get("value", 0)))
@@ -163,7 +165,7 @@ def generate_html_report(report: dict) -> str:
     </div>
     <div class="imara-breakdown">
       <div class="imara-bd-title">Bankability &amp; Investability</div>
-      <div class="imara-bd-desc">A single composite rating across every specialist analysis, weighted toward what a lender or investor assesses. Weights are re-normalised over the components scored in this analysis.</div>
+      <div class="imara-bd-desc">A single composite rating across every specialist analysis, weighted toward what a lender or investor assesses. Weights are re-normalised over the components scored in this analysis.{(" &middot; <b>Confidence: " + imara_conf + "</b> (" + str(imara_compl) + "% of signals)") if imara_conf else ""}</div>
       {comp_rows}
     </div>
   </div>"""
