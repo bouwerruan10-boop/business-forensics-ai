@@ -146,6 +146,24 @@ def save_error(analysis_id: str, error: str):
             conn.close()
 
 
+def mark_interrupted_analyses() -> int:
+    """Flag analyses still in 'processing' (orphaned by a server restart) as errored,
+    so the frontend gets a clear state instead of polling a job that no longer exists.
+    Call once at startup. Returns the number of rows updated."""
+    now = _utcnow()
+    with _lock:
+        conn = _get_conn()
+        try:
+            cur = conn.execute(
+                "UPDATE analyses SET status='error', "
+                "error='Analysis was interrupted by a server restart. Please run it again.', "
+                "completed_at=? WHERE status='processing'", (now,))
+            conn.commit()
+            return cur.rowcount
+        finally:
+            conn.close()
+
+
 def get_analysis(analysis_id: str) -> dict | None:
     """Return a single analysis row as a dict, or None if not found."""
     with _lock:

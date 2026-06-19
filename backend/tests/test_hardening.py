@@ -367,3 +367,19 @@ def test_independent_agents_merge_in_order_isolate_failure_and_set_fields():
     assert titles == ["market", "legal"]                   # declared order, failure skipped
     assert mem.market_visibility_score == 55
     assert mem.sa_legal_risk_score == 30 and mem.sa_legal_performed
+
+
+# ── Reliability: orphaned-job cleanup survives a restart ───────────────────
+def test_mark_interrupted_analyses(tmp_path, monkeypatch):
+    import services.database as db
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "t.db")
+    db.init_db()
+    db.create_analysis("11111111-1111-1111-1111-111111111111", {"company_name": "X"}, 1)
+    assert db.get_analysis("11111111-1111-1111-1111-111111111111")["status"] == "processing"
+    # a restart leaves it orphaned -> flagged as error
+    assert db.mark_interrupted_analyses() == 1
+    assert db.get_analysis("11111111-1111-1111-1111-111111111111")["status"] == "error"
+    # completed rows must never be touched
+    db.create_analysis("22222222-2222-2222-2222-222222222222", {"company_name": "Y"}, 1)
+    db.save_report("22222222-2222-2222-2222-222222222222", {"ok": True})
+    assert db.mark_interrupted_analyses() == 0

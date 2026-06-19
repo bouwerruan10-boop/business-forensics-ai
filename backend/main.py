@@ -32,7 +32,7 @@ from services.benchmark_service import get_benchmarks, detect_industry
 from services.database import (
     init_db, create_analysis, save_report, save_error,
     get_report, list_analyses, count_analyses, delete_analysis,
-    get_analysis as db_get_analysis,
+    get_analysis as db_get_analysis, mark_interrupted_analyses,
 )
 from agents.ceo_agent import CEOAgent
 from memory.shared_memory import SharedMemory
@@ -72,6 +72,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.on_event("startup")
 def on_startup():
     init_db()
+    _interrupted = mark_interrupted_analyses()
+    if _interrupted:
+        print("[startup] flagged {} interrupted analysis(es) from a previous run".format(_interrupted))
 
 
 # CORS — restrict to the Vercel frontend (+ preview deploys) and local dev,
@@ -205,9 +208,21 @@ async def analyze(
 @app.get("/api/status/{analysis_id}")
 def get_status(analysis_id: str):
     status = analysis_status.get(analysis_id)
-    if not status:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    return status
+    if status:
+        return status
+    # Fall back to SQLite so status survives a server restart (in-memory dict is volatile).
+    row = db_get_analysis(analysis_id)
+    if row:
+        st = row.get("status", "unknown")
+        return {
+            "analysis_id": analysis_id,
+            "status": st,
+            "current_agent": "Analysis complete" if st == "complete" else ("Error" if st == "error" else "Processing"),
+            "message": row.get("error") or "",
+            "error": row.get("error"),
+            "progress": [],
+        }
+    raise HTTPException(status_code=404, detail="Analysis not found")
 
 
 @app.get("/api/report/{analysis_id}")
