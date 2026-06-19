@@ -17,8 +17,9 @@ backend/.env
 .env
 *.env
 
-# Database
-backend/data/
+# Database (ignore the runtime DB only — benchmarks.json IS required app data)
+backend/data/*.db
+backend/data/*.sqlite3
 *.db
 *.sqlite
 *.sqlite3

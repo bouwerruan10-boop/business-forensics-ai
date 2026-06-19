@@ -1,0 +1,944 @@
+{
+  "_source": "Damodaran NYU Stern, January 2026 + CFI industry standards + African market data",
+  "_note": "Margins as decimals. Ratios as absolute values. All figures represent industry medians.",
+  "industries": {
+    "retail_general": {
+      "display_name": "Retail (General)",
+      "keywords": [
+        "retail",
+        "shop",
+        "store",
+        "merchandise",
+        "consumer goods",
+        "ecommerce",
+        "e-commerce"
+      ],
+      "margins": {
+        "gross_margin": 0.332,
+        "operating_margin": 0.082,
+        "net_margin": 0.056,
+        "ebitda_margin": 0.101
+      },
+      "efficiency": {
+        "inventory_turnover_days": 45,
+        "debtor_days": 12,
+        "creditor_days": 35,
+        "asset_turnover": 1.8
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.668,
+        "sga_pct_revenue": 0.209,
+        "labour_pct_revenue": 0.14
+      },
+      "liquidity": {
+        "current_ratio": 1.5,
+        "quick_ratio": 0.8
+      },
+      "leverage": {
+        "debt_to_equity": 0.9,
+        "interest_coverage": 6.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.42,
+        "operating_margin": 0.13,
+        "net_margin": 0.09
+      }
+    },
+    "retail_grocery": {
+      "display_name": "Retail (Grocery & Food)",
+      "keywords": [
+        "grocery",
+        "supermarket",
+        "food retail",
+        "fresh produce",
+        "fmcg"
+      ],
+      "margins": {
+        "gross_margin": 0.263,
+        "operating_margin": 0.026,
+        "net_margin": 0.013,
+        "ebitda_margin": 0.054
+      },
+      "efficiency": {
+        "inventory_turnover_days": 14,
+        "debtor_days": 5,
+        "creditor_days": 28,
+        "asset_turnover": 2.5
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.737,
+        "sga_pct_revenue": 0.217,
+        "labour_pct_revenue": 0.12
+      },
+      "liquidity": {
+        "current_ratio": 0.9,
+        "quick_ratio": 0.4
+      },
+      "leverage": {
+        "debt_to_equity": 1.2,
+        "interest_coverage": 4.5
+      },
+      "top_quartile": {
+        "gross_margin": 0.31,
+        "operating_margin": 0.04,
+        "net_margin": 0.025
+      }
+    },
+    "logistics_trucking": {
+      "display_name": "Logistics & Trucking",
+      "keywords": [
+        "logistics",
+        "trucking",
+        "transport",
+        "freight",
+        "delivery",
+        "courier",
+        "supply chain",
+        "fleet",
+        "haulage"
+      ],
+      "margins": {
+        "gross_margin": 0.212,
+        "operating_margin": 0.073,
+        "net_margin": 0.038,
+        "ebitda_margin": 0.156
+      },
+      "efficiency": {
+        "inventory_turnover_days": 0,
+        "debtor_days": 35,
+        "creditor_days": 42,
+        "asset_turnover": 1.1,
+        "fleet_utilisation_pct": 0.78,
+        "fuel_pct_revenue": 0.22,
+        "labour_pct_revenue": 0.35
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.788,
+        "sga_pct_revenue": 0.062,
+        "labour_pct_revenue": 0.35,
+        "fuel_pct_revenue": 0.22
+      },
+      "liquidity": {
+        "current_ratio": 1.3,
+        "quick_ratio": 1.1
+      },
+      "leverage": {
+        "debt_to_equity": 1.4,
+        "interest_coverage": 5.2
+      },
+      "top_quartile": {
+        "gross_margin": 0.28,
+        "operating_margin": 0.11,
+        "fleet_utilisation_pct": 0.88
+      },
+      "industry_notes": "Fleet utilisation below 75% is considered poor. Fuel typically 20-25% of revenue. Driver costs 30-40% of revenue."
+    },
+    "manufacturing": {
+      "display_name": "Manufacturing",
+      "keywords": [
+        "manufacturing",
+        "production",
+        "factory",
+        "assembly",
+        "fabrication",
+        "industrial",
+        "plant"
+      ],
+      "margins": {
+        "gross_margin": 0.255,
+        "operating_margin": 0.112,
+        "net_margin": 0.079,
+        "ebitda_margin": 0.162
+      },
+      "efficiency": {
+        "inventory_turnover_days": 52,
+        "debtor_days": 42,
+        "creditor_days": 38,
+        "asset_turnover": 0.9,
+        "oee_benchmark": 0.65
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.745,
+        "sga_pct_revenue": 0.09,
+        "labour_pct_revenue": 0.22
+      },
+      "liquidity": {
+        "current_ratio": 1.8,
+        "quick_ratio": 1.0
+      },
+      "leverage": {
+        "debt_to_equity": 1.1,
+        "interest_coverage": 7.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.35,
+        "operating_margin": 0.16,
+        "oee_benchmark": 0.82
+      },
+      "industry_notes": "OEE (Overall Equipment Effectiveness) world-class benchmark is 85%. Below 65% indicates significant capacity waste."
+    },
+    "professional_services": {
+      "display_name": "Professional Services",
+      "keywords": [
+        "consulting",
+        "advisory",
+        "professional services",
+        "accounting firm",
+        "law firm",
+        "audit",
+        "management consulting",
+        "services"
+      ],
+      "margins": {
+        "gross_margin": 0.334,
+        "operating_margin": 0.137,
+        "net_margin": 0.07,
+        "ebitda_margin": 0.157
+      },
+      "efficiency": {
+        "inventory_turnover_days": 0,
+        "debtor_days": 45,
+        "creditor_days": 20,
+        "asset_turnover": 1.4,
+        "revenue_per_employee": 180000,
+        "utilisation_rate": 0.72
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.666,
+        "sga_pct_revenue": 0.179,
+        "labour_pct_revenue": 0.55
+      },
+      "liquidity": {
+        "current_ratio": 1.6,
+        "quick_ratio": 1.5
+      },
+      "leverage": {
+        "debt_to_equity": 0.5,
+        "interest_coverage": 12.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.45,
+        "operating_margin": 0.22,
+        "revenue_per_employee": 250000,
+        "utilisation_rate": 0.82
+      },
+      "industry_notes": "Billable utilisation below 65% is a critical profitability signal. Debtor days above 60 indicate collection issues."
+    },
+    "hospitality_restaurant": {
+      "display_name": "Restaurant & Dining",
+      "keywords": [
+        "restaurant",
+        "dining",
+        "food service",
+        "cafe",
+        "bar",
+        "catering",
+        "hospitality"
+      ],
+      "margins": {
+        "gross_margin": 0.322,
+        "operating_margin": 0.172,
+        "net_margin": 0.094,
+        "ebitda_margin": 0.195
+      },
+      "efficiency": {
+        "inventory_turnover_days": 7,
+        "debtor_days": 3,
+        "creditor_days": 21,
+        "asset_turnover": 1.2,
+        "food_cost_pct": 0.28,
+        "labour_pct_revenue": 0.32
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.678,
+        "sga_pct_revenue": 0.108,
+        "labour_pct_revenue": 0.32,
+        "food_cost_pct": 0.28
+      },
+      "liquidity": {
+        "current_ratio": 0.7,
+        "quick_ratio": 0.5
+      },
+      "leverage": {
+        "debt_to_equity": 1.8,
+        "interest_coverage": 4.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.4,
+        "operating_margin": 0.22,
+        "food_cost_pct": 0.22,
+        "labour_pct_revenue": 0.28
+      },
+      "industry_notes": "Food cost above 35% is critical. Combined food + labour (prime cost) should be below 65% of revenue. Industry benchmark is 28-32% food cost."
+    },
+    "hotel_accommodation": {
+      "display_name": "Hotel & Accommodation",
+      "keywords": [
+        "hotel",
+        "accommodation",
+        "lodging",
+        "resort",
+        "motel",
+        "bed and breakfast",
+        "guesthouse"
+      ],
+      "margins": {
+        "gross_margin": 0.609,
+        "operating_margin": 0.216,
+        "net_margin": 0.104,
+        "ebitda_margin": 0.245
+      },
+      "efficiency": {
+        "debtor_days": 15,
+        "asset_turnover": 0.4,
+        "occupancy_rate": 0.68,
+        "revpar_growth_pct": 0.04
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.391,
+        "sga_pct_revenue": 0.282,
+        "labour_pct_revenue": 0.38
+      },
+      "liquidity": {
+        "current_ratio": 1.1,
+        "quick_ratio": 0.9
+      },
+      "leverage": {
+        "debt_to_equity": 2.5,
+        "interest_coverage": 3.5
+      },
+      "top_quartile": {
+        "gross_margin": 0.7,
+        "operating_margin": 0.28,
+        "occupancy_rate": 0.8
+      },
+      "industry_notes": "Occupancy below 60% is unprofitable at most hotels. RevPAR (Revenue per Available Room) is the key performance metric."
+    },
+    "construction": {
+      "display_name": "Engineering & Construction",
+      "keywords": [
+        "construction",
+        "building",
+        "contracting",
+        "civil engineering",
+        "contractor",
+        "developer",
+        "property development"
+      ],
+      "margins": {
+        "gross_margin": 0.155,
+        "operating_margin": 0.07,
+        "net_margin": 0.059,
+        "ebitda_margin": 0.08
+      },
+      "efficiency": {
+        "inventory_turnover_days": 30,
+        "debtor_days": 55,
+        "creditor_days": 45,
+        "asset_turnover": 1.3,
+        "project_overrun_rate": 0.15
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.845,
+        "sga_pct_revenue": 0.078,
+        "labour_pct_revenue": 0.3
+      },
+      "liquidity": {
+        "current_ratio": 1.4,
+        "quick_ratio": 1.2
+      },
+      "leverage": {
+        "debt_to_equity": 1.3,
+        "interest_coverage": 6.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.22,
+        "operating_margin": 0.1,
+        "debtor_days": 38
+      },
+      "industry_notes": "Gross margins below 10% in construction signal contract pricing issues or excessive subcontractor costs. WIP management is critical."
+    },
+    "healthcare": {
+      "display_name": "Healthcare Services",
+      "keywords": [
+        "healthcare",
+        "medical",
+        "clinic",
+        "hospital",
+        "pharmacy",
+        "health",
+        "dental",
+        "physiotherapy"
+      ],
+      "margins": {
+        "gross_margin": 0.391,
+        "operating_margin": 0.141,
+        "net_margin": 0.063,
+        "ebitda_margin": 0.158
+      },
+      "efficiency": {
+        "debtor_days": 40,
+        "asset_turnover": 0.9,
+        "revenue_per_doctor": 400000,
+        "patient_to_staff_ratio": 3.5
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.609,
+        "sga_pct_revenue": 0.044,
+        "labour_pct_revenue": 0.45
+      },
+      "liquidity": {
+        "current_ratio": 1.5,
+        "quick_ratio": 1.3
+      },
+      "leverage": {
+        "debt_to_equity": 0.8,
+        "interest_coverage": 8.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.5,
+        "operating_margin": 0.2,
+        "debtor_days": 25
+      }
+    },
+    "technology_software": {
+      "display_name": "Software & Technology",
+      "keywords": [
+        "software",
+        "saas",
+        "technology",
+        "tech",
+        "app",
+        "platform",
+        "digital",
+        "it services",
+        "cloud"
+      ],
+      "margins": {
+        "gross_margin": 0.717,
+        "operating_margin": 0.33,
+        "net_margin": 0.255,
+        "ebitda_margin": 0.359
+      },
+      "efficiency": {
+        "debtor_days": 35,
+        "asset_turnover": 0.7,
+        "revenue_per_employee": 300000,
+        "churn_rate_annual": 0.08
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.283,
+        "sga_pct_revenue": 0.244,
+        "rnd_pct_revenue": 0.16,
+        "labour_pct_revenue": 0.42
+      },
+      "liquidity": {
+        "current_ratio": 2.5,
+        "quick_ratio": 2.3
+      },
+      "leverage": {
+        "debt_to_equity": 0.4,
+        "interest_coverage": 20.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.8,
+        "operating_margin": 0.4,
+        "churn_rate_annual": 0.04
+      },
+      "industry_notes": "Annual churn above 15% indicates product-market fit or customer success issues. CAC payback period should be under 18 months."
+    },
+    "financial_services": {
+      "display_name": "Financial Services",
+      "keywords": [
+        "financial services",
+        "insurance",
+        "investment",
+        "wealth management",
+        "fintech",
+        "banking",
+        "asset management"
+      ],
+      "margins": {
+        "gross_margin": 0.692,
+        "operating_margin": 0.208,
+        "net_margin": 0.222,
+        "ebitda_margin": 0.21
+      },
+      "efficiency": {
+        "debtor_days": 20,
+        "asset_turnover": 0.3,
+        "combined_ratio": 0.95,
+        "loss_ratio": 0.65
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.308,
+        "sga_pct_revenue": 0.301,
+        "labour_pct_revenue": 0.38
+      },
+      "liquidity": {
+        "current_ratio": 1.2,
+        "quick_ratio": 1.1
+      },
+      "leverage": {
+        "debt_to_equity": 3.0,
+        "interest_coverage": 5.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.75,
+        "operating_margin": 0.3,
+        "combined_ratio": 0.88
+      }
+    },
+    "agriculture": {
+      "display_name": "Farming & Agriculture",
+      "keywords": [
+        "farming",
+        "agriculture",
+        "agri",
+        "crop",
+        "livestock",
+        "dairy",
+        "poultry",
+        "grain",
+        "farm"
+      ],
+      "margins": {
+        "gross_margin": 0.131,
+        "operating_margin": 0.057,
+        "net_margin": 0.039,
+        "ebitda_margin": 0.08
+      },
+      "efficiency": {
+        "inventory_turnover_days": 60,
+        "debtor_days": 30,
+        "creditor_days": 45,
+        "asset_turnover": 0.5
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.869,
+        "sga_pct_revenue": 0.061,
+        "labour_pct_revenue": 0.18
+      },
+      "liquidity": {
+        "current_ratio": 2.0,
+        "quick_ratio": 0.9
+      },
+      "leverage": {
+        "debt_to_equity": 1.0,
+        "interest_coverage": 5.5
+      },
+      "top_quartile": {
+        "gross_margin": 0.2,
+        "operating_margin": 0.09,
+        "net_margin": 0.07
+      }
+    },
+    "mining": {
+      "display_name": "Metals & Mining",
+      "keywords": [
+        "mining",
+        "metals",
+        "minerals",
+        "gold",
+        "platinum",
+        "coal",
+        "iron ore",
+        "extraction",
+        "quarry"
+      ],
+      "margins": {
+        "gross_margin": 0.347,
+        "operating_margin": 0.244,
+        "net_margin": 0.105,
+        "ebitda_margin": 0.294
+      },
+      "efficiency": {
+        "debtor_days": 28,
+        "creditor_days": 40,
+        "asset_turnover": 0.4,
+        "strip_ratio_benchmark": 4.0
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.653,
+        "sga_pct_revenue": 0.039,
+        "labour_pct_revenue": 0.2
+      },
+      "liquidity": {
+        "current_ratio": 2.2,
+        "quick_ratio": 1.5
+      },
+      "leverage": {
+        "debt_to_equity": 0.7,
+        "interest_coverage": 10.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.45,
+        "operating_margin": 0.35
+      }
+    },
+    "real_estate": {
+      "display_name": "Real Estate",
+      "keywords": [
+        "real estate",
+        "property",
+        "rental",
+        "leasing",
+        "reit",
+        "property management",
+        "estate agent",
+        "realty"
+      ],
+      "margins": {
+        "gross_margin": 0.512,
+        "operating_margin": 0.236,
+        "net_margin": 0.238,
+        "ebitda_margin": 0.272
+      },
+      "efficiency": {
+        "debtor_days": 20,
+        "occupancy_rate": 0.92,
+        "asset_turnover": 0.15
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.488,
+        "sga_pct_revenue": 0.323,
+        "labour_pct_revenue": 0.15
+      },
+      "liquidity": {
+        "current_ratio": 1.3,
+        "quick_ratio": 0.9
+      },
+      "leverage": {
+        "debt_to_equity": 2.8,
+        "interest_coverage": 4.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.65,
+        "operating_margin": 0.35,
+        "occupancy_rate": 0.97
+      }
+    },
+    "wholesale_distribution": {
+      "display_name": "Wholesale & Distribution",
+      "keywords": [
+        "wholesale",
+        "distribution",
+        "distributor",
+        "import",
+        "export",
+        "trading",
+        "commodities"
+      ],
+      "margins": {
+        "gross_margin": 0.154,
+        "operating_margin": 0.028,
+        "net_margin": 0.012,
+        "ebitda_margin": 0.037
+      },
+      "efficiency": {
+        "inventory_turnover_days": 28,
+        "debtor_days": 38,
+        "creditor_days": 32,
+        "asset_turnover": 2.2
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.846,
+        "sga_pct_revenue": 0.124,
+        "labour_pct_revenue": 0.08
+      },
+      "liquidity": {
+        "current_ratio": 1.6,
+        "quick_ratio": 0.9
+      },
+      "leverage": {
+        "debt_to_equity": 1.1,
+        "interest_coverage": 5.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.22,
+        "operating_margin": 0.05,
+        "inventory_turnover_days": 18
+      }
+    },
+    "south_africa_sme": {
+      "display_name": "South Africa SME (General)",
+      "keywords": [
+        "south africa",
+        "sa ",
+        "sme",
+        "pty ltd",
+        "pty",
+        "south african"
+      ],
+      "_source": "SARS tax statistics 2024, CIPC SME report 2024, Absa SME Index Q3 2025",
+      "_note": "Benchmarks calibrated for SA SMEs with revenue R1M-R100M. Margins lower than global peers due to load-shedding, high logistics costs, and rand weakness.",
+      "margins": {
+        "gross_margin": 0.31,
+        "operating_margin": 0.09,
+        "net_margin": 0.055,
+        "ebitda_margin": 0.12
+      },
+      "efficiency": {
+        "inventory_turnover_days": 52,
+        "debtor_days": 45,
+        "creditor_days": 38,
+        "asset_turnover": 1.2
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.69,
+        "sga_pct_revenue": 0.175,
+        "labour_pct_revenue": 0.22,
+        "fuel_pct_revenue": 0.07,
+        "load_shedding_cost_pct": 0.025
+      },
+      "liquidity": {
+        "current_ratio": 1.4,
+        "quick_ratio": 0.9
+      },
+      "leverage": {
+        "debt_to_equity": 1.2,
+        "interest_coverage": 4.5,
+        "prime_rate_note": "SA prime lending rate ~11.75% (2025) -- interest burden materially higher than global benchmarks"
+      },
+      "top_quartile": {
+        "gross_margin": 0.42,
+        "operating_margin": 0.16,
+        "net_margin": 0.1
+      },
+      "african_context": {
+        "load_shedding_risk": "High -- most SMEs lose 4-8% productivity; generator diesel costs average 2-3% of revenue",
+        "rand_hedge_note": "USD/ZAR volatility affects import-heavy businesses -- rand depreciated ~6% in 2024",
+        "b_bbee_note": "B-BBEE compliance costs 0.5-2% of payroll for Level 4+ contributors",
+        "payment_culture": "Debtor days often 50-70 days in practice; government debtors can exceed 90 days"
+      }
+    },
+    "nigeria_general": {
+      "display_name": "Nigeria (General Business)",
+      "keywords": [
+        "nigeria",
+        "nigerian",
+        "lagos",
+        "abuja",
+        "naira",
+        "ngn"
+      ],
+      "_source": "CBN SME survey 2024, PWC Nigeria Business Outlook 2025, KPMG Nigeria Economic Outlook 2025",
+      "_note": "Nigerian benchmarks reflect naira devaluation impact, high inflation (28%+ in 2024), and significant informal economy. Margins vary widely by sector and FX exposure.",
+      "margins": {
+        "gross_margin": 0.28,
+        "operating_margin": 0.07,
+        "net_margin": 0.04,
+        "ebitda_margin": 0.11
+      },
+      "efficiency": {
+        "inventory_turnover_days": 65,
+        "debtor_days": 55,
+        "creditor_days": 42,
+        "asset_turnover": 1.0
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.72,
+        "sga_pct_revenue": 0.19,
+        "labour_pct_revenue": 0.18,
+        "fuel_diesel_pct_revenue": 0.09,
+        "fx_hedging_cost_pct": 0.03
+      },
+      "liquidity": {
+        "current_ratio": 1.3,
+        "quick_ratio": 0.8
+      },
+      "leverage": {
+        "debt_to_equity": 1.4,
+        "interest_coverage": 3.0,
+        "mpr_note": "CBN Monetary Policy Rate ~27.5% (2024) -- formal credit extremely expensive; most SMEs rely on informal funding"
+      },
+      "top_quartile": {
+        "gross_margin": 0.4,
+        "operating_margin": 0.14,
+        "net_margin": 0.09
+      },
+      "african_context": {
+        "fx_risk": "Critical -- NGN devalued 70%+ in 2023-24; dollar-denominated inputs create severe margin pressure",
+        "power_cost": "Generator costs average 8-12% of revenue for manufacturing/retail; grid reliability under 50%",
+        "inflation_note": "28%+ inflation in 2024 erodes real margins rapidly; pricing must be reviewed monthly",
+        "payment_terms": "Advance payment common in B2B; credit terms 30-45 days for established relationships only"
+      }
+    },
+    "kenya_general": {
+      "display_name": "Kenya (General Business)",
+      "keywords": [
+        "kenya",
+        "kenyan",
+        "nairobi",
+        "mombasa",
+        "shilling",
+        "kes",
+        "east africa"
+      ],
+      "_source": "CBK Monetary Policy statement 2024, Kenya National Bureau of Statistics 2024, EY Kenya Business Pulse 2025",
+      "_note": "Kenya benchmarks reflect a more stable macro environment vs West Africa peers. Mobile money (M-Pesa) reduces cash-collection friction.",
+      "margins": {
+        "gross_margin": 0.33,
+        "operating_margin": 0.1,
+        "net_margin": 0.065,
+        "ebitda_margin": 0.135
+      },
+      "efficiency": {
+        "inventory_turnover_days": 48,
+        "debtor_days": 40,
+        "creditor_days": 35,
+        "asset_turnover": 1.3
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.67,
+        "sga_pct_revenue": 0.17,
+        "labour_pct_revenue": 0.2,
+        "fuel_pct_revenue": 0.065,
+        "mobile_payment_fee_pct": 0.008
+      },
+      "liquidity": {
+        "current_ratio": 1.45,
+        "quick_ratio": 0.95
+      },
+      "leverage": {
+        "debt_to_equity": 1.1,
+        "interest_coverage": 4.8,
+        "cbr_note": "CBK base rate ~13% (2024) -- lending rates 16-18% for SMEs; mobile loans at 24-36% APR"
+      },
+      "top_quartile": {
+        "gross_margin": 0.44,
+        "operating_margin": 0.17,
+        "net_margin": 0.11
+      },
+      "african_context": {
+        "mobile_money": "M-Pesa penetration >80% -- reduces debtor days vs regional peers; integrate for faster collections",
+        "fx_note": "KES depreciated 20% in 2023 but stabilised in 2024 -- import businesses should hedge USD exposure",
+        "tax_environment": "VAT 16%, corporation tax 30%; iTax system modernised but compliance overhead remains 2-4% of revenue",
+        "east_africa_trade": "EAC common market offers expansion -- Uganda/Tanzania trade corridors growing"
+      }
+    },
+    "zimbabwe_general": {
+      "display_name": "Zimbabwe (General Business)",
+      "keywords": [
+        "zimbabwe",
+        "zimbabwean",
+        "harare",
+        "bulawayo",
+        "zig",
+        "zwl",
+        "usd zim"
+      ],
+      "_source": "RBZ Monetary Policy Statement 2024, CZI Survey 2024, KPMG Zimbabwe 2025",
+      "_note": "Zimbabwe operates a dual currency economy (ZiG + USD). Most serious businesses price/settle in USD. Persistent power/forex/supply-chain challenges depress margins materially.",
+      "margins": {
+        "gross_margin": 0.25,
+        "operating_margin": 0.065,
+        "net_margin": 0.038,
+        "ebitda_margin": 0.095
+      },
+      "efficiency": {
+        "inventory_turnover_days": 42,
+        "debtor_days": 38,
+        "creditor_days": 28,
+        "asset_turnover": 0.9
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.75,
+        "sga_pct_revenue": 0.155,
+        "labour_pct_revenue": 0.175,
+        "power_generator_pct_revenue": 0.12,
+        "forex_premium_pct": 0.04
+      },
+      "liquidity": {
+        "current_ratio": 1.2,
+        "quick_ratio": 0.75
+      },
+      "leverage": {
+        "debt_to_equity": 0.7,
+        "interest_coverage": 3.5,
+        "note": "Low formal debt due to inaccessible credit; most businesses self-fund or use local banks at 20-28% USD rates"
+      },
+      "top_quartile": {
+        "gross_margin": 0.35,
+        "operating_margin": 0.12,
+        "net_margin": 0.08
+      },
+      "african_context": {
+        "currency_risk": "Critical -- ZiG (Gold-backed) launched April 2024; price in USD to protect margins. Parallel rate risk remains.",
+        "power_cost": "ZESA supply <12 hours/day nationally; generator diesel 8-15% of revenue for most businesses",
+        "import_dependency": "Most inputs imported via SA -- Beitbridge corridor delays add 3-7 days lead time and 2-5% cost premium",
+        "cash_economy": "High USD cash usage -- cash management and vault security are real operating costs",
+        "diaspora_market": "Diaspora remittances (USD 1.5B/yr) create strong demand in retail/services -- target Ecocash USD wallet segment"
+      }
+    },
+    "general": {
+      "display_name": "General Business",
+      "keywords": [],
+      "margins": {
+        "gross_margin": 0.378,
+        "operating_margin": 0.144,
+        "net_margin": 0.097,
+        "ebitda_margin": 0.166
+      },
+      "efficiency": {
+        "inventory_turnover_days": 35,
+        "debtor_days": 35,
+        "creditor_days": 35,
+        "asset_turnover": 1.0
+      },
+      "cost_ratios": {
+        "cogs_pct_revenue": 0.622,
+        "sga_pct_revenue": 0.16,
+        "labour_pct_revenue": 0.25
+      },
+      "liquidity": {
+        "current_ratio": 1.5,
+        "quick_ratio": 1.0
+      },
+      "leverage": {
+        "debt_to_equity": 1.0,
+        "interest_coverage": 7.0
+      },
+      "top_quartile": {
+        "gross_margin": 0.5,
+        "operating_margin": 0.22,
+        "net_margin": 0.15
+      }
+    }
+  },
+  "universal_thresholds": {
+    "current_ratio": {
+      "critical": 0.8,
+      "warning": 1.0,
+      "healthy": 1.5,
+      "note": "Below 1.0 means liabilities exceed current assets -- liquidity crisis risk"
+    },
+    "debtor_days": {
+      "excellent": 20,
+      "good": 35,
+      "warning": 50,
+      "critical": 70,
+      "note": "Every 10 days over benchmark ties up approximately 2.7% of annual revenue in working capital"
+    },
+    "creditor_days": {
+      "too_fast": 15,
+      "optimal": 30,
+      "warning": 60,
+      "critical": 90,
+      "note": "Paying suppliers too fast hurts cash flow; too slow damages supplier relationships and credit terms"
+    },
+    "labour_pct_revenue": {
+      "excellent": 0.2,
+      "good": 0.3,
+      "warning": 0.4,
+      "critical": 0.5
+    },
+    "gross_margin_decline_per_year": {
+      "watch": 0.01,
+      "warning": 0.03,
+      "critical": 0.05
+    }
+  },
+  "working_capital_formula": "Working Capital Days = Inventory Days + Debtor Days - Creditor Days",
+  "cash_conversion_cycle_note": "Every 1 day reduction in cash conversion cycle frees approximately (Annual Revenue / 365) in cash"
+}

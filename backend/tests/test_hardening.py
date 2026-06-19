@@ -88,6 +88,7 @@ def _stub(agent_cls, raw):
     a = agent_cls()
     a._call_claude = lambda *x, **k: raw
     a._parse_findings = lambda raw, mem: []
+    a._build_benchmark_block = lambda mem: ""  # isolate from the data file
     return a
 
 
@@ -122,6 +123,7 @@ def test_forecast_agent_extracts_json():
 def test_fraud_agent_fallback_without_json():
     m = SharedMemory()
     a = FraudDetectionAgent()
+    a._build_benchmark_block = lambda mem: ""
     a._call_claude = lambda *x, **k: "no json here"
     a._parse_findings = lambda raw, mem: [_finding("Fraud & Anomaly Detection Agent", "high", "Ghost employees")]
     a.analyze({}, m)
