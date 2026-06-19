@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
+// Full pipeline, in execution order — must match the agents the backend actually
+// runs (CEO + market scan + 15 specialists + market deep-dive + 2 SA compliance).
+// Derived from the real progress feed; no hard-coded total/ETA.
 const AGENT_ORDER = [
   'CEO Agent',
+  'Market Research Agent',
   'Financial Forensics Agent',
   'Accounting Agent',
   'Auditor Agent',
@@ -13,10 +17,18 @@ const AGENT_ORDER = [
   'Procurement Agent',
   'Strategy Agent',
   'Legal Risk Agent',
+  'Fraud & Anomaly Detection Agent',
+  'Credit Readiness Agent',
+  'Valuation Agent',
+  'Forecast Agent',
+  'Market Intelligence Agent',
+  'SA Tax Compliance Agent',
+  'SA Corporate Law & BBBEE Agent',
 ]
 
 const AGENT_ICONS = {
   'CEO Agent': '💼',
+  'Market Research Agent': '🔭',
   'Financial Forensics Agent': '💰',
   'Accounting Agent': '📊',
   'Auditor Agent': '🔍',
@@ -28,22 +40,55 @@ const AGENT_ICONS = {
   'Procurement Agent': '🛒',
   'Strategy Agent': '♟️',
   'Legal Risk Agent': '⚖️',
+  'Fraud & Anomaly Detection Agent': '🚨',
+  'Credit Readiness Agent': '🏦',
+  'Valuation Agent': '💎',
+  'Forecast Agent': '🔮',
+  'Market Intelligence Agent': '🌐',
+  'SA Tax Compliance Agent': '🧾',
+  'SA Corporate Law & BBBEE Agent': '⚖️',
+}
+
+function fmtDuration(sec) {
+  sec = Math.max(0, Math.round(sec))
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
 }
 
 export default function AnalysisProgress({ status, profile }) {
-  const [completedAgents, setCompletedAgents] = useState([])
   const currentAgent = status?.current_agent || 'Initialising...'
   const progress = status?.progress || []
 
-  // Build completed agent list from progress log
+  // Live elapsed timer (resets when this screen mounts, i.e. when the run starts)
+  const startRef = useRef(Date.now())
+  const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
-    const names = [...new Set(progress.map(p => p.agent).filter(a => a !== currentAgent))]
-    setCompletedAgents(names)
-  }, [progress, currentAgent])
+    const t = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 1000)
+    return () => clearInterval(t)
+  }, [])
 
-  const totalAgents = 12
+  // Completed = unique agent names seen in the feed, excluding the one running now
+  const seen = [...new Set(progress.map(p => p.agent).filter(Boolean))]
+  const completedAgents = seen.filter(a => a !== currentAgent)
+
+  const totalAgents = AGENT_ORDER.length
   const completedCount = completedAgents.length
-  const pct = Math.min(95, Math.round((completedCount / totalAgents) * 100))
+  const pct = Math.min(98, Math.round((completedCount / totalAgents) * 100))
+
+  // Honest, dynamic ETA derived from the observed pace — no fabricated "3–8 min".
+  let etaLabel = `A full analysis runs ${totalAgents} AI specialists — this can take several minutes.`
+  if (completedCount >= 2) {
+    const perAgent = elapsed / completedCount
+    const remaining = perAgent * (totalAgents - completedCount)
+    etaLabel = `Elapsed ${fmtDuration(elapsed)} · about ${fmtDuration(remaining)} remaining`
+  } else if (elapsed > 4) {
+    etaLabel = `Elapsed ${fmtDuration(elapsed)} · estimating remaining time…`
+  }
+
+  const headerLabel = currentAgent
+    .replace(' is conducting investigation...', '')
+    .replace(' conducting investigation...', '')
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -54,13 +99,11 @@ export default function AnalysisProgress({ status, profile }) {
           <span className="pulse-dot pulse-dot-2 w-2 h-2 rounded-full bg-gold inline-block" />
           <span className="pulse-dot pulse-dot-3 w-2 h-2 rounded-full bg-gold inline-block" />
         </div>
-        <h2 className="text-xl font-bold text-white mb-1">
-          {currentAgent.replace(' is conducting investigation...', '')}
-        </h2>
+        <h2 className="text-xl font-bold text-white mb-1">{headerLabel}</h2>
         <p className="text-slate-500 text-sm">
           {profile?.company_name} · {profile?.currency} · Analysis in progress
         </p>
-        <p className="text-slate-600 text-xs mt-1">Estimated time: 3–8 minutes</p>
+        <p className="text-slate-600 text-xs mt-1">{etaLabel}</p>
       </div>
 
       {/* Progress bar */}
@@ -82,11 +125,10 @@ export default function AnalysisProgress({ status, profile }) {
         <div className="px-4 py-3 border-b border-white/[0.06]">
           <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Agent Activity</span>
         </div>
-        <div className="divide-y divide-white/[0.04] max-h-80 overflow-y-auto">
+        <div className="divide-y divide-white/[0.04] max-h-96 overflow-y-auto">
           {AGENT_ORDER.map(agent => {
-            const isDone = completedAgents.includes(agent)
-            const isRunning = currentAgent.includes(agent.replace(' Agent', ''))
-              || currentAgent === agent
+            const isRunning = currentAgent === agent
+            const isDone = !isRunning && completedAgents.includes(agent)
             const isPending = !isDone && !isRunning
 
             return (
@@ -100,16 +142,14 @@ export default function AnalysisProgress({ status, profile }) {
                   {AGENT_ICONS[agent] || '🤖'}
                 </span>
                 <span className={`text-sm flex-1 ${
-                  isDone ? 'text-slate-400'
-                  : isRunning ? 'text-white font-medium'
+                  isRunning ? 'text-white font-medium'
+                  : isDone ? 'text-slate-400'
                   : 'text-slate-600'
                 }`}>
                   {agent}
                 </span>
                 <span className="flex-shrink-0">
-                  {isDone && (
-                    <span className="text-emerald-400 text-sm">✓</span>
-                  )}
+                  {isDone && <span className="text-emerald-400 text-sm">✓</span>}
                   {isRunning && (
                     <span className="flex gap-0.5">
                       <span className="pulse-dot w-1.5 h-1.5 rounded-full bg-gold inline-block" />
