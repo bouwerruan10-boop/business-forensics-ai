@@ -79,38 +79,23 @@ generic business language."""
         from agents.parallel import run_agent_waves
         run_agent_waves(ALL_AGENTS, business_data, memory, progress_callback)
 
-        # Phase 2b: Market deep dive — full intelligence after all specialists
-        if progress_callback:
-            progress_callback("Market Intelligence Agent", "Conducting deep market research and competitor analysis...")
-        market_deep = MarketDeepDiveAgent()
-        try:
-            market_findings = market_deep.analyze(business_data, memory)
-            for f in market_findings:
-                memory.add_finding(f)
-        except Exception as exc:
-            print(f"[pipeline] MarketDeepDiveAgent failed, skipping: {exc}")
-
-        # Phase 2c: SA Tax Compliance Agent
-        if progress_callback:
-            progress_callback("SA Tax Compliance Agent", "Reviewing SARS tax obligations — VAT, CIT, PAYE, provisional tax...")
-        sa_tax = SATaxAgent()
-        try:
-            sa_tax_findings = sa_tax.analyze(business_data, memory)
-            for f in sa_tax_findings:
-                memory.add_finding(f)
-        except Exception as exc:
-            print(f"[pipeline] SATaxAgent failed, skipping: {exc}")
-
-        # Phase 2d: SA Corporate Law & BBBEE Agent
-        if progress_callback:
-            progress_callback("SA Corporate Law & BBBEE Agent", "Reviewing Companies Act, BBBEE, POPIA, CIPC compliance...")
-        sa_legal = SALegalAgent()
-        try:
-            sa_legal_findings = sa_legal.analyze(business_data, memory)
-            for f in sa_legal_findings:
-                memory.add_finding(f)
-        except Exception as exc:
-            print(f"[pipeline] SALegalAgent failed, skipping: {exc}")
+        # Phases 2b–2d: market deep-dive + SA tax + SA legal are independent of one
+        # another (each reads the specialist findings and writes its own fields), so run
+        # them in PARALLEL rather than sequentially. Synthesis (Phase 3) waits for all.
+        from agents.parallel import run_independent_agents
+        run_independent_agents(
+            [
+                (MarketDeepDiveAgent(), "Market Intelligence Agent",
+                 "Conducting deep market research and competitor analysis..."),
+                (SATaxAgent(), "SA Tax Compliance Agent",
+                 "Reviewing SARS tax obligations..."),
+                (SALegalAgent(), "SA Corporate Law & BBBEE Agent",
+                 "Reviewing Companies Act, BBBEE, POPIA, CIPC compliance..."),
+            ],
+            business_data, memory, progress_callback,
+            header=("SA Tax Compliance Agent",
+                    "Running SA compliance + market intelligence in parallel..."),
+        )
 
         # Phase 2e: Faithfulness check — flag findings whose cited metrics
         # conflict with the deterministically computed ratios.

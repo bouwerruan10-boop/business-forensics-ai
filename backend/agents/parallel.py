@@ -63,3 +63,39 @@ def run_agent_waves(all_agents, business_data, memory, progress_callback=None,
     wave2 = [C for C in all_agents if getattr(C, "name", "") in wave2_names]
     _run_wave(wave1, business_data, memory, progress_callback, "Specialist Agents", max_workers)
     _run_wave(wave2, business_data, memory, progress_callback, "Specialist Agents", max_workers)
+
+
+def run_independent_agents(items, business_data, memory, progress_callback=None,
+                           header=None, max_workers=3):
+    """Run a set of MUTUALLY-INDEPENDENT agent instances concurrently.
+
+    Each item is (agent, label, message). Every agent.analyze() reads the existing
+    findings read-only and writes its OWN disjoint scalar fields on memory, so the
+    agents don't interfere. Findings are collected and merged back in list order for
+    deterministic output. Used for the pre-synthesis tail (market deep-dive + SA tax
+    + SA legal), which previously ran sequentially.
+    """
+    if not items:
+        return
+    if progress_callback and header:
+        progress_callback(header[0], header[1])
+
+    def _one(item):
+        agent, label, _msg = item
+        try:
+            fnds = agent.analyze(business_data, memory)
+        except Exception as exc:
+            print("[pipeline] {} failed, skipping: {}".format(label, exc))
+            fnds = []
+        if progress_callback:
+            progress_callback(label, "{} complete".format(label))
+        return fnds
+
+    results = [[] for _ in items]
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(items))) as ex:
+        futs = {ex.submit(_one, item): i for i, item in enumerate(items)}
+        for fut in as_completed(futs):
+            results[futs[fut]] = fut.result() or []
+    for fnds in results:
+        for f in fnds:
+            memory.add_finding(f)

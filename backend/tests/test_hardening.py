@@ -338,3 +338,32 @@ def test_parallel_wave_isolates_a_failing_agent():
     run_agent_waves([_fake_agent("Operations Agent", fail=True), _fake_agent("Sales Agent")], {}, mem)
     assert len(mem.findings) == 1                 # only the healthy agent contributed
     assert len(mem.agent_timings) == 2            # both still timed/observed
+
+
+# ── Phase 2b–2d: parallel independent tail (market + SA tax + SA legal) ─────
+from agents.parallel import run_independent_agents
+
+def test_independent_agents_merge_in_order_isolate_failure_and_set_fields():
+    mem = _SM()
+    def mk(title, **fields):
+        class _A:
+            def analyze(self, bd, m):
+                for k, v in fields.items():
+                    setattr(m, k, v)
+                return [_AF(agent=title, category="C", severity="low", title=title,
+                            detail="d", financial_impact="R1", recommendation="r", roi_estimate="x",
+                            cost_of_inaction="y", benchmark_reference="b", quick_win=False)]
+        return _A()
+    class Boom:
+        def analyze(self, bd, m):
+            raise RuntimeError("x")
+    items = [
+        (mk("market", market_visibility_score=55), "Market Intelligence Agent", ""),
+        (Boom(), "SA Tax Compliance Agent", ""),           # fails -> isolated
+        (mk("legal", sa_legal_risk_score=30, sa_legal_performed=True), "SA Corporate Law & BBBEE Agent", ""),
+    ]
+    run_independent_agents(items, {}, mem)
+    titles = [f.title for f in mem.findings]
+    assert titles == ["market", "legal"]                   # declared order, failure skipped
+    assert mem.market_visibility_score == 55
+    assert mem.sa_legal_risk_score == 30 and mem.sa_legal_performed
