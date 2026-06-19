@@ -293,3 +293,48 @@ def test_faithfulness_no_ratios_is_safe():
     f = _Fnd("Gross margin 21.3%")
     summary = verify_findings([f], {})
     assert f.verification == "" and summary["checked"] == 0
+
+
+# ── Phase 0: eval harness (deterministic, runs in CI) ──────────────────────
+from evals.grader import load_cases, grade_deterministic, deterministic_report
+
+def test_golden_cases_exist():
+    cases = load_cases()
+    assert len(cases) >= 2
+
+def test_deterministic_eval_passes_on_golden_set():
+    # Each golden case's computed ratios must match its known-correct expectations.
+    rep = deterministic_report()
+    for r in rep["results"]:
+        assert r["passed"] == r["total"], (r["name"], [c for c in r["checks"] if not c["pass"]])
+    assert rep["overall_score"] == 100
+
+
+# ── Phase 2: parallel specialist waves ─────────────────────────────────────
+from agents.parallel import run_agent_waves
+from memory.shared_memory import SharedMemory as _SM, AgentFinding as _AF
+
+def _fake_agent(agent_name, fail=False):
+    def analyze(self, business_data, memory):
+        if fail:
+            raise RuntimeError("boom")
+        return [_AF(agent=agent_name, category="C", severity="low", title=agent_name + " finding",
+                    detail="d", financial_impact="R1", recommendation="r", roi_estimate="x",
+                    cost_of_inaction="y", benchmark_reference="b", quick_win=False)]
+    return type("A_" + agent_name.replace(" ", "_"), (), {"name": agent_name, "analyze": analyze})
+
+def test_parallel_waves_run_all_and_merge_in_declared_order():
+    mem = _SM()
+    classes = [_fake_agent("Financial Forensics Agent"), _fake_agent("Strategy Agent"),
+               _fake_agent("Accounting Agent"), _fake_agent("Valuation Agent")]
+    run_agent_waves(classes, {"financial": {}}, mem)
+    timed = [t["agent"] for t in mem.agent_timings]
+    # Wave 1 (base) merged before Wave 2 (synthesis), each in declared order.
+    assert timed == ["Financial Forensics Agent", "Accounting Agent", "Strategy Agent", "Valuation Agent"]
+    assert len(mem.findings) == 4
+
+def test_parallel_wave_isolates_a_failing_agent():
+    mem = _SM()
+    run_agent_waves([_fake_agent("Operations Agent", fail=True), _fake_agent("Sales Agent")], {}, mem)
+    assert len(mem.findings) == 1                 # only the healthy agent contributed
+    assert len(mem.agent_timings) == 2            # both still timed/observed

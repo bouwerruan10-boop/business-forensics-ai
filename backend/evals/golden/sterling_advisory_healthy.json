@@ -1,0 +1,19 @@
+{
+  "name": "Sterling Advisory (healthy)",
+  "industry_key": "professional_services",
+  "annual_revenue": 6000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 6000000\nCost of sales: 1800000\nGross profit: 4200000\nOperating expenses: 3000000\nOperating profit: 1200000\nFinance costs: 60000\nNet profit: 860000\nCurrent assets: 2000000\nInventory: 0\nTrade receivables: 500000\nCurrent liabilities: 700000\nTrade payables: 250000\nTotal borrowings: 400000\nEquity: 2500000",
+  "expected_ratios": {
+    "gross_margin": 70.0,
+    "net_margin": 14.33,
+    "operating_margin": 20.0,
+    "current_ratio": 2.86,
+    "debtor_days": 30.42,
+    "debt_to_equity": 0.16,
+    "interest_coverage": 20.0
+  },
+  "expected_status": { "current_ratio": "good", "debt_to_equity": "good" },
+  "planted_issues": [],
+  "imara_band_in": ["A", "B", "C"]
+}

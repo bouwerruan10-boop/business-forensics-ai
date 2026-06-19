@@ -74,22 +74,10 @@ generic business language."""
         except Exception as exc:
             print(f"[pipeline] Market scout failed, skipping: {exc}")
 
-        # Phase 2: Specialist agents (now enriched with market_context_summary)
-        # Each agent is isolated — one agent failing must not sink the whole analysis.
-        for AgentClass in ALL_AGENTS:
-            agent = AgentClass()
-            if progress_callback:
-                progress_callback(agent.name, f"{agent.name} conducting investigation...")
-            _t = time.perf_counter()
-            try:
-                findings = agent.analyze(business_data, memory)
-                for f in findings:
-                    memory.add_finding(f)
-            except Exception as exc:
-                print(f"[pipeline] {agent.name} failed, skipping: {exc}")
-                if progress_callback:
-                    progress_callback(agent.name, f"{agent.name} skipped (error)")
-            memory.agent_timings.append({"agent": agent.name, "seconds": round(time.perf_counter() - _t, 1)})
+        # Phase 2: Specialist agents — run as two parallel waves (see agents/parallel.py).
+        # Wave 1 base analysts, then Wave 2 synthesis agents that see Wave-1 findings.
+        from agents.parallel import run_agent_waves
+        run_agent_waves(ALL_AGENTS, business_data, memory, progress_callback)
 
         # Phase 2b: Market deep dive — full intelligence after all specialists
         if progress_callback:

@@ -1,0 +1,19 @@
+{
+  "name": "Mzansi Retail (struggling)",
+  "industry_key": "retail_general",
+  "annual_revenue": 8000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 8000000\nCost of sales: 5344000\nGross profit: 2656000\nOperating expenses: 2000000\nOperating profit: 656000\nFinance costs: 180000\nNet profit: 448000\nCurrent assets: 2400000\nInventory: 900000\nTrade receivables: 1200000\nCurrent liabilities: 1600000\nTrade payables: 700000\nTotal borrowings: 1800000\nEquity: 2000000",
+  "expected_ratios": {
+    "gross_margin": 33.2,
+    "net_margin": 5.6,
+    "operating_margin": 8.2,
+    "current_ratio": 1.5,
+    "debtor_days": 54.75,
+    "debt_to_equity": 0.9,
+    "interest_coverage": 3.64
+  },
+  "expected_status": { "debtor_days": "critical" },
+  "planted_issues": ["debtor", "working capital", "margin"],
+  "imara_band_in": ["C", "D", "E"]
+}
