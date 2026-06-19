@@ -14,6 +14,8 @@ function FindingCard({ finding }) {
   return (
     <div className={`bg-navy-card border border-white/[0.08] border-l-4 ${s.border} rounded-xl overflow-hidden card-hover`}>
       <button
+        type="button"
+        aria-expanded={expanded}
         onClick={() => setExpanded(e => !e)}
         className="w-full text-left px-5 py-4 flex items-start gap-3"
       >
@@ -109,6 +111,7 @@ export default function FindingsList({ findings = [] }) {
 
   const filterBtn = (val, label) => (
     <button
+      type="button"
       key={val}
       onClick={() => setFilter(val)}
       className={`text-xs px-3 py-1.5 rounded-lg border transition-colors font-medium ${

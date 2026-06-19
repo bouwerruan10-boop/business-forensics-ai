@@ -69,7 +69,7 @@ export default function App() {
         } else if (s.status === 'error') {
           clearInterval(pollRef.current)
           setError(s.error || 'Analysis failed. Please try again.')
-          setPhase('upload')
+          setPhase('intake')
         }
       } catch (e) { /* network hiccup — keep polling */ }
     }, 2000)

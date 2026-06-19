@@ -62,3 +62,23 @@ html { scroll-behavior: smooth; }
   border-color: rgba(201,168,76,0.3) !important;
   box-shadow: 0 0 0 1px rgba(201,168,76,0.1);
 }
+
+/* Accessibility: visible keyboard focus (WCAG 2.4.11 Focus Appearance) */
+:focus-visible {
+  outline: 2px solid #D4AF6A;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Don't show the focus ring for mouse users who didn't tab */
+:focus:not(:focus-visible) { outline: none; }
+
+/* Screen-reader-only utility (for chart data fallbacks / labels) */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

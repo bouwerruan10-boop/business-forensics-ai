@@ -9,6 +9,7 @@ import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
 import MarketIntelligence from './MarketIntelligence'
 import SACompliancePanel from './SACompliancePanel'
+import SectionNav from './SectionNav'
 
 function Section({ id, title, subtitle, children }) {
   return (
@@ -147,6 +148,20 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     return allFindings
   })()
 
+  const navItems = [
+    { id: 'summary', label: 'Executive Summary' },
+    { id: 'scores', label: 'Health Scores' },
+    ...(report.financial_ratios && Object.keys(report.financial_ratios).length > 0 ? [{ id: 'fundamentals', label: 'Financial Fundamentals' }] : []),
+    ...(allFindingsFlat.some(f => f.quick_win) ? [{ id: 'quickwins', label: 'Quick Wins' }] : []),
+    { id: 'findings', label: 'All Findings' },
+    { id: 'roadmap', label: 'Roadmap' },
+    ...((report.credit_score > 0 || (report.fraud_risk_level && report.fraud_risk_level !== 'unknown')) ? [{ id: 'credit', label: 'Credit & Fraud' }] : []),
+    ...((report.valuation_mid > 0 || report.forecast_base_12m > 0) ? [{ id: 'valuation', label: 'Valuation & Forecast' }] : []),
+    ...((report.market_search_performed || report.market_visibility_score > 0) ? [{ id: 'market', label: 'Market Intelligence' }] : []),
+    ...((report.sa_tax_performed || report.sa_legal_performed) ? [{ id: 'sa-compliance', label: 'SA Compliance' }] : []),
+    { id: 'simulator', label: 'What-If Simulator' },
+  ]
+
   return (
     <div>
       <ReportActions
@@ -155,6 +170,10 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         onNewAnalysis={onNewAnalysis}
         showToast={showToast}
       />
+
+      <div className="xl:flex xl:gap-8 xl:items-start">
+        <SectionNav items={navItems} />
+        <div className="min-w-0 flex-1">
 
       {/* Executive Summary */}
       <Section id="summary" title="Executive Summary">
@@ -266,6 +285,8 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
       >
         <Simulator analysisId={analysisId} currency={report.currency} />
       </Section>
+        </div>
+      </div>
     </div>
   )
 }
