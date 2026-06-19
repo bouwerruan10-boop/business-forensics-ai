@@ -171,7 +171,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         showToast={showToast}
       />
 
-      <div className="xl:flex xl:gap-8 xl:items-start">
+      <div className="lg:flex lg:gap-8 lg:items-start">
         <SectionNav items={navItems} />
         <div className="min-w-0 flex-1">
 

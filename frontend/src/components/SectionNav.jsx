@@ -29,7 +29,7 @@ export default function SectionNav({ items = [] }) {
   if (!items.length) return null
 
   return (
-    <nav aria-label="Report sections" className="hidden xl:block w-52 shrink-0">
+    <nav aria-label="Report sections" className="hidden lg:block w-52 shrink-0">
       <div className="sticky top-20">
         <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-2 px-2">On this page</div>
         <ul className="space-y-0.5">
