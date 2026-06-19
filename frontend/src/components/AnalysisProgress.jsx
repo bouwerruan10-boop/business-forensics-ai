@@ -62,6 +62,7 @@ export default function AnalysisProgress({ status, profile }) {
 
   // Live elapsed timer (resets when this screen mounts, i.e. when the run starts)
   const startRef = useRef(Date.now())
+  const targetRef = useRef(null)  // monotonic finish-time estimate (ms)
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setElapsed((Date.now() - startRef.current) / 1000), 1000)
@@ -79,11 +80,18 @@ export default function AnalysisProgress({ status, profile }) {
   // Honest, dynamic ETA derived from the observed pace — no fabricated "3–8 min".
   let etaLabel = `A full analysis runs ${totalAgents} AI specialists — this can take several minutes.`
   if (completedCount >= 2) {
+    // Monotonic ETA: the estimate may only pull the finish line EARLIER, never later,
+    // so the displayed countdown never increases. Agents finish in parallel bursts, which
+    // would otherwise make a naive elapsed/completed estimate jump up between waves.
     const perAgent = elapsed / completedCount
-    const remaining = perAgent * (totalAgents - completedCount)
-    etaLabel = `Elapsed ${fmtDuration(elapsed)} · about ${fmtDuration(remaining)} remaining`
+    const candidate = Date.now() + perAgent * (totalAgents - completedCount) * 1000
+    targetRef.current = targetRef.current == null ? candidate : Math.min(targetRef.current, candidate)
+    const remaining = Math.max(0, (targetRef.current - Date.now()) / 1000)
+    etaLabel = remaining > 3
+      ? `Elapsed ${fmtDuration(elapsed)} \u00b7 about ${fmtDuration(remaining)} remaining`
+      : `Elapsed ${fmtDuration(elapsed)} \u00b7 finishing up\u2026`
   } else if (elapsed > 4) {
-    etaLabel = `Elapsed ${fmtDuration(elapsed)} · estimating remaining time…`
+    etaLabel = `Elapsed ${fmtDuration(elapsed)} \u00b7 estimating remaining time\u2026`
   }
 
   const headerLabel = currentAgent
