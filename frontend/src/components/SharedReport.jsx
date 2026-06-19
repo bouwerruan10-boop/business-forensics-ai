@@ -3,7 +3,7 @@ import Dashboard from './Dashboard'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-export default function SharedReport({ analysisId, showToast }) {
+export default function SharedReport({ analysisId, token, showToast }) {
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -12,8 +12,12 @@ export default function SharedReport({ analysisId, showToast }) {
     const load = async () => {
       setLoading(true)
       try {
-        const res = await fetch(`${API_BASE}/api/report/${analysisId}`)
-        if (!res.ok) throw new Error(res.status === 404 ? 'Report not found' : 'Failed to load report')
+        const endpoint = token ? `${API_BASE}/api/shared/${token}` : `${API_BASE}/api/report/${analysisId}`
+        const res = await fetch(endpoint)
+        if (!res.ok) {
+          if (res.status === 410) throw new Error('This shared link has expired or been revoked.')
+          throw new Error(res.status === 404 ? 'Report not found' : 'Failed to load report')
+        }
         const r = await res.json()
         setReport(r)
       } catch (e) {
@@ -22,8 +26,8 @@ export default function SharedReport({ analysisId, showToast }) {
         setLoading(false)
       }
     }
-    if (analysisId) load()
-  }, [analysisId])
+    if (analysisId || token) load()
+  }, [analysisId, token])
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -39,7 +43,7 @@ export default function SharedReport({ analysisId, showToast }) {
   if (error) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
       <div className="text-4xl mb-4">🔍</div>
-      <h2 className="text-white font-semibold mb-2">Report Not Found</h2>
+      <h2 className="text-white font-semibold mb-2">{error && error.includes('expired') ? 'Link Expired' : 'Report Not Found'}</h2>
       <p className="text-slate-500 text-sm mb-6">{error}</p>
       <a
         href={window.location.pathname}

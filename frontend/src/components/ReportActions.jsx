@@ -13,6 +13,8 @@ export default function ReportActions({ analysisId, businessName, onNewAnalysis,
   const [htmlLoading, setHtmlLoading]   = useState(false)
   const [audience, setAudience]         = useState('owner')
   const [showAudiencePicker, setShowAudiencePicker] = useState(false)
+  const [showShare, setShowShare]       = useState(false)
+  const [sharing, setSharing]           = useState(false)
 
   const slug = (businessName || 'report').replace(/\s+/g, '_')
 
@@ -20,8 +22,7 @@ export default function ReportActions({ analysisId, businessName, onNewAnalysis,
     setPdfLoading(true)
     showToast(`Generating ${audience} PDF…`)
     try {
-      const url = `${API_BASE}/api/report/${analysisId}/pdf?audience=${audience}`
-      const res = await fetch(url)
+      const res = await fetch(`${API_BASE}/api/report/${analysisId}/pdf?audience=${audience}`)
       if (!res.ok) throw new Error('PDF generation failed')
       const blob = await res.blob()
       const link = document.createElement('a')
@@ -40,8 +41,7 @@ export default function ReportActions({ analysisId, businessName, onNewAnalysis,
     setHtmlLoading(true)
     showToast('Generating interactive report…')
     try {
-      const url = `${API_BASE}/api/report/${analysisId}/html`
-      const res = await fetch(url)
+      const res = await fetch(`${API_BASE}/api/report/${analysisId}/html`)
       if (!res.ok) throw new Error('HTML generation failed')
       const blob = await res.blob()
       const link = document.createElement('a')
@@ -56,9 +56,27 @@ export default function ReportActions({ analysisId, businessName, onNewAnalysis,
     }
   }
 
-  const copyShareLink = () => {
+  const copyPermanentLink = () => {
     const url = `${window.location.origin}${window.location.pathname}#/report/${analysisId}`
-    navigator.clipboard.writeText(url).then(() => showToast('Share link copied!'))
+    navigator.clipboard.writeText(url).then(() => showToast('Permanent link copied!'))
+    setShowShare(false)
+  }
+
+  const copyExpiringLink = async (days) => {
+    setSharing(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/report/${analysisId}/share?expires_in_days=${days}`, { method: 'POST' })
+      if (!res.ok) throw new Error('Could not create link')
+      const { token } = await res.json()
+      const url = `${window.location.origin}${window.location.pathname}#/shared/${token}`
+      await navigator.clipboard.writeText(url)
+      showToast(`${days}-day link copied!`)
+    } catch (e) {
+      showToast('Could not create link: ' + e.message, 'error')
+    } finally {
+      setSharing(false)
+      setShowShare(false)
+    }
   }
 
   const currentAudience = AUDIENCE_OPTIONS.find(o => o.value === audience)
@@ -71,59 +89,65 @@ export default function ReportActions({ analysisId, businessName, onNewAnalysis,
         <div className="flex items-center gap-2 ml-auto flex-wrap">
           {/* Audience picker */}
           <div className="relative">
-            <button
-              onClick={() => setShowAudiencePicker(v => !v)}
-              className="flex items-center gap-1.5 border border-white/10 text-slate-300 hover:border-gold/40 hover:text-gold text-xs px-3 py-2 rounded-lg transition-colors"
-            >
-              <span className="text-slate-500">Report for:</span>
+            <button type="button" onClick={() => setShowAudiencePicker(v => !v)} aria-expanded={showAudiencePicker}
+              className="flex items-center gap-1.5 border border-white/10 text-slate-300 hover:border-gold/40 hover:text-gold text-xs px-3 py-2 rounded-lg transition-colors">
+              <span className="text-slate-400">Report for:</span>
               <span className="text-gold font-bold">{currentAudience?.label}</span>
-              <span className="text-slate-500">▾</span>
+              <span className="text-slate-400" aria-hidden="true">▾</span>
             </button>
             {showAudiencePicker && (
               <div className="absolute top-full mt-1 left-0 w-48 bg-[#0D1B2A] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
                 {AUDIENCE_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
+                  <button key={opt.value} type="button"
                     onClick={() => { setAudience(opt.value); setShowAudiencePicker(false) }}
-                    className={`w-full text-left px-4 py-2.5 text-xs hover:bg-white/5 transition-colors ${audience === opt.value ? 'text-gold' : 'text-slate-300'}`}
-                  >
+                    className={`w-full text-left px-4 py-2.5 text-xs hover:bg-white/5 transition-colors ${audience === opt.value ? 'text-gold' : 'text-slate-300'}`}>
                     <div className="font-bold">{opt.label}</div>
-                    <div className="text-slate-500">{opt.desc}</div>
+                    <div className="text-slate-400">{opt.desc}</div>
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* PDF download */}
-          <button
-            onClick={downloadPdf}
-            disabled={pdfLoading}
-            className="flex items-center gap-1.5 bg-gold hover:bg-gold-light disabled:opacity-50 text-navy font-bold text-xs px-4 py-2 rounded-lg transition-colors"
-          >
+          <button type="button" onClick={downloadPdf} disabled={pdfLoading}
+            className="flex items-center gap-1.5 bg-gold hover:bg-gold-light disabled:opacity-50 text-navy font-bold text-xs px-4 py-2 rounded-lg transition-colors">
             ↓ {pdfLoading ? 'Generating…' : 'PDF'}
           </button>
 
-          {/* Interactive HTML download */}
-          <button
-            onClick={downloadHtml}
-            disabled={htmlLoading}
-            className="flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 disabled:opacity-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors hidden sm:flex"
-          >
+          <button type="button" onClick={downloadHtml} disabled={htmlLoading}
+            className="flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 disabled:opacity-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors hidden sm:flex">
             ⬡ {htmlLoading ? 'Building…' : 'Interactive'}
           </button>
 
-          <button
-            onClick={copyShareLink}
-            className="flex items-center gap-1.5 border border-white/10 text-slate-400 hover:border-gold/40 hover:text-gold text-xs px-4 py-2 rounded-lg transition-colors"
-          >
-            🔗
-          </button>
+          {/* Share dropdown — permanent or expiring links */}
+          <div className="relative">
+            <button type="button" onClick={() => setShowShare(v => !v)} aria-expanded={showShare} aria-label="Share report"
+              className="flex items-center gap-1.5 border border-white/10 text-slate-300 hover:border-gold/40 hover:text-gold text-xs px-3 py-2 rounded-lg transition-colors">
+              🔗 <span className="hidden sm:inline">Share</span> <span className="text-slate-400" aria-hidden="true">▾</span>
+            </button>
+            {showShare && (
+              <div className="absolute top-full mt-1 right-0 w-56 bg-[#0D1B2A] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                <button type="button" onClick={copyPermanentLink} disabled={sharing}
+                  className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-white/5 transition-colors">
+                  <div className="font-bold">Copy link</div>
+                  <div className="text-slate-400">Permanent — works until revoked</div>
+                </button>
+                <button type="button" onClick={() => copyExpiringLink(7)} disabled={sharing}
+                  className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-white/5 transition-colors border-t border-white/[0.06]">
+                  <div className="font-bold">Copy 7-day link</div>
+                  <div className="text-slate-400">Expires automatically in a week</div>
+                </button>
+                <button type="button" onClick={() => copyExpiringLink(30)} disabled={sharing}
+                  className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-white/5 transition-colors border-t border-white/[0.06]">
+                  <div className="font-bold">Copy 30-day link</div>
+                  <div className="text-slate-400">Expires automatically in a month</div>
+                </button>
+              </div>
+            )}
+          </div>
 
-          <button
-            onClick={onNewAnalysis}
-            className="border border-white/10 text-slate-400 hover:border-white/20 hover:text-white text-xs px-4 py-2 rounded-lg transition-colors hidden sm:block"
-          >
+          <button type="button" onClick={onNewAnalysis}
+            className="border border-white/10 text-slate-400 hover:border-white/20 hover:text-white text-xs px-4 py-2 rounded-lg transition-colors hidden sm:block">
             + New
           </button>
         </div>

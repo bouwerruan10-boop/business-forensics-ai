@@ -19,6 +19,7 @@ export default function App() {
   const [error, setError] = useState(null)
   const [toast, setToast] = useState(null)
   const [sharedId, setSharedId] = useState(null)
+  const [sharedToken, setSharedToken] = useState(null)
   const pollRef = useRef(null)
 
   // Hash routing — handle /report/:id URLs
@@ -26,10 +27,13 @@ export default function App() {
     const checkHash = () => {
       const hash = window.location.hash
       const match = hash.match(/^#\/report\/([a-f0-9-]{36})$/)
+      const tokenMatch = hash.match(/^#\/shared\/([A-Za-z0-9_-]+)$/)
       if (match) {
-        setSharedId(match[1])
+        setSharedId(match[1]); setSharedToken(null)
+      } else if (tokenMatch) {
+        setSharedToken(tokenMatch[1]); setSharedId(null)
       } else {
-        setSharedId(null)
+        setSharedId(null); setSharedToken(null)
       }
     }
     checkHash()
@@ -113,8 +117,8 @@ export default function App() {
     }
   }
 
-  // Shared report view (hash routing)
-  if (sharedId) {
+  // Shared report view (hash routing) — by analysis id or by share token
+  if (sharedId || sharedToken) {
     return (
       <div className="min-h-screen bg-navy font-sans">
         <Navbar
@@ -126,7 +130,7 @@ export default function App() {
           }}
           showToast={showToast}
         />
-        <SharedReport analysisId={sharedId} showToast={showToast} />
+        <SharedReport analysisId={sharedId} token={sharedToken} showToast={showToast} />
         <Toast toast={toast} />
       </div>
     )
