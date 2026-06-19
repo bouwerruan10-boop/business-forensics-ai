@@ -87,9 +87,17 @@ export default function AnalysisProgress({ status, profile }) {
     const candidate = Date.now() + perAgent * (totalAgents - completedCount) * 1000
     targetRef.current = targetRef.current == null ? candidate : Math.min(targetRef.current, candidate)
     const remaining = Math.max(0, (targetRef.current - Date.now()) / 1000)
-    etaLabel = remaining > 3
-      ? `Elapsed ${fmtDuration(elapsed)} \u00b7 about ${fmtDuration(remaining)} remaining`
-      : `Elapsed ${fmtDuration(elapsed)} \u00b7 finishing up\u2026`
+    // "finishing up" must reflect real progress, not an exhausted estimate: only show it
+    // when genuinely near done. If the (optimistic) estimate runs out earlier while the
+    // slow tail is still running, say "still working" instead of a misleading "finishing up".
+    const nearDone = completedCount >= totalAgents - 2
+    if (nearDone) {
+      etaLabel = `Elapsed ${fmtDuration(elapsed)} \u00b7 finishing up\u2026`
+    } else if (remaining > 3) {
+      etaLabel = `Elapsed ${fmtDuration(elapsed)} \u00b7 about ${fmtDuration(remaining)} remaining`
+    } else {
+      etaLabel = `Elapsed ${fmtDuration(elapsed)} \u00b7 still working\u2026`
+    }
   } else if (elapsed > 4) {
     etaLabel = `Elapsed ${fmtDuration(elapsed)} \u00b7 estimating remaining time\u2026`
   }
