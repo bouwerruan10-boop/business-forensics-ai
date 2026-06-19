@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Navbar from './components/Navbar'
-import BusinessProfile from './components/BusinessProfile'
-import FileUpload from './components/FileUpload'
+import SmartIntake from './components/SmartIntake'
 import AnalysisProgress from './components/AnalysisProgress'
 import Dashboard from './components/Dashboard'
 import AdminDashboard from './components/AdminDashboard'
@@ -12,7 +11,7 @@ import { uploadFiles, pollStatus, getReport } from './api/client'
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default function App() {
-  const [phase, setPhase] = useState('profile') // profile | upload | analyzing | done | admin
+  const [phase, setPhase] = useState('intake') // intake | analyzing | done | admin
   const [profile, setProfile] = useState(null)
   const [analysisId, setAnalysisId] = useState(null)
   const [status, setStatus] = useState(null)
@@ -43,20 +42,16 @@ export default function App() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  const handleProfileComplete = (profileData) => {
-    setProfile(profileData)
-    setPhase('upload')
-  }
-
-  const startAnalysis = async (files) => {
+  const startAnalysis = async (files, profileData) => {
     setError(null)
+    setProfile(profileData)
     setPhase('analyzing')
     try {
-      const { analysis_id } = await uploadFiles(files, profile)
+      const { analysis_id } = await uploadFiles(files, profileData)
       setAnalysisId(analysis_id)
     } catch (e) {
       setError(e.message)
-      setPhase('upload')
+      setPhase('intake')
     }
   }
 
@@ -97,7 +92,7 @@ export default function App() {
   }
 
   const resetAll = () => {
-    setPhase('profile')
+    setPhase('intake')
     setProfile(null)
     setReport(null)
     setAnalysisId(null)
@@ -148,20 +143,9 @@ export default function App() {
       />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {phase === 'profile' && (
+        {phase === 'intake' && (
           <div className="fade-in">
-            <BusinessProfile onComplete={handleProfileComplete} onDemo={loadDemo} />
-          </div>
-        )}
-
-        {phase === 'upload' && (
-          <div className="fade-in">
-            <FileUpload
-              profile={profile}
-              onAnalyze={startAnalysis}
-              onBack={() => setPhase('profile')}
-              error={error}
-            />
+            <SmartIntake onAnalyze={startAnalysis} onDemo={loadDemo} error={error} />
           </div>
         )}
 

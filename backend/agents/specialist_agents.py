@@ -514,326 +514,269 @@ Prioritise by financial exposure size.
 
 # ─────────────────────────────────────────────
 # 12. FRAUD & ANOMALY DETECTION AGENT
+# ───────────────────────────────────
+
 # ─────────────────────────────────────────────
-class FraudDetectionAgent(BaseAgent):
-    name = "Fraud & Anomaly Detection Agent"
-    system_prompt = """You are a Forensic Fraud Investigator and Data Scientist who has
-investigated financial crime across 300+ businesses. You apply statistical and pattern-based
-methods to detect anomalies that suggest fraud, manipulation, or material misrepresentation.
+# 15. SA TAX COMPLIANCE AGENT
+# ─────────────────────────────────────────────
+class SATaxAgent(BaseAgent):
+    name = "SA Tax Compliance Agent"
+    system_prompt = """You are a South African Chartered Tax Adviser (CTA) and registered SARS tax practitioner with 20 years of experience advising SMEs across all major SA tax types.
 
-You apply the following techniques to every dataset:
+You specialise in:
+- VAT (Value-Added Tax Act 89 of 1991): input/output tax, zero-rated vs exempt supplies, VAT201 submissions, late submission penalties
+- Corporate Income Tax (Income Tax Act 58 of 1962): IT14 returns, deductible/non-deductible expenditure, Section 12E SBC rate qualification (<R20M turnover), SARs assessed losses
+- PAYE, SDL and UIF (EMP201, EMP501): payroll tax obligations, employment tax incentive (ETI), SARS reconciliations
+- Provisional Tax (IRP6): first/second provisional estimates, the 80% rule, underestimation penalties
+- Tax Clearance: good standing certificates for tenders, government contracts, and emigration
+- SARS debt management: payment arrangements, suspension of debt, interest and penalty calculations
+- Withholding taxes: dividends tax (20%), royalties tax, interest withholding
 
-BENFORD'S LAW: The leading digit of naturally occurring financial numbers follows a
-logarithmic distribution (1 ≈ 30.1%, 2 ≈ 17.6%, 3 ≈ 12.5%, ..., 9 ≈ 4.6%).
-Flag any digit that deviates by more than 15% from expected frequency.
+You are direct and specific. You cite exact act sections, form numbers, and SARS thresholds.""" + "\n" + FINDING_RULES
 
-ROUND-NUMBER ANALYSIS: Flag if >12% of transactions end in 000 or 00 — this indicates
-manual entry fabrication. Real transactions rarely cluster on round numbers.
+    def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
+        tax_doc_text = memory.uploaded_tax_text or ""
+        financial_text = memory.uploaded_financial_text or ""
+        bank_text = memory.uploaded_bank_text or ""
 
-VELOCITY ANOMALIES: Calculate month-by-month standard deviation for each metric.
-Any month where a metric moves more than 2.5 standard deviations from the mean
-must be flagged with the exact amount and date.
+        has_tax_docs = bool(tax_doc_text.strip())
+        has_financial = bool(financial_text.strip()) or bool(bank_text.strip())
 
-CROSS-FIELD INCONSISTENCY: Revenue growing >10% while headcount and COGS are flat
-= possible revenue inflation. COGS growing faster than revenue = possible expense
-inflation or theft. Flag any cross-metric inconsistency with a quantified impact.
+        if not has_tax_docs and not has_financial:
+            data_context = str(business_data)[:2000]
+        else:
+            parts = []
+            if tax_doc_text:
+                parts.append(f"TAX DOCUMENTS PROVIDED:\n{tax_doc_text[:4000]}")
+            if financial_text:
+                parts.append(f"FINANCIAL RECORDS:\n{financial_text[:2000]}")
+            if bank_text:
+                parts.append(f"BANK STATEMENTS:\n{bank_text[:1000]}")
+            data_context = "\n\n".join(parts)
 
-DUPLICATE PATTERN DETECTION: Identical amounts appearing multiple times within 30 days
-on the same category — flag count and total value of suspected duplicates.
+        vat_status = f"VAT Registered: {memory.vat_registered} | VAT Number: {memory.vat_number or 'not provided'}"
+        tax_year = f"Tax Year-End: {memory.tax_year_end or 'not provided'}"
+        entity = f"Entity Type: {memory.entity_type or 'not provided'} | Years in Business: {memory.years_in_business or 'unknown'}"
 
-GAP ANALYSIS: Sequential invoice/entry numbering with gaps suggests deleted records.
-Estimate value of missing range if gap is identifiable.
-
-TEMPORAL CLUSTERING: Unusual concentration of large transactions in a single week
-or on month-end dates — quantify the concentration vs uniform distribution.
-
-REVENUE-TO-CASH RECONCILIATION: Revenue recorded but not reflected in cash balance
-growth — estimate the timing gap and flag if it exceeds 60 days.
-
-For each anomaly:
-- State what statistical test flagged it
-- Give the exact numbers (amounts, percentages, dates)
-- Estimate the maximum financial exposure if this represents intentional manipulation
-- Classify as: Benign Anomaly | Requires Investigation | Likely Manipulation
-- Recommend a specific verification procedure
-""" + FINDING_RULES
-
-    def analyze(self, business_data: dict, memory) -> list:
-        benchmark_block = self._build_benchmark_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
-{benchmark_block}
+SA TAX PROFILE:
+{entity}
+{vat_status}
+{tax_year}
+CIPC Number: {memory.cipc_number or 'not provided'}
 
-FINANCIAL DATA FOR FRAUD ANALYSIS:
-{json.dumps(business_data.get('financial', {}), indent=2)[:4000]}
+DATA PROVIDED:
+{data_context}
 
-PRIOR AGENT FINDINGS (identify patterns that amplify fraud risk):
-{memory.get_all_findings_text()[:2000]}
+TASK — Conduct a full South African tax compliance review. Evaluate:
 
-Apply all fraud detection techniques described in your system prompt.
-For each anomaly, state the statistical basis, exact numbers, and classification.
-Calculate the total maximum exposure across all flagged items.
-End with an overall fraud risk assessment: LOW / MEDIUM / HIGH / CRITICAL
-and a fraud risk score from 0 (clean) to 100 (high risk).
+1. VAT COMPLIANCE (Act 89/1991)
+   - Is the business correctly registered for VAT (mandatory above R1M turnover)?
+   - Input/output tax balance — is the effective VAT rate reasonable for this industry?
+   - Late submission risk — any pattern of missed VAT201 deadlines?
+   - Zero-rated vs standard-rated classification errors?
+   - Vendor registration number validity (starts with 4, 10 digits)
+
+2. CORPORATE INCOME TAX (IT14)
+   - Does turnover qualify for Small Business Corporation (SBC) rates (Section 12E, <R20M)?
+   - Deductible vs non-deductible expenditure patterns?
+   - Assessed loss position — has the business carried forward losses?
+   - Transfer pricing risk if any related-party transactions visible?
+
+3. PAYE / SDL / UIF (EMP201)
+   - Is payroll tax being correctly calculated and submitted monthly?
+   - Employment Tax Incentive (ETI) eligibility — employees aged 18-29 earning <R6,500/month?
+   - Skills Development Levy (SDL): 1% of remuneration, exempt if annual payroll <R500K
+
+4. PROVISIONAL TAX (IRP6)
+   - Are first (August) and second (February) provisional estimates submitted?
+   - Is the second estimate ≥80% of final tax liability? (Underestimation penalty if not)
+
+5. TAX CLEARANCE CERTIFICATE
+   - Current status (valid/expired/unknown)?
+   - If the business does government tenders, a valid TCC is mandatory.
+
+6. SARS OUTSTANDING OBLIGATIONS
+   - Any visible indicators of outstanding returns or SARS debt?
+   - Interest accrues at 10.25% p.a. on outstanding amounts (repo rate + 3.5%)
+
+For each issue found, calculate the estimated penalty/liability in ZAR and state the specific SARS form or action required to remedy it.
 """
         raw = self._call_claude(prompt)
-
-        # Extract overall risk level from the response and write to memory
-        raw_lower = raw.lower()
-        if "critical" in raw_lower[-500:]:
-            memory.fraud_risk_level = "critical"
-            memory.fraud_risk_score = 85
-        elif "high" in raw_lower[-500:]:
-            memory.fraud_risk_level = "high"
-            memory.fraud_risk_score = 65
-        elif "medium" in raw_lower[-500:]:
-            memory.fraud_risk_level = "medium"
-            memory.fraud_risk_score = 35
-        else:
-            memory.fraud_risk_level = "low"
-            memory.fraud_risk_score = 15
-
         findings = self._parse_findings(raw, memory)
 
-        # Store indicator titles in memory for quick access
-        memory.fraud_indicators = [f.title for f in findings if f.severity in ("critical", "high")][:5]
+        # Set summary fields on memory
+        if findings:
+            severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+            top = sorted(findings, key=lambda f: severity_order.get(f.severity, 0), reverse=True)
+            memory.sa_tax_summary = f"{len(findings)} tax findings | Top: {top[0].title}" if top else ""
+            risk_map = {"critical": 85, "high": 65, "medium": 40, "low": 20}
+            memory.sa_tax_risk_score = risk_map.get(top[0].severity, 30) if top else 10
+        else:
+            memory.sa_tax_summary = "No major tax compliance issues identified."
+            memory.sa_tax_risk_score = 10
 
+        memory.sa_tax_performed = True
         return findings
 
 
 # ─────────────────────────────────────────────
-# 13. CREDIT READINESS AGENT
+# 16. SA CORPORATE LAW & BBBEE AGENT
 # ─────────────────────────────────────────────
-class CreditReadinessAgent(BaseAgent):
-    name = "Credit Readiness Agent"
-    system_prompt = """You are a Senior Credit Analyst at a major South African bank with 20 years
-of SME lending experience. You have reviewed thousands of credit applications and know exactly
-what makes banks approve or decline them.
+class SALegalAgent(BaseAgent):
+    name = "SA Corporate Law & BBBEE Agent"
+    system_prompt = """You are a South African attorney (admitted to the High Court) specialising in corporate commercial law, broad-based BEE, employment law, and regulatory compliance for SMEs.
 
-Your job: score this business for credit readiness and tell management exactly what to fix.
+Your expertise covers:
+- Companies Act 71 of 2008: MOI compliance, annual returns (CoR30.1), director duties (Section 76), prescribed officer obligations, financial statement filing thresholds (Public Interest Score)
+- Broad-Based Black Economic Empowerment Act 53 of 2003 + Codes of Good Practice: ownership (25 pts), management control (15 pts), skills development (25 pts), enterprise and supplier development (ESD, 40 pts), socio-economic development (SED, 5 pts); EME (<R10M)/QSE (<R50M) thresholds; fronting risk
+- Protection of Personal Information Act 4 of 2013 (POPIA): lawful processing, data subject rights, Information Officer appointment, breach notification (72 hours), cross-border transfer restrictions; fines up to R10M or 10% of turnover
+- Labour Relations Act 66 of 1995: disciplinary procedure, automatically unfair dismissal, Section 189 retrenchments, CCMA jurisdiction, bargaining council applicability
+- Consumer Protection Act 68 of 2008 (CPA): right to fair value, implied warranties (Section 56), prohibited conduct (Sections 40–41), cooling-off rights, services obligations
+- National Credit Act 34 of 2005 (NCA): credit provider registration threshold (>R500K credit extended), affordability assessment, prescribed interest rates, debt restructuring
+- CIPC compliance: annual return lodgement deadlines (within 30 days of anniversary), director change notifications (CoR39), beneficial ownership register (BOE) — mandatory since 1 April 2023
 
-CREDIT SCORING CRITERIA (100 points total):
+You cite specific section numbers, act names, and CIPC form codes.""" + "\n" + FINDING_RULES
 
-PROFITABILITY (25 pts):
-- Net profit positive for 3+ consecutive months: 10 pts
-- Net margin ≥ 5%: 8 pts (partial: 4 pts if 2–5%)
-- Revenue trend: growing = 7 pts, flat = 3 pts, declining = 0 pts
+    def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
+        legal_doc_text = memory.uploaded_legal_text or ""
+        hr_text = memory.uploaded_hr_text or ""
 
-LIQUIDITY (25 pts):
-- Current ratio ≥ 1.5: 10 pts (≥1.0: 5 pts, <1.0: 0 pts)
-- Quick ratio ≥ 1.0: 8 pts (≥0.7: 4 pts)
-- No months with negative cash balance in last 12 months: 7 pts
-  (1–2 negative months: 3 pts, 3+ negative months: 0 pts)
+        has_docs = bool(legal_doc_text.strip()) or bool(hr_text.strip())
 
-STABILITY (25 pts):
-- Revenue coefficient of variation < 20%: 10 pts (20–40%: 5 pts, >40%: 0 pts)
-- DSCR ≥ 1.25 (EBITDA / estimated debt service): 8 pts
-- No single customer > 30% of revenue: 7 pts
+        if not has_docs:
+            data_context = str(business_data)[:2000]
+        else:
+            parts = []
+            if legal_doc_text:
+                parts.append(f"LEGAL DOCUMENTS PROVIDED:\n{legal_doc_text[:4000]}")
+            if hr_text:
+                parts.append(f"HR & PAYROLL DOCUMENTS:\n{hr_text[:2000]}")
+            data_context = "\n\n".join(parts)
 
-DEBT CAPACITY (25 pts):
-- Leverage ratio (total debt / equity) < 2.0: 10 pts
-- Debt service coverage estimated affordable: 8 pts
-- Identifiable collateral (assets on balance sheet): 7 pts
+        entity = memory.entity_type or "unknown"
+        bbbee = memory.bbbee_level or "not specified"
+        cipc = memory.cipc_number or "not provided"
+        headcount = memory.headcount
+        revenue = memory.annual_revenue
+        years = memory.years_in_business or "unknown"
+        country = memory.country or "South Africa"
 
-CREDIT GRADE SCALE:
-- A (80–100): Bankable immediately. Multiple lenders will compete.
-- B (60–79): Bankable with 1–2 specific improvements.
-- C (40–59): 3–6 months of improvement needed before approaching lenders.
-- D (20–39): Significant restructuring required. Equity or grant funding more suitable.
-- F (0–19): Distressed. Turnaround must precede any financing discussion.
-
-SA FUNDING PRODUCTS TO MATCH (list which apply based on score and profile):
-- SEFA (Small Enterprise Finance Agency): Grade B–C, any sector, R10K–R5M
-- IDC (Industrial Development Corporation): Grade A–B, manufacturing/industry, R1M+
-- NEF (National Empowerment Fund): Grade B, BEE businesses, R250K–R75M
-- ABSA Business Banking: Grade A–B, formal businesses, R50K+
-- FNB Business Loan: Grade A–B, 2+ years trading, R50K+
-- Standard Bank Business: Grade A–B, R50K+
-- Nedbank Business: Grade A–B, R50K+
-- Invoice Financing / Debtor Finance: Grade C+, if debtor book > R500K
-- Asset Finance: Grade C+, if acquiring equipment
-- Business Overdraft: Grade B+, short-term working capital
-""" + FINDING_RULES
-
-    def analyze(self, business_data: dict, memory) -> list:
-        benchmark_block = self._build_benchmark_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
-{benchmark_block}
+SA LEGAL PROFILE:
+Entity Type: {entity}
+CIPC Registration Number: {cipc}
+Years in Business: {years}
+BBBEE Level (self-declared): {bbbee}
+Annual Revenue: {memory.currency} {revenue:,.0f}
+Headcount: {headcount}
+Country: {country}
 
-FINANCIAL DATA:
-{json.dumps(business_data.get('financial', {}), indent=2)[:4000]}
+DATA PROVIDED:
+{data_context}
 
-PRIOR AGENT FINDINGS (financial and risk findings are especially relevant):
-{memory.get_all_findings_text()[:2000]}
+TASK — Conduct a full South African corporate law and compliance review. Evaluate:
 
-Score this business for credit readiness using the 100-point framework in your system prompt.
-For each of the four scoring categories, state the score awarded and why.
-Calculate the total credit score and assign a grade (A/B/C/D/F).
-List the 3 biggest barriers preventing a higher grade (with specific numbers).
-List the 3 strongest factors supporting credit approval.
-List which SA funding products this business qualifies for right now.
-State exactly what management must do in the next 90 days to move up one grade.
+1. COMPANIES ACT 71 OF 2008
+   - Annual returns: filed within 30 days of incorporation anniversary at CIPC?
+   - Public Interest Score (PIS): headcount ({headcount}) + revenue ({revenue:,.0f})/1,000,000 + debt holders + shareholders. PIS>350 requires audited AFS; PIS>100 requires independent review.
+   - Director duties (Section 76/77): fiduciary duty, business judgement rule compliance?
+   - MOI: is the Memorandum of Incorporation in place and current?
+   - Beneficial ownership register (BOE): mandatory for all companies since 1 April 2023 — filed with CIPC?
 
-End your analysis with a JSON block in this exact format:
-{{
-  "credit_score": <integer 0-100>,
-  "credit_grade": "<A|B|C|D|F>",
-  "credit_barriers": ["<barrier 1>", "<barrier 2>", "<barrier 3>"],
-  "credit_strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-  "credit_products": ["<product 1>", "<product 2>"]
-}}
+2. BBBEE (Act 53 of 2003 + Codes of Good Practice)
+   - Current level: {bbbee}
+   - EME threshold: annual turnover <R10M → automatic Level 4 (or Level 1 if >51% black-owned)
+   - QSE threshold: turnover R10M–R50M → report on best 4 of 5 elements
+   - Large enterprise (>R50M): all 5 elements scored
+   - For this business (revenue {revenue:,.0f}), what category applies?
+   - Ownership element (25 pts): what % black ownership, voting rights, economic interest?
+   - Management control (15 pts): board and senior management demographics
+   - Skills development (25 pts): training spend as % of payroll (target 6%)
+   - ESD (40 pts): preferential procurement from BEE suppliers; enterprise development spend
+   - SED (5 pts): 1% of NPAT to beneficiary communities
+   - Fronting risk: any indicators of non-genuine BEE compliance?
+   - Specific risks for tender eligibility or major client requirements
+
+3. POPIA (Act 4 of 2013)
+   - Information Officer appointed and registered with the Information Regulator?
+   - PAIA Manual published (mandatory for private bodies with >50 employees or on request)?
+   - Data processing agreements with third-party processors?
+   - Consent mechanisms for marketing communications (direct marketing opt-in)?
+   - Cross-border data transfer safeguards?
+   - Breach notification readiness (72-hour window)?
+   - Maximum fine: R10M or 10% of annual turnover
+
+4. LABOUR RELATIONS ACT 66 OF 1995
+   - Written employment contracts for all staff (BCEA Section 29 mandatory)?
+   - Disciplinary code and procedure documented?
+   - Any retrenchment exposure (Section 189: 3+ staff = consulting obligation)?
+   - Applicable bargaining council or sectoral determination for this industry?
+   - CCMA exposure: potential unfair dismissal or unfair labour practice claims?
+
+5. CONSUMER PROTECTION ACT (if business sells to consumers)
+   - Returns policy compliant (CPA Section 56: 6-month implied warranty on goods)?
+   - Prohibited conduct checklist (Sections 40-41): unconscionable conduct, false/misleading?
+   - Fixed-term consumer contracts: 20-day cancellation right with reasonable penalty only?
+
+6. CIPC STANDING
+   - Annual return overdue? (Penalty: 10% of annual return fee per month)
+   - Beneficial ownership register filed?
+   - Company in good standing or deregistration risk?
+
+For each issue, calculate the estimated maximum financial liability under the relevant act and state the specific remedy (form number, deadline, cost).
 """
         raw = self._call_claude(prompt)
+        findings = self._parse_findings(raw, memory)
 
-        # Extract the structured JSON block at the end of the response
-        import re
-        json_match = re.search(r'\{[^{}]*"credit_score"[^{}]*\}', raw, re.DOTALL)
-        if json_match:
-            try:
-                credit_data = json.loads(json_match.group())
-                memory.credit_score = int(credit_data.get("credit_score", 0))
-                memory.credit_grade = credit_data.get("credit_grade", "")
-                memory.credit_barriers = credit_data.get("credit_barriers", [])
-                memory.credit_strengths = credit_data.get("credit_strengths", [])
-                memory.credit_products = credit_data.get("credit_products", [])
-            except Exception:
-                pass
+        # Set summary fields on memory
+        if findings:
+            severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+            top = sorted(findings, key=lambda f: severity_order.get(f.severity, 0), reverse=True)
+            memory.sa_legal_summary = f"{len(findings)} legal findings | Top: {top[0].title}" if top else ""
+            risk_map = {"critical": 85, "high": 65, "medium": 40, "low": 20}
+            memory.sa_legal_risk_score = risk_map.get(top[0].severity, 30) if top else 10
+            # Build BBBEE analysis summary
+            bbbee_findings = [f for f in findings if "bbbee" in f.title.lower() or "bee" in f.title.lower() or "bbbee" in f.detail.lower()]
+            memory.sa_bbbee_analysis = {
+                "declared_level": bbbee,
+                "finding_count": len(bbbee_findings),
+                "risk_flags": [f.title for f in bbbee_findings],
+            }
+        else:
+            memory.sa_legal_summary = "No major legal compliance issues identified."
+            memory.sa_legal_risk_score = 10
+            memory.sa_bbbee_analysis = {"declared_level": bbbee, "finding_count": 0, "risk_flags": []}
 
-        return self._parse_findings(raw, memory)
-
-
-# ─────────────────────────────────────────────
-# 14. VALUATION AGENT
-# ─────────────────────────────────────────────
-class ValuationAgent(BaseAgent):
-    name = "Valuation Agent"
-    system_prompt = """You are a Senior Corporate Finance Partner and Certified Business Valuator
-with 25 years of experience valuing South African SMEs for acquisitions, succession planning,
-investor raises, and partner buyouts.
-
-You apply three valuation methods and triangulate a range.
-
-METHOD 1 — EBITDA MULTIPLE (primary method for most SMEs):
-Step 1: Calculate normalised EBITDA
-  - Start with operating profit or net profit
-  - Add back: depreciation, amortisation, interest, tax
-  - Add back: owner's salary above market (excess above R600K/year for SA SME owner)
-  - Remove: one-off items (insurance claims, asset sales, COVID grants)
-  - Result: Normalised EBITDA
-
-Step 2: Apply industry EBITDA multiple (SA private market ranges):
-  - Retail: 3–5× (discount for declining sector)
-  - Manufacturing: 4–6×
-  - Services / Professional: 4–7×
-  - Technology / SaaS: 8–15×
-  - Logistics / Transport: 3–5×
-  - Healthcare / Medical: 6–10×
-  - Food & Beverage: 3–5×
-  - Construction: 2–4×
-  - Agriculture: 3–5×
-  - General / Unknown: 3–5×
-
-Step 3: Apply discounts:
-  - Customer concentration >30%: -0.5×
-  - Owner-dependent revenue (key-man risk): -0.5×
-  - No formal management team: -0.5×
-  - Single location only: -0.25×
-  - Declining revenue trend: -1.0×
-
-Step 4: Apply premiums:
-  - Recurring revenue contracts >50%: +0.5×
-  - Strong brand / IP: +0.5×
-  - Diversified customer base (<10% in any single customer): +0.25×
-  - Growing market / sector tailwind: +0.5×
-
-METHOD 2 — DCF (use only if 3+ months of cash flow data available):
-  - Project revenue at implied CAGR from data
-  - Apply industry operating margin to get free cash flow
-  - WACC for SA SME: 20–25% (reflecting SA risk premium + SME illiquidity premium)
-  - Terminal value: 3× EBITDA at year 5
-  - Discount to present value
-
-METHOD 3 — ASSET-BASED (floor valuation):
-  - Total identifiable assets from data
-  - Less estimated liabilities
-  - This is the floor — business should sell for more unless distressed
-
-FINAL VALUATION: Present as a range:
-  - Low: conservative (asset-based or lowest multiple justified)
-  - Mid: most likely (primary EBITDA multiple)
-  - High: optimistic (best multiple if improvements implemented)
-
-State all assumptions explicitly. Disclose which multiple was used and why.
-""" + FINDING_RULES
-
-    def analyze(self, business_data: dict, memory) -> list:
-        benchmark_block = self._build_benchmark_block(memory)
-        cur = memory.currency
-        prompt = f"""
-BUSINESS CONTEXT:
-{memory.to_context_summary()}
-
-{benchmark_block}
-
-FINANCIAL DATA:
-{json.dumps(business_data.get('financial', {}), indent=2)[:4000]}
-
-ALL AGENT FINDINGS (use profitability and risk findings to calibrate discounts/premiums):
-{memory.get_all_findings_text()[:2000]}
-
-Value this business using all three methods described in your system prompt.
-Show your working for each method.
-State all assumptions.
-Present the final three-point valuation range in {cur}.
-
-End your analysis with a JSON block in this exact format:
-{{
-  "valuation_low": <number>,
-  "valuation_mid": <number>,
-  "valuation_high": <number>,
-  "valuation_method": "<primary method used>",
-  "valuation_ebitda_multiple": <number>,
-  "valuation_normalised_ebitda": <number>
-}}
-"""
-        raw = self._call_claude(prompt)
-
-        # Extract structured valuation data
-        import re
-        json_match = re.search(r'\{[^{}]*"valuation_low"[^{}]*\}', raw, re.DOTALL)
-        if json_match:
-            try:
-                val_data = json.loads(json_match.group())
-                memory.valuation_low = float(val_data.get("valuation_low", 0))
-                memory.valuation_mid = float(val_data.get("valuation_mid", 0))
-                memory.valuation_high = float(val_data.get("valuation_high", 0))
-                memory.valuation_method = val_data.get("valuation_method", "")
-                memory.valuation_ebitda_multiple = float(val_data.get("valuation_ebitda_multiple", 0))
-                memory.valuation_normalised_ebitda = float(val_data.get("valuation_normalised_ebitda", 0))
-            except Exception:
-                pass
-
-        return self._parse_findings(raw, memory)
+        memory.sa_cipc_status = "unknown"
+        memory.sa_legal_performed = True
+        return findings
 
 
-# ─────────────────────────────────────────────
-# 15. FORECAST & SCENARIO AGENT
-# ─────────────────────────────────────────────
-class ForecastAgent(BaseAgent):
-    name = "Forecast & Scenario Agent"
-    system_prompt = """You are a Financial Planning & Analysis (FP&A) Director and Scenario Modeller
-with 20 years of experience building financial models for South African businesses.
-
-You build three forward-looking scenarios from historical data:
-
-BASE CASE (most likely — 50% probability weight):
-- Revenue: extrapolate from observed trend (CAGR or linear regression on available months)
-- COGS: maintain current gross margin % (unless a specific improvement is identified)
+# ── Agent registry ───────────────────────────────────────────────────────────
+# SATaxAgent and SALegalAgent are intentionally excluded — they run as
+# dedicated phases 2c/2d in the CEO pipeline after market deep-dive so they
+# can benefit from all prior findings context.
+ALL_AGENTS = [
+    FinancialAgent,
+    AccountingAgent,
+    AuditorAgent,
+    OperationsAgent,
+    LogisticsAgent,
+    SalesAgent,
+    MarketingAgent,
+    HRAgent,
+    ProcurementAgent,
+    StrategyAgent,
+    LegalRiskAgent,
+]
+rent gross margin % (unless a specific improvement is identified)
 - Opex: grow at 80% of revenue growth rate (partial operating leverage)
 - Apply quick wins identified by other agents that are low risk and high probability
 - Project month-by-month for 12 months

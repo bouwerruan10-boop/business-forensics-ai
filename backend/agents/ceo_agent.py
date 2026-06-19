@@ -8,7 +8,7 @@ Findings ranked by quantified financial impact, not by agent order.
 import json
 import re
 from agents.base_agent import BaseAgent
-from agents.specialist_agents import ALL_AGENTS
+from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent
 from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
 from memory.shared_memory import SharedMemory, AgentFinding
 from config import MODEL, MAX_TOKENS
@@ -73,6 +73,22 @@ generic business language."""
         market_deep = MarketDeepDiveAgent()
         market_findings = market_deep.analyze(business_data, memory)
         for f in market_findings:
+            memory.add_finding(f)
+
+        # Phase 2c: SA Tax Compliance Agent
+        if progress_callback:
+            progress_callback("SA Tax Compliance Agent", "Reviewing SARS tax obligations — VAT, CIT, PAYE, provisional tax...")
+        sa_tax = SATaxAgent()
+        sa_tax_findings = sa_tax.analyze(business_data, memory)
+        for f in sa_tax_findings:
+            memory.add_finding(f)
+
+        # Phase 2d: SA Corporate Law & BBBEE Agent
+        if progress_callback:
+            progress_callback("SA Corporate Law & BBBEE Agent", "Reviewing Companies Act, BBBEE, POPIA, CIPC compliance...")
+        sa_legal = SALegalAgent()
+        sa_legal_findings = sa_legal.analyze(business_data, memory)
+        for f in sa_legal_findings:
             memory.add_finding(f)
 
         # Phase 3: Cross-agent synthesis
@@ -435,6 +451,25 @@ Return ONLY valid JSON.
             "market_context_summary": memory.market_context_summary,
             "market_search_performed": memory.market_search_performed,
             "market_total_results": memory.market_total_results,
+
+            # SA Tax Agent
+            "sa_tax_risk_score": memory.sa_tax_risk_score,
+            "sa_tax_summary": memory.sa_tax_summary,
+            "sa_vat_status": memory.sa_vat_status,
+            "sa_tax_clearance_status": memory.sa_tax_clearance_status,
+            "sa_tax_performed": memory.sa_tax_performed,
+
+            # SA Legal Agent
+            "sa_legal_risk_score": memory.sa_legal_risk_score,
+            "sa_legal_summary": memory.sa_legal_summary,
+            "sa_bbbee_analysis": memory.sa_bbbee_analysis,
+            "sa_cipc_status": memory.sa_cipc_status,
+            "sa_legal_performed": memory.sa_legal_performed,
+
+            # SA intake profile
+            "entity_type": memory.entity_type,
+            "bbbee_level": memory.bbbee_level,
+            "report_audience": memory.report_audience,
 
             # Legacy compat
             "summary": executive_summary,

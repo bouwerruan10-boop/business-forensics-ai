@@ -63,11 +63,11 @@ class SharedMemory:
 
     # Fraud & Anomaly Detection
     fraud_risk_level: str = "unknown"        # "low" | "medium" | "high" | "critical"
-    fraud_risk_score: int = 0                # 0–100  (100 = highest risk)
+    fraud_risk_score: int = 0                # 0-100  (100 = highest risk)
     fraud_indicators: list = field(default_factory=list)
 
     # Credit Readiness
-    credit_score: int = 0                    # 0–100 credit readiness score
+    credit_score: int = 0                    # 0-100 credit readiness score
     credit_grade: str = ""                   # "A" | "B" | "C" | "D" | "F"
     credit_barriers: list = field(default_factory=list)
     credit_strengths: list = field(default_factory=list)
@@ -89,7 +89,7 @@ class SharedMemory:
     forecast_monthly: list = field(default_factory=list)  # [{month, base, bull, bear}]
 
     # ── Market Research ───────────────────────────────────────────
-    market_visibility_score: int = 0         # 0–100 (0 = no online presence)
+    market_visibility_score: int = 0         # 0-100 (0 = no online presence)
     market_sentiment: str = "unknown"        # "positive" | "neutral" | "negative" | "unknown"
     market_news: list = field(default_factory=list)       # [{title, url, source, snippet, date}]
     market_competitors: list = field(default_factory=list) # [str] competitor names
@@ -98,6 +98,40 @@ class SharedMemory:
     market_context_summary: str = ""         # compact string injected into specialist agent prompts
     market_search_performed: bool = False    # True once quick scan has run
     market_total_results: int = 0            # total search results found across all queries
+
+    # ── SA Intake Profile Fields ──────────────────────────────────
+    entity_type: str = ""                    # Pty Ltd / CC / Sole Prop / Trust / NPO / etc.
+    cipc_number: str = ""                    # CIPC registration number e.g. 2015/123456/07
+    vat_registered: str = "unknown"          # "yes" | "no" | "pending" | "unknown"
+    vat_number: str = ""                     # VAT vendor number (10 digits)
+    tax_year_end: str = ""                   # e.g. "February" | "June" | "December"
+    years_in_business: str = ""              # e.g. "1-3 years" | "3-7 years"
+    bbbee_level: str = ""                    # e.g. "Level 1" | "Exempt" | "Non-Compliant"
+    banking_partner: str = ""                # Primary bank e.g. "Standard Bank"
+    report_audience: str = "owner"           # "owner" | "banker" | "investor"
+
+    # ── Document Category Text Buckets ────────────────────────────
+    # Each specialist agent reads from its own bucket
+    uploaded_financial_text: str = ""        # income statement, balance sheet, management accounts
+    uploaded_bank_text: str = ""             # bank statements 3-6 months
+    uploaded_tax_text: str = ""              # VAT201, IT14, EMP201, IRP6, tax clearance
+    uploaded_legal_text: str = ""            # MOI, shareholder agreements, contracts
+    uploaded_hr_text: str = ""               # payroll, employment contracts, leave records
+    uploaded_plan_text: str = ""             # business plan
+
+    # ── SA Tax Agent Outputs ──────────────────────────────────────
+    sa_tax_risk_score: int = 0               # 0-100 (100 = highest tax risk)
+    sa_tax_summary: str = ""                 # injected into CEO synthesis
+    sa_vat_status: str = "unknown"           # "compliant" | "risk" | "unknown"
+    sa_tax_clearance_status: str = "unknown" # "valid" | "expired" | "not_provided" | "unknown"
+    sa_tax_performed: bool = False           # True once SATaxAgent has run
+
+    # ── SA Legal Agent Outputs ────────────────────────────────────
+    sa_legal_risk_score: int = 0             # 0-100 (100 = highest legal risk)
+    sa_legal_summary: str = ""               # injected into CEO synthesis
+    sa_bbbee_analysis: dict = field(default_factory=dict)  # level, elements, risk flags
+    sa_cipc_status: str = "unknown"          # "compliant" | "overdue" | "unknown"
+    sa_legal_performed: bool = False         # True once SALegalAgent has run
 
     def add_finding(self, finding):
         self.findings.append(finding)
@@ -119,7 +153,7 @@ class SharedMemory:
             return "No findings recorded yet."
         lines = []
         for finding in self.findings:
-             lines.append(
+            lines.append(
                 f"[{finding.severity.upper()}] {finding.title} ({finding.agent}): "
                 f"{finding.detail} | Impact: {finding.financial_impact} | "
                 f"Recommendation: {finding.recommendation}"
@@ -145,6 +179,12 @@ class SharedMemory:
             parts.append(f"Business model: {self.business_model_summary}")
         if self.market_context_summary:
             parts.append(f"Market context: {self.market_context_summary}")
+        if self.entity_type:
+            parts.append(f"Entity: {self.entity_type} | BBBEE: {self.bbbee_level or 'unknown'} | VAT: {self.vat_registered}")
+        if self.sa_tax_summary:
+            parts.append(f"SA Tax: {self.sa_tax_summary}")
+        if self.sa_legal_summary:
+            parts.append(f"SA Legal: {self.sa_legal_summary}")
         return "\n".join(parts)
 
     def to_dict(self):

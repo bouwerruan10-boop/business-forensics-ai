@@ -6,6 +6,7 @@ import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
 import MarketIntelligence from './MarketIntelligence'
+import SACompliancePanel from './SACompliancePanel'
 
 function Section({ id, title, subtitle, children }) {
   return (
@@ -229,6 +230,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Live brand visibility, public sentiment, news coverage, and competitor landscape"
         >
           <MarketIntelligence report={report} />
+        </Section>
+      )}
+
+      {/* SA Compliance Panel */}
+      {(report.sa_tax_performed || report.sa_legal_performed) && (
+        <Section
+          id="sa-compliance"
+          title="SA Compliance Intelligence"
+          subtitle="SARS tax obligations, Companies Act, BBBEE, POPIA, and CIPC compliance"
+        >
+          <SACompliancePanel report={report} />
         </Section>
       )}
 

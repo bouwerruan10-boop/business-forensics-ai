@@ -116,11 +116,31 @@ async def analyze(
     currency: Optional[str] = Form("ZAR"),
     country: Optional[str] = Form(""),
     primary_concern: Optional[str] = Form(None),
+    # SA-specific intake fields
+    entity_type: Optional[str] = Form(""),
+    cipc_number: Optional[str] = Form(""),
+    vat_registered: Optional[str] = Form("unknown"),
+    vat_number: Optional[str] = Form(""),
+    tax_year_end: Optional[str] = Form(""),
+    years_in_business: Optional[str] = Form(""),
+    bbbee_level: Optional[str] = Form(""),
+    banking_partner: Optional[str] = Form(""),
+    report_audience: Optional[str] = Form("owner"),
+    # File category labels — JSON array matching files[] order
+    # e.g. '["financial","bank","tax"]'
+    file_categories: Optional[str] = Form("[]"),
     _api_key: None = Depends(verify_api_key),
 ):
     """Accept files + business profile. Returns analysis_id to poll."""
+    import json as _json
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
+
+    # Parse file category labels
+    try:
+        categories = _json.loads(file_categories or "[]")
+    except Exception:
+        categories = []
 
     analysis_id = str(uuid.uuid4())
     analysis_status[analysis_id] = {
@@ -132,9 +152,13 @@ async def analyze(
 
     # Read file bytes immediately -- can't read in background task
     file_data = []
-    for f in files:
+    for i, f in enumerate(files):
         content = await f.read()
-        file_data.append({"filename": f.filename, "content": content})
+        file_data.append({
+            "filename": f.filename,
+            "content": content,
+            "category": categories[i] if i < len(categories) else "general",
+        })
 
     profile = {
         "company_name": company_name or "Unknown Business",
@@ -144,6 +168,16 @@ async def analyze(
         "currency": currency or "ZAR",
         "country": country or "",
         "primary_concern": primary_concern or "",
+        # SA-specific
+        "entity_type": entity_type or "",
+        "cipc_number": cipc_number or "",
+        "vat_registered": vat_registered or "unknown",
+        "vat_number": vat_number or "",
+        "tax_year_end": tax_year_end or "",
+        "years_in_business": years_in_business or "",
+        "bbbee_level": bbbee_level or "",
+        "banking_partner": banking_partner or "",
+        "report_audience": report_audience or "owner",
     }
 
     # Persist the new analysis record immediately
@@ -355,17 +389,29 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
     """Full multi-agent analysis pipeline. Runs in a thread pool."""
     def _sync_run():
         try:
-            # 1. Parse uploaded files
+            # 1. Parse uploaded files — route by category
             analysis_status[analysis_id]["current_agent"] = "Parsing uploaded files..."
             parsed_files = []
+            category_texts = {
+                "financial": [], "bank": [], "tax": [],
+                "legal": [], "hr": [], "business_plan": [], "general": [],
+            }
             for fd in file_data:
                 analysis_status[analysis_id]["message"] = "Reading {}...".format(fd["filename"])
                 parsed = parse_file(fd["filename"], fd["content"])
                 parsed_files.append(parsed)
+                cat = fd.get("category", "general")
+                if cat not in category_texts:
+                    cat = "general"
+                if isinstance(parsed, dict):
+                    text = parsed.get("text", "") or str(parsed)
+                else:
+                    text = str(parsed)
+                category_texts[cat].append(text)
 
             business_data = merge_parsed_data(parsed_files)
 
-            # 2. Build SharedMemory with profile context
+            # 2. Build SharedMemory with profile context + SA fields + doc buckets
             memory = SharedMemory(
                 business_name=profile["company_name"],
                 industry=profile.get("industry_key", "general"),
@@ -375,6 +421,23 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
                 currency=profile.get("currency", "ZAR"),
                 country=profile.get("country", ""),
                 primary_concern=profile.get("primary_concern", ""),
+                # SA intake fields
+                entity_type=profile.get("entity_type", ""),
+                cipc_number=profile.get("cipc_number", ""),
+                vat_registered=profile.get("vat_registered", "unknown"),
+                vat_number=profile.get("vat_number", ""),
+                tax_year_end=profile.get("tax_year_end", ""),
+                years_in_business=profile.get("years_in_business", ""),
+                bbbee_level=profile.get("bbbee_level", ""),
+                banking_partner=profile.get("banking_partner", ""),
+                report_audience=profile.get("report_audience", "owner"),
+                # Document category text buckets
+                uploaded_financial_text="\n\n".join(category_texts["financial"]),
+                uploaded_bank_text="\n\n".join(category_texts["bank"]),
+                uploaded_tax_text="\n\n".join(category_texts["tax"]),
+                uploaded_legal_text="\n\n".join(category_texts["legal"]),
+                uploaded_hr_text="\n\n".join(category_texts["hr"]),
+                uploaded_plan_text="\n\n".join(category_texts["business_plan"]),
             )
 
             # 3. Progress callback for frontend polling
