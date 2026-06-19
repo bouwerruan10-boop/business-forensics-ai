@@ -106,6 +106,68 @@ def generate_html_report(report: dict) -> str:
         _score_bar("Fraud Risk (lower=better)", fraud_score, 20, 50, invert=True)
     )
 
+    # ── Imara Score hero ──────────────────────────────────────────
+    imara_score = report.get("imara_score")
+    imara_html = ""
+    if imara_score is not None:
+        imara_band  = _e(report.get("imara_band", ""))
+        imara_label = _e(report.get("imara_label", ""))
+        _imc = report.get("imara_components", []) or []
+
+        def _imara_col(s):
+            if s >= 80: return GOLD
+            if s >= 65: return GREEN
+            if s >= 50: return AMBER
+            if s >= 35: return ORANGE
+            return RED
+
+        icol = _imara_col(imara_score)
+        comp_rows = ""
+        for c in _imc:
+            v = int(round(c.get("value", 0)))
+            wpct = int(round(c.get("weight", 0) * 100))
+            vcol = GREEN if v >= 70 else AMBER if v >= 40 else RED
+            bw = max(2, int(v * 1.6))
+            comp_rows += f"""
+            <div class="imara-comp">
+              <span class="imara-comp-label">{_e(c.get('label',''))}</span>
+              <div class="imara-comp-track"><div class="imara-comp-fill" style="width:{bw}px;background:{vcol}"></div></div>
+              <span class="imara-comp-val" style="color:{vcol}">{v}</span>
+              <span class="imara-comp-wt">{wpct}%</span>
+            </div>"""
+
+        imara_html = f"""
+  <style>
+    .imara-hero{{display:flex;gap:20px;flex-wrap:wrap;background:#fff;border:1px solid {GOLD}33;border-radius:14px;padding:20px;margin-bottom:22px}}
+    .imara-score-panel{{flex:0 0 200px;border:1.5px solid;border-radius:12px;padding:16px;text-align:center;background:{OFF_W}}}
+    .imara-kicker{{font-size:10px;letter-spacing:2px;color:{GOLD};font-weight:700;margin-bottom:6px}}
+    .imara-score-num{{font-size:52px;font-weight:800;line-height:1}}
+    .imara-score-sub{{font-size:11px;color:{GRAY};margin-bottom:10px}}
+    .imara-band{{display:inline-block;color:#fff;font-size:12px;font-weight:700;border-radius:20px;padding:4px 12px}}
+    .imara-breakdown{{flex:1;min-width:260px}}
+    .imara-bd-title{{font-size:15px;font-weight:700;color:{NAVY};margin-bottom:4px}}
+    .imara-bd-desc{{font-size:12px;color:{DARK};line-height:1.5;margin-bottom:12px}}
+    .imara-comp{{display:flex;align-items:center;gap:10px;margin-bottom:7px}}
+    .imara-comp-label{{flex:0 0 145px;font-size:12px;color:{DARK}}}
+    .imara-comp-track{{flex:1;height:7px;background:{LIGHT};border-radius:4px;overflow:hidden}}
+    .imara-comp-fill{{height:100%;border-radius:4px}}
+    .imara-comp-val{{flex:0 0 26px;text-align:right;font-size:12px;font-weight:700}}
+    .imara-comp-wt{{flex:0 0 38px;text-align:right;font-size:11px;color:{GRAY}}}
+  </style>
+  <div class="imara-hero">
+    <div class="imara-score-panel" style="border-color:{icol}">
+      <div class="imara-kicker">IMARA SCORE&trade;</div>
+      <div class="imara-score-num" style="color:{icol}">{imara_score}</div>
+      <div class="imara-score-sub">out of 100</div>
+      <div class="imara-band" style="background:{icol}">Band {imara_band} &middot; {imara_label}</div>
+    </div>
+    <div class="imara-breakdown">
+      <div class="imara-bd-title">Bankability &amp; Investability</div>
+      <div class="imara-bd-desc">A single composite rating across every specialist analysis, weighted toward what a lender or investor assesses. Weights are re-normalised over the components scored in this analysis.</div>
+      {comp_rows}
+    </div>
+  </div>"""
+
     # ── Valuation bar SVG ─────────────────────────────────────────
     def _val_bar_svg() -> str:
         if not val_mid:
@@ -637,6 +699,7 @@ def generate_html_report(report: dict) -> str:
 
 <!-- ── OVERVIEW ───────────────────────────────────────────── -->
 <div id="page-overview" class="page active">
+  {imara_html}
   <div class="metrics-grid">
     <div class="metric-card">
       <div class="metric-label">Business Health</div>

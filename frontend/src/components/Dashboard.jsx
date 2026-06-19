@@ -1,4 +1,5 @@
 import ScoreCards from './ScoreCards'
+import ImaraScoreHero from './ImaraScoreHero'
 import FindingsList from './FindingsList'
 import Roadmap from './Roadmap'
 import Simulator from './Simulator'
@@ -168,6 +169,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         title="Business Health Scores"
         subtitle="Calculated from findings severity and financial impact across all departments"
       >
+        <ImaraScoreHero report={report} />
         <ScoreCards scores={report.scores || {}} report={report} />
       </Section>
 

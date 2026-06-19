@@ -100,6 +100,7 @@ generic business language."""
         if progress_callback:
             progress_callback("CEO Agent", "Calculating business health scores...")
         self._score_business(memory)
+        self._calculate_imara_score(memory)
 
         # Phase 5: Generate report
         if progress_callback:
@@ -306,6 +307,60 @@ Return ONLY valid JSON.
             (memory.profitability_score + memory.efficiency_score + memory.risk_score) / 3
         )))
 
+    def _calculate_imara_score(self, memory: SharedMemory):
+        """
+        Imara Score™ — a single branded 0–100 bankability / investability rating.
+
+        Blends the agent outputs already produced, weighted toward what a lender
+        or investor cares about. Components that were not produced this run (e.g.
+        no market scan, no SA compliance pass, no credit assessment) are dropped
+        and the remaining weights are re-normalised, so the score is always 0–100.
+        """
+        # (label, value 0-100 where higher = better, base weight, include?)
+        candidates = [
+            ("Profitability",        memory.profitability_score,            0.25, memory.profitability_score > 0),
+            ("Credit Readiness",     memory.credit_score,                   0.20, memory.credit_score > 0),
+            ("Risk & Compliance",    memory.risk_score,                     0.15, memory.risk_score > 0),
+            ("Operational Efficiency", memory.efficiency_score,             0.10, memory.efficiency_score > 0),
+            ("Financial Integrity",  100 - memory.fraud_risk_score,         0.10, memory.fraud_risk_level not in ("", "unknown")),
+            ("Market Visibility",    memory.market_visibility_score,        0.10, bool(memory.market_search_performed)),
+            ("Tax Compliance",       100 - memory.sa_tax_risk_score,        0.05, bool(memory.sa_tax_performed)),
+            ("Legal Compliance",     100 - memory.sa_legal_risk_score,      0.05, bool(memory.sa_legal_performed)),
+        ]
+
+        active = [(label, value, weight) for (label, value, weight, include) in candidates if include]
+
+        # Fallback: if nothing scored, anchor on business health
+        if not active:
+            active = [("Business Health", memory.business_health_score or 50, 1.0)]
+
+        total_weight = sum(w for (_, _, w) in active)
+        composite = sum(max(0, min(100, v)) * w for (_, v, w) in active) / total_weight
+
+        memory.imara_score = int(round(max(0, min(100, composite))))
+
+        s = memory.imara_score
+        if s >= 80:
+            memory.imara_band, memory.imara_label = "A", "Investment Ready"
+        elif s >= 65:
+            memory.imara_band, memory.imara_label = "B", "Bankable"
+        elif s >= 50:
+            memory.imara_band, memory.imara_label = "C", "Developing"
+        elif s >= 35:
+            memory.imara_band, memory.imara_label = "D", "At Risk"
+        else:
+            memory.imara_band, memory.imara_label = "E", "Distressed"
+
+        # Breakdown with re-normalised (effective) weights for transparency
+        memory.imara_components = [
+            {
+                "label": label,
+                "value": int(round(max(0, min(100, value)))),
+                "weight": round(weight / total_weight, 3),
+            }
+            for (label, value, weight) in active
+        ]
+
     # ── Phase 5 ──────────────────────────────────────────────────
 
     def _generate_report(
@@ -380,6 +435,12 @@ Return ONLY valid JSON.
                 "efficiency": memory.efficiency_score,
                 "risk": memory.risk_score,
             },
+
+            # Imara Score™ (branded composite hero metric)
+            "imara_score": memory.imara_score,
+            "imara_band": memory.imara_band,
+            "imara_label": memory.imara_label,
+            "imara_components": memory.imara_components,
 
             # Narrative (McKinsey SCR)
             "situation": situation,

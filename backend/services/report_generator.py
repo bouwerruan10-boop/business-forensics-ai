@@ -88,6 +88,9 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
 
     story.append(PageBreak())
 
+    # ── Imara Score hero (all audiences) ──────────
+    _imara_score_block(story, report)
+
     # ── Traffic light scorecard (all audiences) ────────────────────
     _traffic_light_section(story, report)
     story.append(PageBreak())
@@ -886,6 +889,92 @@ def _section_header(story, title: str):
 def _hex(c) -> str:
     """Return uppercase 6-char hex string (no #) from a ReportLab color."""
     return "%02X%02X%02X" % (int(c.red * 255), int(c.green * 255), int(c.blue * 255))
+
+
+def _imara_band_colors(score):
+    if score >= 80:
+        return GOLD, colors.HexColor("#FBF4DE")
+    if score >= 65:
+        return GREEN, GREEN_BG
+    if score >= 50:
+        return AMBER, AMBER_BG
+    if score >= 35:
+        return ORANGE, ORANGE_BG
+    return RED, RED_BG
+
+
+def _imara_score_block(story, report):
+    """Imara Score hero — composite score, band, and component breakdown."""
+    score = report.get("imara_score")
+    if score is None:
+        return
+    band  = report.get("imara_band", "")
+    label = report.get("imara_label", "")
+    components = report.get("imara_components", []) or []
+    col, bg = _imara_band_colors(score)
+
+    _section_header(story, "IMARA SCORE™  ·  BANKABILITY & INVESTABILITY")
+
+    left = Table(
+        [
+            [Paragraph(str(score), _style(fontSize=44, fontName="Helvetica-Bold",
+                                          textColor=col, alignment=TA_CENTER))],
+            [Paragraph("OUT OF 100", _style(fontSize=7, textColor=MID_GRAY,
+                                            alignment=TA_CENTER, letterSpacing=1))],
+            [Paragraph("Band " + str(band) + "  ·  " + str(label),
+                       _style(fontSize=9, fontName="Helvetica-Bold",
+                              textColor=col, alignment=TA_CENTER))],
+        ],
+        colWidths=[CONTENT_W * 0.30],
+    )
+    left.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), bg),
+        ("BOX", (0, 0), (-1, -1), 0.7, col),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    rows = [[
+        Paragraph("COMPONENT", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE)),
+        Paragraph("SCORE", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE, alignment=TA_CENTER)),
+        Paragraph("WEIGHT", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE, alignment=TA_CENTER)),
+    ]]
+    comp_tbl_style = [
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, LIGHT_GRAY),
+        ("BOX", (0, 0), (-1, -1), 0.5, LIGHT_GRAY),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]
+    ri = 1
+    for c in components:
+        v = int(round(c.get("value", 0)))
+        wpct = int(round(c.get("weight", 0) * 100))
+        vc = GREEN if v >= 70 else AMBER if v >= 40 else RED
+        rows.append([
+            Paragraph(str(c.get("label", "")), _style(fontSize=8, textColor=DARK_GRAY)),
+            Paragraph(str(v), _style(fontSize=8, fontName="Helvetica-Bold", textColor=vc, alignment=TA_CENTER)),
+            Paragraph(str(wpct) + "%", _style(fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER)),
+        ])
+        if ri % 2 == 0:
+            comp_tbl_style.append(("BACKGROUND", (0, ri), (-1, ri), OFF_WHITE))
+        ri += 1
+
+    right = Table(rows, colWidths=[CONTENT_W * 0.42, CONTENT_W * 0.13, CONTENT_W * 0.13])
+    right.setStyle(TableStyle(comp_tbl_style))
+
+    outer = Table([[left, right]], colWidths=[CONTENT_W * 0.32, CONTENT_W * 0.68])
+    outer.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (1, 0), (1, 0), 10),
+        ("RIGHTPADDING", (0, 0), (0, 0), 0),
+    ]))
+    story.append(outer)
+    story.append(Spacer(1, 0.5 * cm))
 
 
 # ── Traffic Light Scorecard ────────────────────────────────────────

@@ -51,6 +51,12 @@ class SharedMemory:
     efficiency_score: int = 0
     risk_score: int = 0
 
+    # Imara Score (branded composite, set by CEO agent Phase 4)
+    imara_score: int = 0                     # 0-100 bankability / investability
+    imara_band: str = ""                     # "A" | "B" | "C" | "D" | "E"
+    imara_label: str = ""                    # e.g. "Investment Ready"
+    imara_components: list = field(default_factory=list)  # [{label, value, weight}]
+
     # Client context
     primary_concern: str = ""   # client's stated focus area from profile form
 

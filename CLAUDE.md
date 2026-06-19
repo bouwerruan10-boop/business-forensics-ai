@@ -1,148 +1,244 @@
-# CLAUDE.md
+# CLAUDE.md — Imara Business Intelligence
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## What This Is
-
-Business Forensics AI — a solo consulting tool. A client uploads Excel/CSV/PDF business data, 11 specialist Claude agents run sequentially, and the platform outputs a McKinsey-quality PDF report with quantified findings, scores, and a 90-day implementation roadmap.
+This file is the authoritative guide to the codebase. Read it fully before touching any file.
 
 ---
 
-## Commands
+## What This Is
 
-### Backend
+**Imara** — an AI-powered business intelligence platform for South African SMEs. A client fills in a profile form and uploads business documents (financials, bank statements, tax returns, legal docs, HR records, business plan). Up to 15 Claude API calls run sequentially through a pipeline of specialist agents. The output is a structured JSON report rendered in a React dashboard, with optional PDF export.
+
+**Deployed:**
+- Backend → Railway (FastAPI, Docker)
+- Frontend → Vercel (React/Vite)
+- Repo → GitHub (`bouwerruan10-boop/business-forensics-ai`)
+
+---
+
+## Local Dev Commands
 
 ```bash
+# Backend
 cd backend
-cp .env.example .env          # first-time setup — add ANTHROPIC_API_KEY
+cp .env.example .env   # add ANTHROPIC_API_KEY
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
-```
 
-### Frontend
-
-```bash
+# Frontend
 cd frontend
 npm install
-npm run dev                   # dev server on http://localhost:3000
-npm run build                 # production build → dist/
+npm run dev            # http://localhost:3000
+npm run build
+
+# Quick import check
+cd backend && MOCK_MODE=true python -c "from agents.ceo_agent import CEOAgent; print('OK')"
 ```
 
-There are no automated tests. Manual verification: start both servers, upload a sample Excel file, wait for the analysis pipeline to complete (~3–8 min), and confirm the PDF downloads.
+No automated tests. Manual check: start both servers, submit the SmartIntake form, confirm analysis completes.
 
 ---
 
 ## Architecture
 
 ```
-frontend (React/Vite :3000)  ──→  backend (FastAPI :8000)  ──→  Anthropic API
-                                        │
-                                   SQLite (backend/data/analyses.db)
+frontend (React/Vite :3000)
+  └─ SmartIntake form → POST /api/analyze (multipart)
+  └─ polls GET /api/status/{id} every 2s
+  └─ fetches GET /api/report/{id} on completion
+
+backend (FastAPI :8000)
+  └─ main.py → spawns background task → CEOAgent.run_full_analysis()
+  └─ SharedMemory flows through all agents
+  └─ SQLite (backend/data/analyses.db)
+  └─ Anthropic API
 ```
 
-The Vite dev server proxies `/api/*` to `http://localhost:8000` (see `vite.config.js`). In production set `VITE_API_URL` in the frontend environment and the proxy is bypassed.
+Vite dev server proxies `/api/*` → `http://localhost:8000`. In production set `VITE_API_URL`.
 
 ---
 
-## Backend Deep Dive
+## Pipeline — CEOAgent (`agents/ceo_agent.py`)
 
-### Pipeline Flow (`agents/ceo_agent.py → CEOAgent.run_full_analysis`)
+The entire analysis is one sequential call chain in `run_full_analysis()`:
 
-This is the core of the system — all 13 Claude API calls per analysis flow through here:
+| Phase | Agent(s) | What it does |
+|---|---|---|
+| 1 | CEO (business model) | Extracts structure from raw data. **Profile values always win over extracted values.** |
+| 1b | MarketResearchAgent | Quick brand/market scan (SERPER API). Populates `market_context_summary` which all Phase 2 agents read. |
+| 2 | ALL_AGENTS (11 agents) | Sequential specialist analysis. Each makes 2 Claude calls: `analyze()` + `_parse_findings()`. |
+| 2b | MarketDeepDiveAgent | Deep competitor + news + opportunity intelligence. |
+| 2c | SATaxAgent | SARS compliance: VAT Act, IT14, EMP201, IRP6, tax clearance. Reads `uploaded_tax_text`, `uploaded_financial_text`, `uploaded_bank_text`. |
+| 2d | SALegalAgent | SA corporate law: Companies Act 71/2008, BBBEE 53/2003, POPIA 4/2013, LRA 66/1995, CPA 68/2008, NCA 34/2005, CIPC compliance. Reads `uploaded_legal_text`, `uploaded_hr_text`. |
+| 3 | CEO (synthesis) | Cross-agent SCR narrative (Situation→Complication→Resolution), systemic themes. |
+| 4 | CEO (scoring) | Penalty-weighted scoring from finding severities. No Claude call. |
+| 5 | CEO (report) | Executive summary, roadmap, digital twin params. Assembles full report dict. |
 
-1. **Phase 1 — Business model extraction**: CEO Agent calls Claude to extract structure from raw data. Profile values (revenue, headcount, currency) provided by the user always win over extracted values.
-2. **Phase 2 — 11 specialist agents** run sequentially from `ALL_AGENTS` list in `agents/specialist_agents.py`. Each agent calls `_call_claude()` for domain analysis, then calls `_call_claude()` a second time inside `_parse_findings()` to convert prose into structured `AgentFinding` objects.
-3. **Phase 3 — Cross-agent synthesis**: CEO Agent calls Claude with all findings to produce the McKinsey SCR narrative (Situation → Complication → Resolution), systemic themes, and ranked priority issues.
-4. **Phase 4 — Scoring**: penalty-weighted scoring from finding severities. No Claude call.
-5. **Phase 5 — Report assembly**: CEO Agent calls Claude for executive summary, roadmap, and digital twin parameters, then assembles the full report dict.
-
-### SharedMemory (`memory/shared_memory.py`)
-
-The single mutable context object passed to every agent. Key things to know:
-- `to_context_summary()` returns compact JSON injected into every agent prompt — keep it lean.
-- `primary_concern` (from the profile form) must be threaded through CEO Agent prompts — it gates what the executive summary opens with.
-- Scores are set directly on the memory object by `_score_business()`, not by individual agents.
-
-### AgentFinding (`memory/shared_memory.py`)
-
-Every finding must have: `severity` (critical/high/medium/low), `financial_impact`, `recommendation`, `roi_estimate`, `cost_of_inaction`, `benchmark_reference`, `quick_win` (bool). The `_parse_findings()` method in `BaseAgent` enforces this schema via a second Claude call.
-
-### Adding a New Specialist Agent
-
-1. Create a class in `agents/specialist_agents.py` inheriting `BaseAgent`.
-2. Set `name`, `system_prompt` (include `FINDING_RULES`), and implement `analyze(business_data, memory)`.
-3. Add it to the `ALL_AGENTS` list at the bottom of that file.
-4. CEO Agent's Phase 2 loop picks it up automatically.
-
-### Benchmark System (`services/benchmark_service.py` + `data/benchmarks.json`)
-
-- `detect_industry()` keyword-scans business name, industry hint, and file names against benchmark profiles. African country profiles (`south_africa_sme`, `nigeria_general`, `kenya_general`, `zimbabwe_general`) are excluded from keyword scan — they activate only as a country fallback when no specific industry matches.
-- `format_benchmark_context()` builds the prompt block injected into every agent. If `african_context` key exists in a profile, it appends an "AFRICAN MARKET CONTEXT" block.
-- To add a new industry: add an entry to `data/benchmarks.json` under `industries`, then add keywords.
-
-### File Parser (`services/file_parser.py`)
-
-Handles messy real-world files. Key behaviours:
-- Excel: re-reads with `header=1` if the first row looks like a title row (≤2 non-null values). Deduplicates column names, coerces object columns to numeric/date when >60% of values parse successfully.
-- CSV: tries encodings in order: utf-8 → utf-8-sig → latin-1 → cp1252.
-- Sheet domain detection (`_detect_domain`) labels sheets as `financial`, `hr`, `sales`, etc. — this is what populates `business_data['financial']`, `business_data['hr']`, etc. that specialist agents receive.
-- Limits: 60 sample rows, 20 sheets, 30 PDF pages.
-
-### Persistence (`services/database.py`)
-
-SQLite at `backend/data/analyses.db`. All functions use a module-level `threading.Lock()` because FastAPI runs background tasks in a thread pool. The full `report_json` blob is only fetched by `get_report()` — `list_analyses()` excludes it for performance.
-
-### Rate Limiting & API Key Gate (`main.py`)
-
-- `RATE_LIMIT` env var (default `3/hour`) controls slowapi rate limiting on `POST /api/analyze`.
-- `API_SECRET_KEY` env var: if set, all `/api/analyze` calls require `X-API-Key` header matching this value. Leave blank to disable.
-
-### PDF Generation (`services/report_generator.py`)
-
-ReportLab-based. Charts from `services/charts.py` are embedded as PNG bytes via `io.BytesIO`. All chart calls are wrapped in `try/except` — chart failures are silently skipped, never crash the PDF.
-
-**Critical**: This file and any other Python files with f-strings containing complex expressions are vulnerable to truncation when edited with file-editing tools. **Always rewrite large Python files using bash heredoc** (`cat > file << 'PYEOF' ... PYEOF`) and verify with `python3 -c "import ast; ast.parse(open('file.py').read())"`. Never use f-strings in files written this way — use `.format()` instead.
+**SATaxAgent and SALegalAgent are NOT in `ALL_AGENTS`** — they run as dedicated phases 2c/2d so they benefit from all prior findings context.
 
 ---
 
-## Frontend Deep Dive
+## ALL_AGENTS List (`agents/specialist_agents.py`)
 
-### Phase State Machine (`src/App.jsx`)
+Order matters — they run sequentially:
+1. FinancialAgent
+2. AccountingAgent
+3. AuditorAgent
+4. OperationsAgent
+5. LogisticsAgent
+6. SalesAgent
+7. MarketingAgent
+8. HRAgent
+9. ProcurementAgent
+10. StrategyAgent
+11. LegalRiskAgent
 
-`phase` state drives the entire UI: `profile → upload → analyzing → done | admin`.
+**Adding a new specialist agent:**
+1. Create a class in `specialist_agents.py` inheriting `BaseAgent`.
+2. Implement `analyze(business_data, memory) → list[AgentFinding]`.
+3. Add to `ALL_AGENTS` list. CEO Phase 2 picks it up automatically.
+4. For SA-specific agents that need prior findings context: add as a dedicated phase in `ceo_agent.py` instead.
 
-- `profile`: `BusinessProfile.jsx` collects company name, industry, revenue, headcount, currency, country, primary concern.
-- `upload`: `FileUpload.jsx` drag-and-drop. On submit calls `POST /api/analyze` with multipart form data.
-- `analyzing`: polls `GET /api/status/{id}` every 2 seconds. `AgentActivity.jsx` displays live agent progress.
-- `done`: `Dashboard.jsx` renders the full report with tabs (Executive Summary, Findings, Roadmap, Digital Twin).
-- `admin`: `AdminDashboard.jsx` fetches `GET /api/admin/analyses`, shows all analyses, supports delete and jump-to-report.
+---
 
-### API Client (`src/api/client.js`)
+## SharedMemory (`memory/shared_memory.py`)
 
-All backend calls go through this file. `VITE_API_URL` env var overrides the base URL (falls back to empty string, which uses the Vite proxy in dev).
+The single mutable object passed to every agent. Key field groups:
 
-### Scores Display
+**Business identity** — `business_name`, `industry`, `annual_revenue`, `headcount`, `currency`, `country`
 
-`ScoreCards.jsx` renders the four health scores (business_health, profitability, efficiency, risk) as recharts `RadialBarChart` components. Score values come from `report.scores`.
+**SA intake profile** — `entity_type`, `cipc_number`, `vat_registered`, `vat_number`, `tax_year_end`, `years_in_business`, `bbbee_level`, `banking_partner`, `report_audience`
+
+**Document text buckets** — one per zone:
+- `uploaded_financial_text` — income statement, balance sheet, management accounts
+- `uploaded_bank_text` — bank statements
+- `uploaded_tax_text` — VAT201, IT14, EMP201, IRP6, tax clearance
+- `uploaded_legal_text` — MOI, shareholder agreements, contracts
+- `uploaded_hr_text` — payroll, employment contracts
+- `uploaded_plan_text` — business plan
+
+**Specialist agent outputs** — `fraud_risk_level/score`, `credit_score/grade`, `valuation_low/mid/high`, `forecast_base/bull/bear_12m`
+
+**Market intelligence** — `market_visibility_score`, `market_sentiment`, `market_news`, `market_competitors`, `market_context_summary`, `market_search_performed`
+
+**SA Tax outputs** — `sa_tax_risk_score`, `sa_tax_summary`, `sa_vat_status`, `sa_tax_clearance_status`, `sa_tax_performed`
+
+**SA Legal outputs** — `sa_legal_risk_score`, `sa_legal_summary`, `sa_bbbee_analysis`, `sa_cipc_status`, `sa_legal_performed`
+
+**Key rules:**
+- `to_context_summary()` returns the compact string injected into CEO synthesis — keep it lean.
+- `primary_concern` from the intake form must appear in CEO Phases 1, 3, and 5 prompts.
+- `profile values beat extracted values` — `_build_business_model()` never overwrites non-zero profile fields.
+
+---
+
+## AgentFinding Schema
+
+Every finding must have all of these or `_parse_findings()` will reject it:
+
+```python
+AgentFinding(
+    agent="FinancialAgent",
+    category="Cash Flow",
+    severity="critical",          # critical | high | medium | low
+    title="Negative operating cash flow",
+    detail="...",
+    financial_impact="R 450 000 annual cash drain",
+    recommendation="...",
+    roi_estimate="...",
+    cost_of_inaction="...",
+    benchmark_reference="...",
+    quick_win=False,
+)
+```
+
+`FINDING_RULES` constant in `specialist_agents.py` is injected into every agent system prompt — do not weaken it.
+
+---
+
+## Document Routing (`main.py`)
+
+`file_categories` is a JSON array sent from the frontend matching the `files[]` array index-for-index. Categories: `financial`, `bank`, `tax`, `legal`, `hr`, `business_plan`.
+
+`_run_analysis()` builds `category_texts` dict, then populates the correct `uploaded_*_text` bucket on SharedMemory from each document's extracted text.
+
+---
+
+## Frontend Phase State Machine (`src/App.jsx`)
+
+```
+intake → analyzing → done
+          ↕               ↕
+        admin          shared (hash routing for /report/:id URLs)
+```
+
+- **intake**: `SmartIntake.jsx` — single-page form replacing the old BusinessProfile + FileUpload two-step. Has 4 sections: Business Identity, Financial & Tax (incl. BBBEE radio buttons), 6 Document Upload Zones, Context & Focus.
+- **analyzing**: `AnalysisProgress.jsx` — polls `/api/status/{id}` every 2s, shows agent progress.
+- **done**: `Dashboard.jsx` — full report. Sections: Executive Summary, Health Scores, Quick Wins, All Findings, Roadmap, Credit & Fraud, Valuation & Forecast, Market Intelligence, SA Compliance (conditional), What-If Simulator.
+- **admin**: `AdminDashboard.jsx` — lists all analyses, view/delete.
+- **shared**: `SharedReport.jsx` — hash-routed `/report/:id` public link view.
+
+---
+
+## Document Upload Zones (`SmartIntake.jsx`)
+
+6 zones, each with per-zone file arrays. At submit, builds parallel `files[]` + `file_categories[]` arrays:
+
+| Zone | Category string | Agent(s) that read it |
+|---|---|---|
+| Financial Statements | `financial` | FinancialAgent, AccountingAgent, AuditorAgent, SATaxAgent |
+| Bank Statements | `bank` | FinancialAgent, SATaxAgent |
+| Tax Documents | `tax` | SATaxAgent |
+| Legal & Contracts | `legal` | LegalRiskAgent, SALegalAgent |
+| HR & Payroll | `hr` | HRAgent, SALegalAgent |
+| Business Plan | `business_plan` | StrategyAgent, MarketingAgent |
+
+---
+
+## Key Services
+
+| File | Purpose |
+|---|---|
+| `services/file_parser.py` | Handles messy Excel/CSV/PDF. Sheet domain detection labels sheets as financial/hr/sales etc. 60-row limit, 20-sheet limit, 30-page PDF limit. |
+| `services/benchmark_service.py` | Keyword-scans for industry profile. African country profiles activate as country fallback only. `format_benchmark_context()` builds the prompt block every agent uses. |
+| `services/database.py` | SQLite persistence with threading.Lock(). `list_analyses()` excludes `report_json` for performance. |
+| `services/report_generator.py` | ReportLab PDF. Charts from `charts.py` embedded as PNG bytes. All chart calls wrapped in try/except. |
+| `services/html_report.py` | Self-contained HTML report with inline CSS/JS. |
 
 ---
 
 ## Environment Variables
 
-| Variable | Where | Purpose |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | `backend/.env` | **Required.** Claude API key. |
-| `MODEL` | `backend/.env` | Claude model. Default: `claude-sonnet-4-6` |
-| `MAX_TOKENS` | `backend/.env` | Max tokens per agent call. Default: `4096` |
-| `RATE_LIMIT` | `backend/.env` | slowapi rate limit string. Default: `3/hour` |
-| `API_SECRET_KEY` | `backend/.env` | Optional API key gate on `/api/analyze`. |
-| `VITE_API_URL` | frontend env | Backend URL for production. Empty = use Vite proxy. |
+| Variable | Where | Required | Purpose |
+|---|---|---|---|
+| `ANTHROPIC_API_KEY` | `backend/.env` | ✅ | Claude API |
+| `MODEL` | `backend/.env` | no | Default: `claude-sonnet-4-6` |
+| `MAX_TOKENS` | `backend/.env` | no | Default: `4096` |
+| `MOCK_MODE` | shell | no | Set `true` to skip Claude calls (import testing) |
+| `SERPER_API_KEY` | `backend/.env` | no | Market research. Gracefully skipped if missing. |
+| `RATE_LIMIT` | `backend/.env` | no | Default: `3/hour` |
+| `API_SECRET_KEY` | `backend/.env` | no | Optional API key gate on `/api/analyze` |
+| `VITE_API_URL` | Vercel env | prod | Backend URL. Empty = Vite proxy (dev only). |
 
 ---
 
-## Key Constraints
+## Critical Constraints — Never Break These
 
-- **All agent findings must cite specific numbers** — the `FINDING_RULES` constant in `specialist_agents.py` is injected into every agent system prompt to enforce this. Don't weaken it.
-- **Profile values beat extracted values** — `CEOAgent._build_business_model()` explicitly never overwrites non-zero profile fields with Claude's extractions. Maintain this precedent when touching that method.
-- **`primary_concern` must flow everywhere** — it's set on `SharedMemory` from the profile form and must appear in the CEO Agent's Phase 1, Phase 3 (synthesis), and Phase 5 (executive summary) prompts.
-- **f-string truncation** — see PDF Generation note above. Applies to any large Python file.
+1. **Bash heredoc for large Python files.** The Edit tool truncates files on the Windows filesystem mount. Always write large Python files with `cat > file << 'PYEOF' ... PYEOF` and verify with `wc -l`. Never use f-strings in heredoc content — use `.format()`.
+
+2. **Profile values beat extracted values.** `_build_business_model()` never overwrites non-zero profile fields with Claude's extractions.
+
+3. **`primary_concern` flows everywhere.** It must appear in CEO Phases 1, 3, and 5 prompts.
+
+4. **FINDING_RULES stays strict.** Every finding must cite specific ZAR amounts and SA legislation references. Do not soften the rules constant.
+
+5. **SA agents excluded from ALL_AGENTS.** SATaxAgent and SALegalAgent run as phases 2c/2d — not in the Phase 2 loop — so they can read all prior agent findings.
+
+6. **Git operations from user's Windows terminal.** The sandbox cannot read `.git/config`. Use `push_imara.bat` (double-click in File Explorer) for all pushes.
+
+---
+
+## SA Coverage Reference
+
+**Tax (SATaxAgent):** VAT Act 89/1991, Income Tax Act 58/1962 (IT14), EMP201/PAYE/SDL, IRP6 provisional tax, tax clearance certificate, SARS debt management.
+
+**Legal (SALegalAgent):** Companies Act 71/2008, BBBEE Act 53/2003, POPIA Act 4/2013, LRA 66/1995, CPA 68/2008, NCA 34/2005, CIPC compliance, beneficial ownership register.

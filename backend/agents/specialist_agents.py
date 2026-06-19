@@ -514,7 +514,260 @@ Prioritise by financial exposure size.
 
 # ─────────────────────────────────────────────
 # 12. FRAUD & ANOMALY DETECTION AGENT
-# ───────────────────────────────────
+# ─────────────────────────────────────────────
+class FraudDetectionAgent(BaseAgent):
+    name = "Fraud & Anomaly Detection Agent"
+    system_prompt = """You are a Certified Fraud Examiner (CFE) and forensic accountant with 20 years
+investigating financial fraud, embezzlement, and accounting manipulation in SMEs.
+
+You detect anomalies and fraud-risk indicators in financial and operational data:
+- Revenue anomalies: round-number transactions, revenue spikes near period-end, channel stuffing
+- Expense irregularities: duplicate payments, ghost vendors, expenses lacking business purpose
+- Payroll fraud: ghost employees, inflated hours, unauthorised salary changes
+- Cash handling: unexplained cash shortfalls, unreconciled bank differences
+- Margin manipulation: gross margins inconsistent with the stated cost structure
+- Segregation-of-duties gaps: the same person authorising, recording, and paying
+- Benford's Law deviations in transaction-level data where available
+- Related-party transactions priced off-market
+- VAT fraud indicators: input VAT claimed without valid tax invoices, or suspect zero-rating
+- Cash-economy under-declaration: cash sales materially below sector norms (SARS lifestyle-audit risk)
+- Ghost beneficiaries in EMP201/PAYE submissions or UIF claims
+
+For each indicator:
+- State the specific anomaly and where it appears in the data
+- Rate the fraud-risk severity and estimate the financial exposure in ZAR
+- Recommend the specific control or investigation step to close the gap
+- Stay measured: an anomaly is a RISK INDICATOR, not proof of fraud — say so explicitly.
+
+End your analysis with a JSON block in this exact format:
+{
+  "fraud_risk_level": "low|medium|high|critical",
+  "fraud_risk_score": <integer 0-100, where 100 = highest risk>,
+  "fraud_indicators": ["<short indicator 1>", "<short indicator 2>"]
+}
+""" + FINDING_RULES
+
+    def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
+        benchmark_block = self._build_benchmark_block(memory)
+        financial_text = memory.uploaded_financial_text or ""
+        bank_text = memory.uploaded_bank_text or ""
+        prompt = f"""
+BUSINESS CONTEXT:
+{memory.to_context_summary()}
+
+{benchmark_block}
+
+FINANCIAL RECORDS:
+{financial_text[:3000]}
+
+BANK STATEMENTS:
+{bank_text[:2000]}
+
+ALL PRIOR AGENT FINDINGS (look for corroborating anomalies):
+{memory.get_all_findings_text()[:2000]}
+
+Assess fraud and anomaly risk for this business. Flag every red flag you can evidence from
+the data, quantify the potential exposure in ZAR, and recommend the control needed.
+Conclude with the JSON risk block specified in your system prompt.
+"""
+        raw = self._call_claude(prompt)
+        findings = self._parse_findings(raw, memory)
+
+        # Extract the structured fraud-risk block
+        import re
+        match = re.search(r'\{[^{}]*"fraud_risk_level".*?\}', raw, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group())
+                level = str(data.get("fraud_risk_level", "")).lower().strip()
+                if level in ("low", "medium", "high", "critical"):
+                    memory.fraud_risk_level = level
+                memory.fraud_risk_score = int(float(data.get("fraud_risk_score", 0)))
+                memory.fraud_indicators = data.get("fraud_indicators", []) or []
+            except Exception:
+                pass
+
+        # Fallback: derive from finding severities
+        if memory.fraud_risk_level == "unknown" or memory.fraud_risk_score == 0:
+            if findings:
+                severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+                top = sorted(findings, key=lambda f: severity_order.get(f.severity, 0), reverse=True)[0]
+                score_map = {"critical": 85, "high": 65, "medium": 40, "low": 20}
+                if memory.fraud_risk_level == "unknown":
+                    memory.fraud_risk_level = top.severity if top.severity in ("low", "medium", "high", "critical") else "medium"
+                if memory.fraud_risk_score == 0:
+                    memory.fraud_risk_score = score_map.get(top.severity, 30)
+                if not memory.fraud_indicators:
+                    memory.fraud_indicators = [f.title for f in findings[:5]]
+            else:
+                memory.fraud_risk_level = "low"
+                memory.fraud_risk_score = 15
+
+        return findings
+
+
+# ─────────────────────────────────────────────
+# 13. CREDIT READINESS AGENT
+# ─────────────────────────────────────────────
+class CreditReadinessAgent(BaseAgent):
+    name = "Credit Readiness Agent"
+    system_prompt = """You are a commercial credit analyst and former SME lending head at a major
+South African bank. You assess how ready a business is to raise debt or attract funders.
+
+You evaluate the business the way a credit committee would:
+- Cash-flow adequacy: does operating cash flow cover debt service (target DSCR > 1.25x)?
+- Leverage: debt-to-equity and gearing relative to industry norms
+- Profitability and trend: is EBITDA positive and stable or improving?
+- Working-capital health: debtor days, creditor days, inventory days
+- Collateral and security available
+- Governance and record quality: are financials reliable, audited or reviewed?
+- Compliance: tax clearance, VAT, statutory filings up to date
+- Banking conduct: account conduct, returned debits, overdraft usage
+- Rate sensitivity: price debt off prime plus a typical SME margin (3-5%) and stress-test a +200bps rise
+- Funder fit for SA: commercial banks vs development funders (SEFA, IDC, NEF) vs alternative lenders
+
+Score the business 0-100 for credit readiness, assign a grade (A 80-100, B 60-79, C 40-59,
+D 20-39, F <20), and identify the specific barriers and strengths. Then recommend the funding
+products that realistically fit (e.g. asset finance, invoice discounting, term loan, overdraft,
+SEFA / IDC development funding, merchant cash advance).
+
+End your analysis with a JSON block in this exact format:
+{
+  "credit_score": <integer 0-100>,
+  "credit_grade": "A|B|C|D|F",
+  "credit_barriers": ["<barrier 1>", "<barrier 2>"],
+  "credit_strengths": ["<strength 1>", "<strength 2>"],
+  "credit_products": ["<product 1>", "<product 2>"]
+}
+""" + FINDING_RULES
+
+    def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
+        benchmark_block = self._build_benchmark_block(memory)
+        financial_text = memory.uploaded_financial_text or ""
+        bank_text = memory.uploaded_bank_text or ""
+        banking = f"Primary Bank: {memory.banking_partner or 'not provided'} | Report audience: {memory.report_audience}"
+        prompt = f"""
+BUSINESS CONTEXT:
+{memory.to_context_summary()}
+
+{benchmark_block}
+
+BANKING PROFILE:
+{banking}
+
+FINANCIAL RECORDS:
+{financial_text[:3000]}
+
+BANK STATEMENTS:
+{bank_text[:2000]}
+
+ALL PRIOR AGENT FINDINGS (factor compliance and cash issues into the assessment):
+{memory.get_all_findings_text()[:2000]}
+
+Assess this business's credit readiness as a lender's credit committee would. Quantify DSCR,
+leverage, and working-capital metrics wherever the data allows. Conclude with the JSON block
+specified in your system prompt.
+"""
+        raw = self._call_claude(prompt)
+        findings = self._parse_findings(raw, memory)
+
+        import re
+        match = re.search(r'\{[^{}]*"credit_score".*?\}', raw, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group())
+                memory.credit_score = int(float(data.get("credit_score", 0)))
+                grade = str(data.get("credit_grade", "")).upper().strip()
+                if grade in ("A", "B", "C", "D", "F"):
+                    memory.credit_grade = grade
+                memory.credit_barriers = data.get("credit_barriers", []) or []
+                memory.credit_strengths = data.get("credit_strengths", []) or []
+                memory.credit_products = data.get("credit_products", []) or []
+            except Exception:
+                pass
+
+        # Backstop the grade from the score if the model omitted it
+        if memory.credit_score > 0 and not memory.credit_grade:
+            s = memory.credit_score
+            memory.credit_grade = "A" if s >= 80 else "B" if s >= 60 else "C" if s >= 40 else "D" if s >= 20 else "F"
+
+        return findings
+
+
+# ─────────────────────────────────────────────
+# 14. VALUATION AGENT
+# ─────────────────────────────────────────────
+class ValuationAgent(BaseAgent):
+    name = "Valuation Agent"
+    system_prompt = """You are a business valuation specialist (CFA / registered valuator) who values
+owner-managed SMEs for sale, fundraising, and shareholder transactions.
+
+You value the business using methods appropriate to an SME:
+- Normalised EBITDA: adjust reported earnings for owner remuneration above or below market,
+  one-off items, and non-business expenses
+- EBITDA multiple: apply an industry- and size-appropriate multiple (typically 3x-6x for SMEs,
+  adjusted for growth, customer concentration, and key-person dependency)
+- DCF sanity check where forward cash flows are estimable
+- Asset-based floor for asset-heavy businesses
+- SA SME deal reality: owner-managed businesses typically transact at 2.5x-5x normalised EBITDA;
+  apply explicit discounts for customer concentration, key-person dependency, and thin marketability
+
+Produce a defensible low / mid / high valuation range in ZAR. State the normalised EBITDA,
+the multiple applied, the method, and the three biggest value drivers and value detractors.
+Be explicit that this is an indicative valuation, not a formal valuation report.
+
+End your analysis with a JSON block in this exact format:
+{
+  "valuation_low": <number in ZAR>,
+  "valuation_mid": <number in ZAR>,
+  "valuation_high": <number in ZAR>,
+  "valuation_method": "<short method description>",
+  "valuation_ebitda_multiple": <number>,
+  "valuation_normalised_ebitda": <number in ZAR>
+}
+""" + FINDING_RULES
+
+    def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
+        benchmark_block = self._build_benchmark_block(memory)
+        cur = memory.currency
+        financial_text = memory.uploaded_financial_text or ""
+        prompt = f"""
+BUSINESS CONTEXT:
+{memory.to_context_summary()}
+
+{benchmark_block}
+
+REPORTED REVENUE: {cur} {memory.annual_revenue:,.0f}
+
+FINANCIAL DATA:
+{json.dumps(business_data.get('financial', {}), indent=2)[:3000]}
+{financial_text[:2000]}
+
+ALL PRIOR AGENT FINDINGS (reflect risks and quick wins in the value drivers and detractors):
+{memory.get_all_findings_text()[:2000]}
+
+Value this business using the methodology in your system prompt. Show your normalisation of
+EBITDA and justify the multiple. Conclude with the JSON valuation block specified.
+"""
+        raw = self._call_claude(prompt)
+        findings = self._parse_findings(raw, memory)
+
+        import re
+        match = re.search(r'\{[^{}]*"valuation_mid".*?\}', raw, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group())
+                memory.valuation_low = float(data.get("valuation_low", 0))
+                memory.valuation_mid = float(data.get("valuation_mid", 0))
+                memory.valuation_high = float(data.get("valuation_high", 0))
+                memory.valuation_method = data.get("valuation_method", "") or ""
+                memory.valuation_ebitda_multiple = float(data.get("valuation_ebitda_multiple", 0))
+                memory.valuation_normalised_ebitda = float(data.get("valuation_normalised_ebitda", 0))
+            except Exception:
+                pass
+
+        return findings
+
 
 # ─────────────────────────────────────────────
 # 15. SA TAX COMPLIANCE AGENT
@@ -759,24 +1012,19 @@ For each issue, calculate the estimated maximum financial liability under the re
         return findings
 
 
-# ── Agent registry ───────────────────────────────────────────────────────────
-# SATaxAgent and SALegalAgent are intentionally excluded — they run as
-# dedicated phases 2c/2d in the CEO pipeline after market deep-dive so they
-# can benefit from all prior findings context.
-ALL_AGENTS = [
-    FinancialAgent,
-    AccountingAgent,
-    AuditorAgent,
-    OperationsAgent,
-    LogisticsAgent,
-    SalesAgent,
-    MarketingAgent,
-    HRAgent,
-    ProcurementAgent,
-    StrategyAgent,
-    LegalRiskAgent,
-]
-rent gross margin % (unless a specific improvement is identified)
+# ─────────────────────────────────────────────
+# 16. FORECAST & SCENARIO AGENT
+# ─────────────────────────────────────────────
+class ForecastAgent(BaseAgent):
+    name = "Forecast Agent"
+    system_prompt = """You are a financial planning and analysis (FP&A) specialist who builds
+12-month forward projections and scenario models for SMEs.
+
+Build three explicitly-labelled 12-month scenarios from the historical financials.
+
+BASE CASE (most likely — 50% probability weight):
+- Revenue: continue the recent trend (use the historical growth rate; hold flat if no trend)
+- Margins: hold at current gross margin % (unless a specific improvement is identified)
 - Opex: grow at 80% of revenue growth rate (partial operating leverage)
 - Apply quick wins identified by other agents that are low risk and high probability
 - Project month-by-month for 12 months
@@ -793,6 +1041,11 @@ BEAR CASE (conservative — 25% probability weight):
 - Gross margin: -2pp compression (cost pressure)
 - Opex: sticky (cannot be cut quickly)
 - Cash: model the cash impact of the revenue shortfall
+
+SOUTH AFRICAN MACRO FACTORS to weave into the scenarios where relevant:
+- Energy security (load-shedding, diesel/generator costs) and its effect on opex and output
+- Interest-rate environment (prime) and its effect on debt service and customer demand
+- Inflation (CPI) on input costs and rand volatility on any imported inputs
 
 For each scenario:
 - State the 3 key assumptions driving it
