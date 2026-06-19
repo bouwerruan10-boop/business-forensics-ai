@@ -124,6 +124,16 @@ generic business language."""
         report["faithfulness_summary"] = memory.faithfulness_summary
         report["agent_timings"] = memory.agent_timings
         report["total_runtime_seconds"] = memory.total_runtime_seconds
+        # Deterministic data-coverage: which document types the client actually
+        # provided. Powers the "analyzed vs not provided" disclosure in the UI.
+        report["document_coverage"] = {
+            "financial": bool(memory.uploaded_financial_text.strip()),
+            "bank": bool(memory.uploaded_bank_text.strip()),
+            "tax": bool(memory.uploaded_tax_text.strip()),
+            "legal": bool(memory.uploaded_legal_text.strip()),
+            "hr": bool(memory.uploaded_hr_text.strip()),
+            "business_plan": bool(memory.uploaded_plan_text.strip()),
+        }
 
         return report
 

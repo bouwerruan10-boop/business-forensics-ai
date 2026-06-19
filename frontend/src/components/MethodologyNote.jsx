@@ -1,8 +1,13 @@
 // Methodology & Confidence — a transparency panel. Research shows that disclosing
 // how an analysis was produced, how confident it is, and what it could NOT verify
 // raises trust rather than lowering it. All values come from the report itself.
-import { ShieldCheck, AlertTriangle, Gauge, Database, Clock } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Gauge, Database, Clock, Check, Minus } from 'lucide-react'
 import InfoTip from './InfoTip'
+
+const COVERAGE_LABELS = {
+  financial: 'Financial Records', bank: 'Bank Statements', tax: 'Tax Documents',
+  legal: 'Legal Documents', hr: 'HR & Payroll', business_plan: 'Business Plan',
+}
 
 function Stat({ Icon, label, value, tone = 'slate' }) {
   const toneCls = {
@@ -65,6 +70,24 @@ export default function MethodologyNote({ report }) {
           <ul className="text-slate-300 text-xs space-y-0.5 list-disc list-inside">
             {conflictTitles.slice(0, 6).map((t, i) => <li key={i}>{t}</li>)}
           </ul>
+        </div>
+      )}
+
+      {report.document_coverage && (
+        <div className="mb-4">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Documents analysed</div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(COVERAGE_LABELS).map(([k, label]) => {
+              const has = !!report.document_coverage[k]
+              return (
+                <span key={k}
+                  className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${has ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20' : 'bg-white/[0.03] text-slate-500 border-white/10'}`}
+                  aria-label={`${label}: ${has ? 'provided' : 'not provided'}`}>
+                  {has ? <Check size={11} aria-hidden="true" /> : <Minus size={11} aria-hidden="true" />} {label}
+                </span>
+              )
+            })}
+          </div>
         </div>
       )}
 
