@@ -7,6 +7,7 @@ Findings ranked by quantified financial impact, not by agent order.
 """
 import json
 import re
+import time
 from agents.base_agent import BaseAgent
 from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent
 from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
@@ -48,6 +49,7 @@ generic business language."""
         """
 
         # Phase 1: Business model — profile data takes priority over extracted data
+        _pipeline_start = time.perf_counter()
         if progress_callback:
             progress_callback("CEO Agent", "Analysing business model from uploaded data...")
         self._build_business_model(business_data, memory)
@@ -78,6 +80,7 @@ generic business language."""
             agent = AgentClass()
             if progress_callback:
                 progress_callback(agent.name, f"{agent.name} conducting investigation...")
+            _t = time.perf_counter()
             try:
                 findings = agent.analyze(business_data, memory)
                 for f in findings:
@@ -86,6 +89,7 @@ generic business language."""
                 print(f"[pipeline] {agent.name} failed, skipping: {exc}")
                 if progress_callback:
                     progress_callback(agent.name, f"{agent.name} skipped (error)")
+            memory.agent_timings.append({"agent": agent.name, "seconds": round(time.perf_counter() - _t, 1)})
 
         # Phase 2b: Market deep dive — full intelligence after all specialists
         if progress_callback:
@@ -120,6 +124,14 @@ generic business language."""
         except Exception as exc:
             print(f"[pipeline] SALegalAgent failed, skipping: {exc}")
 
+        # Phase 2e: Faithfulness check — flag findings whose cited metrics
+        # conflict with the deterministically computed ratios.
+        try:
+            from services.faithfulness import verify_findings
+            memory.faithfulness_summary = verify_findings(memory.findings, memory.financial_ratios)
+        except Exception as exc:
+            print(f"[pipeline] faithfulness check skipped: {exc}")
+
         # Phase 3: Cross-agent synthesis
         if progress_callback:
             progress_callback("CEO Agent", "Synthesising cross-agent findings...")
@@ -134,7 +146,11 @@ generic business language."""
         # Phase 5: Generate report
         if progress_callback:
             progress_callback("CEO Agent", "Writing executive narrative...")
+        memory.total_runtime_seconds = round(time.perf_counter() - _pipeline_start, 1)
         report = self._generate_report(business_data, memory, synthesis)
+        report["faithfulness_summary"] = memory.faithfulness_summary
+        report["agent_timings"] = memory.agent_timings
+        report["total_runtime_seconds"] = memory.total_runtime_seconds
 
         return report
 
@@ -427,6 +443,8 @@ Return ONLY valid JSON.
                 "benchmark_reference": f.benchmark_reference,
                 "data_source": f.data_source,
                 "quick_win": f.quick_win,
+                "verification": getattr(f, "verification", ""),
+                "verification_note": getattr(f, "verification_note", ""),
             }
 
         all_findings_serial = [_serialise(f) for f in memory.findings]

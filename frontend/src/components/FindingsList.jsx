@@ -27,6 +27,16 @@ function FindingCard({ finding }) {
                 ⚡ Quick Win
               </span>
             )}
+            {finding.verification === 'conflict' && (
+              <span title={finding.verification_note} className="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5 font-medium">
+                ⚠ Figure unverified
+              </span>
+            )}
+            {finding.verification === 'confirmed' && (
+              <span title={finding.verification_note} className="text-xs bg-emerald-500/10 text-emerald-400/70 border border-emerald-500/20 rounded-full px-2 py-0.5">
+                ✓ Verified
+              </span>
+            )}
             <span className="text-xs text-slate-600">{finding.agent?.replace(' Agent', '')}</span>
           </div>
           <div className="text-white text-sm font-semibold leading-snug">{finding.title}</div>
@@ -67,6 +77,14 @@ function FindingCard({ finding }) {
               <div className="text-slate-400 text-xs">{finding.benchmark_reference}</div>
             </div>
           )}
+          {finding.verification_note && (
+            <div className={`rounded-lg p-3 ${finding.verification === 'conflict' ? 'bg-amber-500/5 border border-amber-500/20' : 'bg-emerald-500/5 border border-emerald-500/15'}`}>
+              <div className={`text-xs font-medium mb-0.5 ${finding.verification === 'conflict' ? 'text-amber-300' : 'text-emerald-400'}`}>
+                Figure verification
+              </div>
+              <div className="text-slate-300 text-xs">{finding.verification_note}</div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -103,8 +121,20 @@ export default function FindingsList({ findings = [] }) {
     </button>
   )
 
+  const conflicts = findings.filter(f => f.verification === 'conflict').length
+
   return (
     <div>
+      {conflicts > 0 && (
+        <div className="mb-4 bg-amber-500/5 border border-amber-500/25 rounded-xl px-4 py-3 flex items-start gap-2">
+          <span className="text-amber-300 text-sm">⚠</span>
+          <p className="text-amber-200/90 text-xs leading-relaxed">
+            <span className="font-semibold">{conflicts} finding{conflicts > 1 ? 's' : ''}</span> cite a figure that
+            conflicts with the financials computed directly from your statements. These are flagged below — verify them
+            before relying on them. (Imara cross-checks AI figures against deterministic arithmetic.)
+          </p>
+        </div>
+      )}
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-5">
         {filterBtn('all', 'All')}

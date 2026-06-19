@@ -21,6 +21,8 @@ class AgentFinding:
     benchmark_reference: str = ""
     data_source: str = ""
     quick_win: bool = False
+    verification: str = ""        # "" | "confirmed" | "conflict" (vs computed ratios)
+    verification_note: str = ""
 
 
 @dataclass
@@ -55,6 +57,12 @@ class SharedMemory:
     financial_figures: dict = field(default_factory=dict)     # extracted line items
     financial_ratios: dict = field(default_factory=dict)      # {key: {value, benchmark, status, source}}
     financial_fundamentals_score: int = 0                     # 0-100 (0 = not computed)
+
+    # Phase 1 — faithfulness verification (findings vs computed ratios)
+    faithfulness_summary: dict = field(default_factory=dict)   # {checked, confirmed, conflicts, conflict_titles}
+    # Phase 0 — observability
+    agent_timings: list = field(default_factory=list)          # [{agent, seconds}]
+    total_runtime_seconds: float = 0.0
 
     # Imara Score (branded composite, set by CEO agent Phase 4)
     imara_score: int = 0                     # 0-100 bankability / investability

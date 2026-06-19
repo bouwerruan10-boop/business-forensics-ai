@@ -255,3 +255,41 @@ def test_ratios_extract_from_summary_csv():
     assert "current_ratio" in ratios
     fs = fundamentals_score(ratios, "retail_general")
     assert fs["available"] and fs["score"] is not None
+
+
+# ── Phase 1: faithfulness verification ─────────────────────────────────────
+from services.faithfulness import verify_findings
+
+class _Fnd:
+    def __init__(self, title, detail="", benchmark_reference=""):
+        self.title = title; self.detail = detail; self.benchmark_reference = benchmark_reference
+        self.verification = ""; self.verification_note = ""
+
+_RATIOS = {
+    "gross_margin": {"value": 33.2, "label": "Gross Margin"},
+    "current_ratio": {"value": 1.5, "label": "Current Ratio"},
+    "debtor_days": {"value": 55.0, "label": "Debtor Days"},
+}
+
+def test_faithfulness_flags_conflict():
+    # The exact live-test hallucination: claims 21.3% when computed is 33.2%.
+    f = _Fnd("Gross Margin ~21.3% vs Industry Median 37.8%", "R1.32M erosion")
+    summary = verify_findings([f], _RATIOS)
+    assert f.verification == "conflict"
+    assert "33.2" in f.verification_note
+    assert summary["conflicts"] == 1 and summary["checked"] == 1
+
+def test_faithfulness_confirms_match():
+    f = _Fnd("Current Ratio healthy at 1.5x")
+    verify_findings([f], _RATIOS)
+    assert f.verification == "confirmed"
+
+def test_faithfulness_ignores_unverifiable():
+    f = _Fnd("Staff turnover ~35% costs R956k")  # no computed metric for this
+    verify_findings([f], _RATIOS)
+    assert f.verification == ""
+
+def test_faithfulness_no_ratios_is_safe():
+    f = _Fnd("Gross margin 21.3%")
+    summary = verify_findings([f], {})
+    assert f.verification == "" and summary["checked"] == 0
