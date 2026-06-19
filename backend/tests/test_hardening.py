@@ -383,3 +383,22 @@ def test_mark_interrupted_analyses(tmp_path, monkeypatch):
     db.create_analysis("22222222-2222-2222-2222-222222222222", {"company_name": "Y"}, 1)
     db.save_report("22222222-2222-2222-2222-222222222222", {"ok": True})
     assert db.mark_interrupted_analyses() == 0
+
+
+# ── Security: opt-in admin gate ────────────────────────────────────────────
+def test_admin_gate(monkeypatch):
+    import main, pytest as _pt
+    from fastapi import HTTPException
+    class _Req:
+        def __init__(self, headers): self.headers = headers
+    # disabled when no key configured -> passes through
+    monkeypatch.setattr(main, "ADMIN_API_KEY", "")
+    assert main.verify_admin_key(_Req({})) is None
+    # enabled: missing or wrong key -> 401
+    monkeypatch.setattr(main, "ADMIN_API_KEY", "s3cret")
+    with _pt.raises(HTTPException):
+        main.verify_admin_key(_Req({}))
+    with _pt.raises(HTTPException):
+        main.verify_admin_key(_Req({"X-Admin-Key": "nope"}))
+    # correct key -> passes
+    assert main.verify_admin_key(_Req({"X-Admin-Key": "s3cret"})) is None

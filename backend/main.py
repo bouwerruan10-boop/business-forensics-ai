@@ -58,6 +58,23 @@ def verify_api_key(request: Request):
             detail="Invalid or missing API key. Provide it in the X-API-Key header.",
         )
 
+# -- Optional admin gate (separate key for /api/admin/*) -----------
+# Set ADMIN_API_KEY in the backend env to lock the admin endpoints. Opt-in:
+# if unset, the gate stays open (no behaviour change until you set the key).
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+
+
+def verify_admin_key(request: Request):
+    """Dependency: protect /api/admin/* when ADMIN_API_KEY is configured."""
+    if not ADMIN_API_KEY:
+        return  # gate disabled
+    provided = request.headers.get("X-Admin-Key", "")
+    if provided != ADMIN_API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing admin key. Provide it in the X-Admin-Key header.",
+        )
+
 
 app = FastAPI(
     title="Imara",
@@ -381,7 +398,7 @@ def simulate(req: SimulateRequest):
 # -- Admin endpoints -----------------------------------------------
 
 @app.get("/api/admin/analyses")
-def admin_list_analyses(limit: int = 50, offset: int = 0):
+def admin_list_analyses(limit: int = 50, offset: int = 0, _admin: None = Depends(verify_admin_key)):
     """List all historical analyses. Returns metadata only (no report blob)."""
     rows = list_analyses(limit=limit, offset=offset)
     totals = {
@@ -394,7 +411,7 @@ def admin_list_analyses(limit: int = 50, offset: int = 0):
 
 
 @app.get("/api/admin/analyses/{analysis_id}")
-def admin_get_analysis(analysis_id: str):
+def admin_get_analysis(analysis_id: str, _admin: None = Depends(verify_admin_key)):
     """Full detail for one analysis including report."""
     row = db_get_analysis(analysis_id)
     if not row:
@@ -403,7 +420,7 @@ def admin_get_analysis(analysis_id: str):
 
 
 @app.delete("/api/admin/analyses/{analysis_id}")
-def admin_delete_analysis(analysis_id: str):
+def admin_delete_analysis(analysis_id: str, _admin: None = Depends(verify_admin_key)):
     """Hard-delete an analysis record."""
     deleted = delete_analysis(analysis_id)
     if not deleted:
