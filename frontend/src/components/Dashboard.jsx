@@ -10,6 +10,7 @@ import ValuationPanel from './ValuationPanel'
 import MarketIntelligence from './MarketIntelligence'
 import SACompliancePanel from './SACompliancePanel'
 import SectionNav from './SectionNav'
+import MethodologyNote from './MethodologyNote'
 
 function Section({ id, title, subtitle, children }) {
   return (
@@ -160,6 +161,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...((report.market_search_performed || report.market_visibility_score > 0) ? [{ id: 'market', label: 'Market Intelligence' }] : []),
     ...((report.sa_tax_performed || report.sa_legal_performed) ? [{ id: 'sa-compliance', label: 'SA Compliance' }] : []),
     { id: 'simulator', label: 'What-If Simulator' },
+    { id: 'methodology', label: 'Methodology' },
   ]
 
   return (
@@ -284,6 +286,15 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         subtitle="Model financial scenarios using your actual revenue and industry benchmark cost ratios"
       >
         <Simulator analysisId={analysisId} currency={report.currency} />
+      </Section>
+
+      {/* Methodology & confidence */}
+      <Section
+        id="methodology"
+        title="Methodology & Confidence"
+        subtitle="How this analysis was produced, how confident it is, and its limits"
+      >
+        <MethodologyNote report={report} />
       </Section>
         </div>
       </div>

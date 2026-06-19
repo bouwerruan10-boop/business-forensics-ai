@@ -1,0 +1,79 @@
+// Methodology & Confidence — a transparency panel. Research shows that disclosing
+// how an analysis was produced, how confident it is, and what it could NOT verify
+// raises trust rather than lowering it. All values come from the report itself.
+import { ShieldCheck, AlertTriangle, Gauge, Database, Clock } from 'lucide-react'
+import InfoTip from './InfoTip'
+
+function Stat({ Icon, label, value, tone = 'slate' }) {
+  const toneCls = {
+    emerald: 'text-emerald-400',
+    amber: 'text-amber-400',
+    red: 'text-red-400',
+    gold: 'text-gold',
+    slate: 'text-slate-200',
+  }[tone] || 'text-slate-200'
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+      <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider mb-1">
+        <Icon size={12} aria-hidden="true" /> {label}
+      </div>
+      <div className={`text-sm font-semibold ${toneCls}`}>{value}</div>
+    </div>
+  )
+}
+
+export default function MethodologyNote({ report }) {
+  if (!report) return null
+  const f = report.faithfulness_summary || {}
+  const checked = Number(f.checked || 0)
+  const confirmed = Number(f.confirmed || 0)
+  const conflicts = Number(f.conflicts || 0)
+  const conflictTitles = Array.isArray(f.conflict_titles) ? f.conflict_titles : []
+  const completeness = typeof report.imara_completeness === 'number' ? report.imara_completeness : null
+  const confidence = report.imara_confidence || null
+  const runtime = report.total_runtime_seconds
+  const runtimeLabel = runtime ? (runtime >= 60 ? `${Math.round(runtime / 60)}m ${Math.round(runtime % 60)}s` : `${Math.round(runtime)}s`) : null
+  const confTone = confidence === 'high' ? 'emerald' : confidence === 'medium' ? 'amber' : 'slate'
+
+  return (
+    <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5 sm:p-6">
+      <h3 className="text-white font-bold text-lg flex items-center gap-1.5 mb-2">
+        Methodology &amp; Confidence
+        <InfoTip label="Methodology" text="How this analysis was produced and how far to trust it. Financial ratios are computed by arithmetic from your statements; AI specialists add context and recommendations; every AI-cited figure is cross-checked against the computed ratios." />
+      </h3>
+      <p className="text-slate-300 text-sm leading-relaxed mb-4">
+        Imara blends two layers: a <span className="text-white">deterministic engine</span> that computes financial ratios
+        directly from your statements (arithmetic, not AI), and a panel of <span className="text-white">AI specialist agents</span> that
+        add interpretation, benchmarks and recommendations. Every figure an agent cites is automatically
+        cross-checked against the computed ratios, and any mismatch is flagged.
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+        {confidence && <Stat Icon={Gauge} label="Confidence" value={confidence.charAt(0).toUpperCase() + confidence.slice(1)} tone={confTone} />}
+        {completeness != null && <Stat Icon={Database} label="Data completeness" value={`${completeness}% of signals`} tone={completeness >= 80 ? 'emerald' : completeness >= 50 ? 'amber' : 'red'} />}
+        {checked > 0 && <Stat Icon={ShieldCheck} label="Figures checked" value={`${checked}`} tone="slate" />}
+        {checked > 0 && <Stat Icon={ShieldCheck} label="Confirmed" value={`${confirmed}`} tone="emerald" />}
+        {checked > 0 && <Stat Icon={AlertTriangle} label="Conflicts" value={`${conflicts}`} tone={conflicts > 0 ? 'amber' : 'emerald'} />}
+        {runtimeLabel && <Stat Icon={Clock} label="Analysis time" value={runtimeLabel} tone="slate" />}
+      </div>
+
+      {conflicts > 0 && conflictTitles.length > 0 && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 mb-4">
+          <div className="text-amber-300 text-xs font-medium mb-1 flex items-center gap-1.5">
+            <AlertTriangle size={13} aria-hidden="true" /> Figures flagged for verification
+          </div>
+          <ul className="text-slate-300 text-xs space-y-0.5 list-disc list-inside">
+            {conflictTitles.slice(0, 6).map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+
+      <div className="text-slate-400 text-xs leading-relaxed">
+        <span className="text-slate-300 font-medium">What this is — and isn&apos;t.</span> This report is decision-support, not
+        a substitute for a registered auditor, business valuator, or tax practitioner.
+        {completeness != null && completeness < 100 && ' A completeness below 100% means some inputs (e.g. bank statements, tax or legal documents) were not provided, so parts of the analysis are estimated from what was available.'}
+        {' '}Indicative valuations and forecasts should be confirmed by a qualified professional before you rely on them.
+      </div>
+    </div>
+  )
+}
