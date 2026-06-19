@@ -8,7 +8,7 @@ import httpx
 import json
 import os
 from memory.shared_memory import SharedMemory, AgentFinding
-from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS, MOCK_MODE
+from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS, MOCK_MODE, PARSE_MODEL
 from services.benchmark_service import format_benchmark_context
 
 # Build an httpx client that works in any environment:
@@ -45,10 +45,10 @@ class BaseAgent:
     role: str = ""
     system_prompt: str = ""
 
-    def _call_claude(self, user_message: str, system_override: str = "") -> str:
+    def _call_claude(self, user_message: str, system_override: str = "", model_override: str = "") -> str:
         system = system_override or self.system_prompt
         response = client.messages.create(
-            model=MODEL,
+            model=model_override or MODEL,
             max_tokens=MAX_TOKENS,
             system=system,
             messages=[{"role": "user", "content": user_message}]
@@ -88,7 +88,12 @@ ANALYSIS TO EXTRACT FROM:
 
 Return ONLY a valid JSON array. No explanation text. No markdown fences.
 """
-        raw = self._call_claude(parse_prompt)
+        _parse_system = "You are a precise JSON data-extraction engine. Output only valid JSON — no prose, no markdown fences."
+        try:
+            raw = self._call_claude(parse_prompt, system_override=_parse_system, model_override=PARSE_MODEL)
+        except Exception as _exc:
+            print("[parse] {} model failed ({}); retrying on default model".format(PARSE_MODEL, _exc))
+            raw = self._call_claude(parse_prompt, system_override=_parse_system)
         raw = raw.strip()
 
         # Strip markdown code fences
