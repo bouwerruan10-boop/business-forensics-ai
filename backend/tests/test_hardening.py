@@ -402,3 +402,27 @@ def test_admin_gate(monkeypatch):
         main.verify_admin_key(_Req({"X-Admin-Key": "nope"}))
     # correct key -> passes
     assert main.verify_admin_key(_Req({"X-Admin-Key": "s3cret"})) is None
+
+
+# ── Security: expiring/revocable share tokens ──────────────────────────────
+def test_share_tokens(tmp_path, monkeypatch):
+    import services.database as db
+    from datetime import datetime, timezone, timedelta
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "t.db")
+    db.init_db()
+    aid = "33333333-3333-3333-3333-333333333333"
+    db.create_analysis(aid, {"company_name": "Z"}, 1)
+    # valid token resolves to the analysis
+    tok = db.create_share(aid)
+    assert db.resolve_share(tok) == aid
+    # revoked token -> None
+    assert db.revoke_share(tok) is True
+    assert db.resolve_share(tok) is None
+    # expired token -> None
+    past = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    assert db.resolve_share(db.create_share(aid, past)) is None
+    # future expiry -> valid
+    future = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
+    assert db.resolve_share(db.create_share(aid, future)) == aid
+    # unknown token -> None
+    assert db.resolve_share("does-not-exist") is None

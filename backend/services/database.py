@@ -7,6 +7,7 @@ import sqlite3
 import json
 import threading
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -73,6 +74,15 @@ def init_db():
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_analyses_created
                 ON analyses (created_at DESC)
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS shares (
+                    token       TEXT PRIMARY KEY,
+                    analysis_id TEXT NOT NULL,
+                    expires_at  TEXT,
+                    revoked     INTEGER NOT NULL DEFAULT 0,
+                    created_at  TEXT NOT NULL
+                )
             """)
             conn.commit()
         finally:
@@ -142,6 +152,56 @@ def save_error(analysis_id: str, error: str):
                 WHERE id = ?
             """, (error[:2000], now, analysis_id))
             conn.commit()
+        finally:
+            conn.close()
+
+
+def create_share(analysis_id: str, expires_at: str | None = None) -> str:
+    """Create an opaque public share token for an analysis (optional ISO expiry)."""
+    token = secrets.token_urlsafe(16)
+    now = _utcnow()
+    with _lock:
+        conn = _get_conn()
+        try:
+            conn.execute(
+                "INSERT INTO shares (token, analysis_id, expires_at, revoked, created_at) "
+                "VALUES (?, ?, ?, 0, ?)", (token, analysis_id, expires_at, now))
+            conn.commit()
+        finally:
+            conn.close()
+    return token
+
+
+def resolve_share(token: str) -> str | None:
+    """Return the analysis_id for a VALID share (exists, not revoked, not expired), else None."""
+    with _lock:
+        conn = _get_conn()
+        try:
+            row = conn.execute(
+                "SELECT analysis_id, expires_at, revoked FROM shares WHERE token = ?",
+                (token,)).fetchone()
+        finally:
+            conn.close()
+    if row is None or row["revoked"]:
+        return None
+    exp = row["expires_at"]
+    if exp:
+        try:
+            if datetime.now(timezone.utc) > datetime.fromisoformat(exp):
+                return None
+        except Exception:
+            pass
+    return row["analysis_id"]
+
+
+def revoke_share(token: str) -> bool:
+    """Revoke a share token so its public link stops working. Returns True if a row changed."""
+    with _lock:
+        conn = _get_conn()
+        try:
+            cur = conn.execute("UPDATE shares SET revoked = 1 WHERE token = ?", (token,))
+            conn.commit()
+            return cur.rowcount > 0
         finally:
             conn.close()
 

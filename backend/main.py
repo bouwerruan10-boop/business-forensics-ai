@@ -33,6 +33,7 @@ from services.database import (
     init_db, create_analysis, save_report, save_error,
     get_report, list_analyses, count_analyses, delete_analysis,
     get_analysis as db_get_analysis, mark_interrupted_analyses,
+    create_share, resolve_share, revoke_share,
 )
 from agents.ceo_agent import CEOAgent
 from memory.shared_memory import SharedMemory
@@ -257,6 +258,39 @@ def get_report_endpoint(analysis_id: str):
     if status.get("status") == "processing":
         raise HTTPException(status_code=202, detail="Analysis still in progress")
     raise HTTPException(status_code=404, detail="Analysis not found")
+
+
+@app.post("/api/report/{analysis_id}/share")
+def create_report_share(analysis_id: str, expires_in_days: int = 0):
+    """Create a public, optionally-expiring share link for a report."""
+    if not db_get_analysis(analysis_id):
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    expires_at = None
+    if expires_in_days and expires_in_days > 0:
+        from datetime import datetime, timezone, timedelta
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=expires_in_days)).isoformat()
+    token = create_share(analysis_id, expires_at)
+    return {"token": token, "expires_at": expires_at}
+
+
+@app.get("/api/shared/{token}")
+def get_shared_report(token: str):
+    """Public report fetch via a share token — 410 if expired or revoked."""
+    analysis_id = resolve_share(token)
+    if not analysis_id:
+        raise HTTPException(status_code=410, detail="This shared link has expired or been revoked.")
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Report not available")
+    return result
+
+
+@app.post("/api/admin/shares/{token}/revoke")
+def admin_revoke_share(token: str, _admin: None = Depends(verify_admin_key)):
+    """Revoke a share token so its public link stops working."""
+    if not revoke_share(token):
+        raise HTTPException(status_code=404, detail="Share not found")
+    return {"revoked": True}
 
 
 @app.get("/api/report/{analysis_id}/pdf")
