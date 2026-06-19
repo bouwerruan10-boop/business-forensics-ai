@@ -237,3 +237,40 @@ def fundamentals_score(ratios: dict, industry_key: str = "general") -> dict:
         return {"score": None, "components_used": 0, "available": False}
     return {"score": int(round(sum(parts) / len(parts))),
             "components_used": len(parts), "available": True}
+
+
+# ── Extraction schema + validation (used by the AI-extraction fallback) ────
+# Raw income-statement / balance-sheet figures the ratio engine consumes.
+KNOWN_FIGURE_FIELDS = (
+    "revenue", "cogs", "gross_profit", "operating_profit", "net_profit",
+    "current_assets", "inventory", "receivables", "current_liabilities",
+    "payables", "total_debt", "equity", "interest",
+)
+
+
+def validate_financials(figs: dict) -> dict:
+    """Deterministic internal-consistency checks on an extracted figure set.
+    Used to gauge confidence (esp. for AI-extracted figures from messy documents).
+    Returns {ok, issues, checks, fields}. Lenient by design — real statements vary."""
+    issues = []
+    checks = 0
+    rev = figs.get("revenue")
+    cogs = figs.get("cogs")
+    gp = figs.get("gross_profit")
+    if rev is not None and rev <= 0:
+        issues.append("Revenue is missing or non-positive.")
+    if rev is not None and cogs is not None and gp is not None:
+        checks += 1
+        if abs((rev - cogs) - gp) > max(0.01 * abs(rev), 1.0):
+            issues.append("Gross profit does not reconcile to revenue minus cost of sales.")
+    gp_eff = gp if gp is not None else ((rev - cogs) if (rev is not None and cogs is not None) else None)
+    op = figs.get("operating_profit")
+    if gp_eff is not None and op is not None:
+        checks += 1
+        if op > gp_eff + max(0.01 * abs(gp_eff), 1.0):
+            issues.append("Operating profit exceeds gross profit.")
+    for k in ("current_assets", "current_liabilities", "inventory", "receivables", "payables", "equity"):
+        v = figs.get(k)
+        if v is not None and v < 0:
+            issues.append("{} is negative.".format(k))
+    return {"ok": len(issues) == 0, "issues": issues, "checks": checks, "fields": len(figs)}

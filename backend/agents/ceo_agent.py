@@ -12,7 +12,7 @@ from agents.base_agent import BaseAgent
 from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent
 from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
 from memory.shared_memory import SharedMemory, AgentFinding
-from config import MODEL, MAX_TOKENS
+from config import MODEL, MAX_TOKENS, PARSE_MODEL
 
 
 class CEOAgent(BaseAgent):
@@ -57,7 +57,15 @@ generic business language."""
         # Phase 1c: Deterministic financial ratios — grounds scores in real arithmetic
         try:
             from services.financial_ratios import extract_financials, compute_ratios, fundamentals_score
-            figs = extract_financials(memory.uploaded_financial_text or "")
+            _ftext = memory.uploaded_financial_text or ""
+            figs = extract_financials(_ftext)
+            src = "deterministic"
+            # Messy/unstructured document where the arithmetic parser found little -> AI fallback.
+            if len(_ftext.strip()) > 40 and len(figs) < 3:
+                ai_figs = self._llm_extract_financials(_ftext)
+                if len(ai_figs) > len(figs):
+                    figs, src = ai_figs, "ai"
+            memory.financial_extraction_source = src if figs else ""
             memory.financial_figures = figs
             memory.financial_ratios = compute_ratios(figs, memory.industry_key or "general", memory.annual_revenue)
             _fs = fundamentals_score(memory.financial_ratios, memory.industry_key or "general")
@@ -124,6 +132,7 @@ generic business language."""
         report["faithfulness_summary"] = memory.faithfulness_summary
         report["agent_timings"] = memory.agent_timings
         report["total_runtime_seconds"] = memory.total_runtime_seconds
+        report["financial_extraction_source"] = memory.financial_extraction_source
         # Deterministic data-coverage: which document types the client actually
         # provided. Powers the "analyzed vs not provided" disclosure in the UI.
         report["document_coverage"] = {
@@ -136,6 +145,39 @@ generic business language."""
         }
 
         return report
+
+    def _llm_extract_financials(self, text: str) -> dict:
+        """Fallback extractor for messy/unstructured statements: ask a cheap model to
+        pull the standard figures into JSON. Deterministic extraction is always preferred;
+        this only runs when the arithmetic parser finds too little, and the result is
+        flagged as AI-extracted (lower confidence) downstream."""
+        from services.financial_ratios import KNOWN_FIGURE_FIELDS
+        fields = ", ".join(KNOWN_FIGURE_FIELDS)
+        prompt = (
+            "Extract these financial figures from the statement text below and return ONLY a JSON object.\n"
+            "Keys (use only those you can find; omit the rest): " + fields + "\n"
+            "Values must be plain numbers (no currency symbols, no thousands separators). "
+            "Use the most recent full-year figures if multiple periods appear.\n\n"
+            "STATEMENT TEXT:\n" + text[:6000] + "\n\nJSON:"
+        )
+        try:
+            raw = self._call_claude(
+                prompt,
+                system_override="You are a precise financial-figure extraction engine. Output only a JSON object of numbers.",
+                model_override=PARSE_MODEL,
+            )
+            data = json.loads(_strip_json(raw))
+            figs = {}
+            for k in KNOWN_FIGURE_FIELDS:
+                v = data.get(k)
+                if isinstance(v, bool):
+                    continue
+                if isinstance(v, (int, float)) and v == v:
+                    figs[k] = float(v)
+            return figs
+        except Exception as exc:
+            print("[extract] AI fallback failed: {}".format(exc))
+            return {}
 
     # ── Phase 1 ──────────────────────────────────────────────────
 

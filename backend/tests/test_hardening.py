@@ -426,3 +426,18 @@ def test_share_tokens(tmp_path, monkeypatch):
     assert db.resolve_share(db.create_share(aid, future)) == aid
     # unknown token -> None
     assert db.resolve_share("does-not-exist") is None
+
+
+# ── Front 4: financial extraction validation ───────────────────────────────
+def test_validate_financials():
+    from services.financial_ratios import validate_financials, KNOWN_FIGURE_FIELDS
+    assert "revenue" in KNOWN_FIGURE_FIELDS and "equity" in KNOWN_FIGURE_FIELDS
+    # consistent income statement -> ok, with at least one reconciliation check run
+    ok = validate_financials({"revenue": 1000, "cogs": 600, "gross_profit": 400, "operating_profit": 250})
+    assert ok["ok"] is True and ok["checks"] >= 1
+    # gross profit doesn't reconcile to revenue - cogs -> flagged
+    assert validate_financials({"revenue": 1000, "cogs": 600, "gross_profit": 250})["ok"] is False
+    # operating profit exceeds gross profit -> flagged
+    assert validate_financials({"revenue": 1000, "cogs": 600, "gross_profit": 400, "operating_profit": 500})["ok"] is False
+    # negative balance-sheet item -> flagged
+    assert validate_financials({"revenue": 100, "equity": -5})["ok"] is False

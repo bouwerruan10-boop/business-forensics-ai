@@ -55,6 +55,7 @@ class SharedMemory:
 
     # Deterministic financial ratios — computed from uploaded financials, NOT LLM-generated
     financial_figures: dict = field(default_factory=dict)     # extracted line items
+    financial_extraction_source: str = ""   # "deterministic" | "ai" — provenance of the figures
     financial_ratios: dict = field(default_factory=dict)      # {key: {value, benchmark, status, source}}
     financial_fundamentals_score: int = 0                     # 0-100 (0 = not computed)
 

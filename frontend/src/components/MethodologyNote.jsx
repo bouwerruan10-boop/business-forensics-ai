@@ -73,6 +73,14 @@ export default function MethodologyNote({ report }) {
         </div>
       )}
 
+      {report.financial_extraction_source === 'ai' && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 mb-4 text-xs text-amber-200/90 leading-relaxed">
+          <span className="font-semibold text-amber-300">Note on the figures:</span> the financial numbers were
+          AI-extracted from an unstructured document (the deterministic parser could not read it directly), so the
+          computed ratios carry lower confidence — verify them against your statements before relying on them.
+        </div>
+      )}
+
       {report.document_coverage && (
         <div className="mb-4">
           <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Documents analysed</div>
