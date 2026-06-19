@@ -36,6 +36,15 @@ prompts. The repair commit (`acf49b6`) passed the healthcheck and is live.
    (env `CORS_ORIGINS`); frontend sends `X-API-Key` when `VITE_API_KEY` set.
 7. **Version visibility** — `/api/health` returns the deploy commit (`RAILWAY_GIT_COMMIT_SHA`).
 
+### D. Grounded financial ratios (this commit)
+`services/financial_ratios.py` — pure-Python extractor + ratio calculator. Computes margins,
+liquidity, gearing, working-capital days, and interest cover **directly from the uploaded
+financials (arithmetic, not LLM-generated)**, each metric traceable to its source figures.
+A deterministic `financial_fundamentals_score` now **anchors the Imara Score's Profitability
+component** (60/40 blend) so the headline number reflects real margins, not finding-count.
+Rendered as a "Financial Fundamentals" panel in the dashboard, PDF, and HTML. Fully unit-tested
+(6 new tests, no API). Addresses the #1 product risk for a credit tool: number hallucination.
+
 ### Two pre-existing bugs fixed
 - `_wrap_flowables` was **called but never defined** → PDF export 500'd on any report with findings. Added.
 - `client.js` used a relative `/api` that Vercel's SPA rewrite swallowed and **never read

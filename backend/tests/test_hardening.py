@@ -141,3 +141,75 @@ def test_all_agents_registered():
 def test_app_imports_and_has_routes():
     from main import app
     assert len(app.routes) > 5
+
+
+# ── Deterministic financial ratios ────────────────────────────────────────
+from services.financial_ratios import (
+    parse_amount, extract_financials, compute_ratios, fundamentals_score,
+)
+
+_STATEMENT = """Revenue 8,000,000
+Cost of sales 5,344,000
+Gross profit 2,656,000
+Operating profit 656,000
+Net profit 448,000
+Current assets 2,400,000
+Current liabilities 1,600,000
+Inventory 900,000
+Trade receivables 1,200,000
+Trade payables 700,000
+Total borrowings 1,800,000
+Equity 2,000,000
+Finance costs 180,000"""
+
+
+def test_parse_amount_formats():
+    assert parse_amount("R 1 200 000") == 1_200_000
+    assert parse_amount("1.2m") == 1_200_000
+    assert parse_amount("8,000,000") == 8_000_000
+    assert parse_amount("(500)") == -500
+    assert parse_amount("not a number") is None
+
+
+def test_extract_financials():
+    f = extract_financials(_STATEMENT)
+    assert f["revenue"] == 8_000_000
+    assert f["gross_profit"] == 2_656_000
+    assert f["current_liabilities"] == 1_600_000
+    assert f["equity"] == 2_000_000
+
+
+def test_compute_ratios_values_and_source():
+    r = compute_ratios(extract_financials(_STATEMENT), "retail_general", 8_000_000)
+    # gross margin 2.656M / 8M = 33.2%
+    assert abs(r["gross_margin"]["value"] - 33.2) < 0.2
+    # current ratio 2.4M / 1.6M = 1.5x
+    assert abs(r["current_ratio"]["value"] - 1.5) < 0.01
+    # every ratio is traceable to source figures
+    for v in r.values():
+        assert v["source"] and "=" in v["source"]
+    # debtor days are critical for retail (benchmark 12)
+    assert r["debtor_days"]["status"] == "critical"
+
+
+def test_fundamentals_score_range():
+    r = compute_ratios(extract_financials(_STATEMENT), "retail_general", 8_000_000)
+    fs = fundamentals_score(r, "retail_general")
+    assert fs["available"] and 0 <= fs["score"] <= 100 and fs["components_used"] >= 4
+
+
+def test_fundamentals_score_empty():
+    fs = fundamentals_score({}, "general")
+    assert fs["available"] is False and fs["score"] is None
+
+
+def test_imara_profitability_anchored_on_fundamentals():
+    m = _full_memory()
+    m.financial_fundamentals_score = 30  # weak fundamentals should pull profitability down
+    ceo = _ceo(); ceo._score_business(m)
+    base_prof = m.profitability_score
+    ceo._calculate_imara_score(m)
+    prof_comp = next(c for c in m.imara_components if c["label"] == "Profitability")
+    # blended 0.6*30 + 0.4*base; must differ from the raw sub-score when they diverge
+    expected = round(0.6 * 30 + 0.4 * base_prof)
+    assert prof_comp["value"] == expected

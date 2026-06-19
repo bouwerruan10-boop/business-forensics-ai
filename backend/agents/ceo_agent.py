@@ -52,6 +52,17 @@ generic business language."""
             progress_callback("CEO Agent", "Analysing business model from uploaded data...")
         self._build_business_model(business_data, memory)
 
+        # Phase 1c: Deterministic financial ratios — grounds scores in real arithmetic
+        try:
+            from services.financial_ratios import extract_financials, compute_ratios, fundamentals_score
+            figs = extract_financials(memory.uploaded_financial_text or "")
+            memory.financial_figures = figs
+            memory.financial_ratios = compute_ratios(figs, memory.industry_key or "general", memory.annual_revenue)
+            _fs = fundamentals_score(memory.financial_ratios, memory.industry_key or "general")
+            memory.financial_fundamentals_score = _fs.get("score") or 0
+        except Exception as exc:
+            print(f"[pipeline] financial ratios skipped: {exc}")
+
         # Phase 1b: Market quick scan — runs first so all specialists get market context
         if progress_callback:
             progress_callback("Market Research Agent", "Scanning market presence and industry trends...")
@@ -338,8 +349,14 @@ Return ONLY valid JSON.
         and the remaining weights are re-normalised, so the score is always 0–100.
         """
         # (label, value 0-100 where higher = better, base weight, include?)
+        # Anchor profitability on COMPUTED fundamentals when available (60/40 blend),
+        # so the biggest component reflects real margins, not LLM finding-count.
+        _prof = memory.profitability_score
+        if memory.financial_fundamentals_score:
+            _prof = int(round(0.6 * memory.financial_fundamentals_score + 0.4 * memory.profitability_score))
+
         candidates = [
-            ("Profitability",        memory.profitability_score,            0.25, memory.profitability_score > 0),
+            ("Profitability",        _prof,                                 0.25, _prof > 0),
             ("Credit Readiness",     memory.credit_score,                   0.20, memory.credit_score > 0),
             ("Risk & Compliance",    memory.risk_score,                     0.15, memory.risk_score > 0),
             ("Operational Efficiency", memory.efficiency_score,             0.10, memory.efficiency_score > 0),
@@ -471,6 +488,11 @@ Return ONLY valid JSON.
             "imara_completeness": memory.imara_completeness,
             "imara_confidence": memory.imara_confidence,
             "imara_components": memory.imara_components,
+
+            # Deterministic financial ratios (grounded — computed, not LLM-generated)
+            "financial_figures": memory.financial_figures,
+            "financial_ratios": memory.financial_ratios,
+            "financial_fundamentals_score": memory.financial_fundamentals_score,
 
             # Narrative (McKinsey SCR)
             "situation": situation,

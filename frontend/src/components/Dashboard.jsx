@@ -1,5 +1,6 @@
 import ScoreCards from './ScoreCards'
 import ImaraScoreHero from './ImaraScoreHero'
+import FinancialRatios from './FinancialRatios'
 import FindingsList from './FindingsList'
 import Roadmap from './Roadmap'
 import Simulator from './Simulator'
@@ -172,6 +173,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         <ImaraScoreHero report={report} />
         <ScoreCards scores={report.scores || {}} report={report} />
       </Section>
+
+      {/* Financial Fundamentals (grounded ratios) */}
+      {report.financial_ratios && Object.keys(report.financial_ratios).length > 0 && (
+        <Section
+          id="fundamentals"
+          title="Financial Fundamentals"
+          subtitle="Ratios computed directly from your financials — traceable to source figures"
+        >
+          <FinancialRatios report={report} />
+        </Section>
+      )}
 
       {/* Quick Wins */}
       {allFindingsFlat.some(f => f.quick_win) && (

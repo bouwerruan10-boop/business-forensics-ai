@@ -106,6 +106,55 @@ def generate_html_report(report: dict) -> str:
         _score_bar("Fraud Risk (lower=better)", fraud_score, 20, 50, invert=True)
     )
 
+    # ── Financial Fundamentals (deterministic, grounded) ──────────
+    _ratios = report.get("financial_ratios", {}) or {}
+    ratios_html = ""
+    if _ratios:
+        _fund = report.get("financial_fundamentals_score")
+        _statcol = {"good": GREEN, "warning": AMBER, "critical": RED}
+        _rrows = ""
+        for _k, _r in _ratios.items():
+            _v = _r.get("value")
+            _val = ("%g%s" % (_v, _r.get("unit", ""))) if _v is not None else "—"
+            _col = _statcol.get(_r.get("status"), GRAY)
+            _rrows += f"""
+            <tr>
+              <td class="fr-label">{_e(_r.get('label',''))}</td>
+              <td class="fr-val" style="color:{_col}">{_e(_val)}</td>
+              <td class="fr-bench">{_e(_r.get('benchmark'))}</td>
+              <td class="fr-status"><span style="color:{_col}">&#9679;</span> {_e(str(_r.get('status','')).title())}</td>
+              <td class="fr-src">{_e(_r.get('source',''))}</td>
+            </tr>"""
+        _fund_html = (f'<span class="fr-score">Fundamentals score: <b>{_fund}/100</b></span>'
+                      if _fund else '')
+        ratios_html = f"""
+  <style>
+    .fr-wrap{{background:#fff;border:1px solid {LIGHT};border-radius:14px;padding:18px 20px;margin-bottom:22px}}
+    .fr-head{{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}}
+    .fr-title{{font-size:15px;font-weight:700;color:{NAVY}}}
+    .fr-score{{font-size:12px;color:{DARK}}}
+    .fr-note{{font-size:11px;color:{GRAY};margin-bottom:12px}}
+    table.fr{{width:100%;border-collapse:collapse;font-size:12px}}
+    table.fr th{{text-align:left;color:{GRAY};font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid {LIGHT};padding:4px 8px}}
+    table.fr td{{padding:6px 8px;border-bottom:1px solid #F3F3F3;vertical-align:top}}
+    .fr-label{{font-weight:600;color:{NAVY};white-space:nowrap}}
+    .fr-val{{font-weight:700;white-space:nowrap}}
+    .fr-bench{{color:{DARK}}}
+    .fr-status{{white-space:nowrap}}
+    .fr-src{{color:{GRAY};font-size:11px}}
+  </style>
+  <div class="fr-wrap">
+    <div class="fr-head">
+      <span class="fr-title">Financial Fundamentals</span>
+      {_fund_html}
+    </div>
+    <div class="fr-note">Computed directly from your financial statements (arithmetic, not AI-generated). Each figure is traceable to its source line items.</div>
+    <table class="fr">
+      <thead><tr><th>Metric</th><th>Value</th><th>Benchmark</th><th>Status</th><th>Source figures</th></tr></thead>
+      <tbody>{_rrows}</tbody>
+    </table>
+  </div>"""
+
     # ── Imara Score hero ──────────────────────────────────────────
     imara_score = report.get("imara_score")
     imara_html = ""
@@ -702,6 +751,7 @@ def generate_html_report(report: dict) -> str:
 <!-- ── OVERVIEW ───────────────────────────────────────────── -->
 <div id="page-overview" class="page active">
   {imara_html}
+  {ratios_html}
   <div class="metrics-grid">
     <div class="metric-card">
       <div class="metric-label">Business Health</div>

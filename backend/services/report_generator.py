@@ -93,6 +93,7 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
 
     # ── Traffic light scorecard (all audiences) ────────────────────
     _traffic_light_section(story, report)
+    _financial_ratios_section(story, report)
     story.append(PageBreak())
 
     # ── Standard narrative sections ────────────────────────────────
@@ -998,6 +999,58 @@ def _imara_score_block(story, report):
     ]))
     story.append(outer)
     story.append(Spacer(1, 0.5 * cm))
+
+
+def _financial_ratios_section(story, report):
+    """Grounded financial ratios table — computed from the financials, traceable."""
+    ratios = report.get("financial_ratios", {}) or {}
+    if not ratios:
+        return
+    fund = report.get("financial_fundamentals_score")
+    title = "FINANCIAL FUNDAMENTALS"
+    if fund:
+        title += "  ·  SCORE " + str(fund) + "/100"
+    _section_header(story, title)
+    story.append(Paragraph(
+        "Computed directly from the financial statements (arithmetic, not AI-generated). "
+        "Each figure is traceable to its source line items.",
+        _style(fontSize=8, textColor=MID_GRAY, leading=11)))
+    story.append(Spacer(1, 0.2 * cm))
+
+    stat_col = {"good": GREEN, "warning": AMBER, "critical": RED}
+    head = [Paragraph(h, _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE))
+            for h in ("METRIC", "VALUE", "BENCHMARK", "STATUS", "SOURCE FIGURES")]
+    rows = [head]
+    style = [
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, LIGHT_GRAY),
+        ("BOX", (0, 0), (-1, -1), 0.5, LIGHT_GRAY),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+    ]
+    ri = 1
+    for _k, r in ratios.items():
+        v = r.get("value")
+        unit = r.get("unit", "")
+        val = ("%g%s" % (v, unit)) if v is not None else "—"
+        col = stat_col.get(r.get("status"), MID_GRAY)
+        rows.append([
+            Paragraph(str(r.get("label", "")), _style(fontSize=8, fontName="Helvetica-Bold", textColor=NAVY)),
+            Paragraph(val, _style(fontSize=8, fontName="Helvetica-Bold", textColor=col)),
+            Paragraph(str(r.get("benchmark", "")), _style(fontSize=8, textColor=DARK_GRAY)),
+            Paragraph(str(r.get("status", "")).title(), _style(fontSize=8, textColor=col)),
+            Paragraph(str(r.get("source", "")), _style(fontSize=7, textColor=MID_GRAY)),
+        ])
+        if ri % 2 == 0:
+            style.append(("BACKGROUND", (0, ri), (-1, ri), OFF_WHITE))
+        ri += 1
+    t = Table(rows, colWidths=[CONTENT_W * 0.22, CONTENT_W * 0.13, CONTENT_W * 0.15,
+                               CONTENT_W * 0.13, CONTENT_W * 0.37])
+    t.setStyle(TableStyle(style))
+    story.append(t)
+    story.append(Spacer(1, 0.4 * cm))
 
 
 # ── Traffic Light Scorecard ────────────────────────────────────────

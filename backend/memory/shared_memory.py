@@ -51,6 +51,11 @@ class SharedMemory:
     efficiency_score: int = 0
     risk_score: int = 0
 
+    # Deterministic financial ratios — computed from uploaded financials, NOT LLM-generated
+    financial_figures: dict = field(default_factory=dict)     # extracted line items
+    financial_ratios: dict = field(default_factory=dict)      # {key: {value, benchmark, status, source}}
+    financial_fundamentals_score: int = 0                     # 0-100 (0 = not computed)
+
     # Imara Score (branded composite, set by CEO agent Phase 4)
     imara_score: int = 0                     # 0-100 bankability / investability
     imara_band: str = ""                     # "A" | "B" | "C" | "D" | "E"
