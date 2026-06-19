@@ -213,3 +213,45 @@ def test_imara_profitability_anchored_on_fundamentals():
     # blended 0.6*30 + 0.4*base; must differ from the raw sub-score when they diverge
     expected = round(0.6 * 30 + 0.4 * base_prof)
     assert prof_comp["value"] == expected
+
+
+# ── Parser → ratios integration (regression for summary-CSV extraction) ────
+from services.file_parser import parse_file
+
+_SUMMARY_CSV = (
+    b"Acme (Pty) Ltd Financial Statements,\n"
+    b"INCOME STATEMENT,\n"
+    b"Revenue,8000000\n"
+    b"Cost of sales,5344000\n"
+    b"Gross profit,2656000\n"
+    b"Operating profit,656000\n"
+    b"Net profit,448000\n"
+    b"BALANCE SHEET,\n"
+    b"Current assets,2400000\n"
+    b"Current liabilities,1600000\n"
+    b"Inventory,900000\n"
+    b"Trade receivables,1200000\n"
+    b"Equity,2000000\n"
+)
+
+
+def test_parser_emits_clean_text():
+    parsed = parse_file("statement.csv", _SUMMARY_CSV)
+    text = parsed.get("text", "")
+    assert text, "parser must expose a top-level 'text' key"
+    assert "Revenue: 8000000" in text  # label: value, not a dict repr
+    assert "col_1" not in text         # no opaque column noise
+
+
+def test_ratios_extract_from_summary_csv():
+    # The exact failure mode from the live test: summary-statement CSV.
+    parsed = parse_file("statement.csv", _SUMMARY_CSV)
+    text = parsed.get("text", "") or str(parsed)
+    figs = extract_financials(text)
+    assert figs.get("revenue") == 8_000_000
+    assert figs.get("gross_profit") == 2_656_000
+    ratios = compute_ratios(figs, "retail_general", 8_000_000)
+    assert "gross_margin" in ratios and abs(ratios["gross_margin"]["value"] - 33.2) < 0.5
+    assert "current_ratio" in ratios
+    fs = fundamentals_score(ratios, "retail_general")
+    assert fs["available"] and fs["score"] is not None

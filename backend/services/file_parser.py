@@ -79,6 +79,12 @@ def _parse_excel(filename: str, content: bytes) -> dict:
 
     except Exception as e:
         result["error"] = f"Excel parse failed: {e}"
+    # Aggregate clean per-sheet text so downstream consumers get readable lines
+    _parts = []
+    for _name, _sd in result.get("sheets", {}).items():
+        if isinstance(_sd, dict) and _sd.get("text"):
+            _parts.append("[{}]\n{}".format(_name, _sd["text"]))
+    result["text"] = "\n\n".join(_parts)
     return result
 
 
@@ -214,6 +220,7 @@ def _parse_csv(filename: str, content: bytes) -> dict:
             result = {
                 "general": {"filename": filename},
                 "financial": summary,
+                "text": summary.get("text", ""),
                 "_meta": {"source_file": filename, "type": "csv"},
             }
             if domain:
@@ -268,6 +275,7 @@ def _parse_pdf(filename: str, content: bytes) -> dict:
 
         result["general"]["full_text"] = full_text[:8000]
         result["financial"]["text_extract"] = full_text[:5000]
+        result["text"] = full_text[:8000]
 
     except Exception as e:
         result["error"] = f"PDF parse failed: {e}"
@@ -285,6 +293,7 @@ def _parse_text(filename: str, content: bytes) -> dict:
             text = ""
     return {
         "general": {"filename": filename, "raw_text": text[:8000]},
+        "text": text[:8000],
         "_meta": {"source_file": filename, "type": "text"},
     }
 
@@ -326,7 +335,48 @@ def _df_to_summary(df: pd.DataFrame, sheet_name: str = "") -> dict:
         "row_count": len(df),
         "sample_rows": records,
         "numeric_summary": numeric_summary,
+        "text": _df_to_text(df),
     }
+
+
+def _df_to_text(df, max_rows: int = MAX_SAMPLE_ROWS) -> str:
+    """Render a DataFrame as clean, human/LLM-readable lines.
+
+    Critical for financial statements: a label/value sheet renders as
+    'Revenue: 8000000' (one fact per line), instead of an opaque dict repr.
+    This is what every agent AND the deterministic ratio extractor read, so a
+    clean rendering both unblocks ratio extraction and reduces LLM hallucination.
+    """
+    if df is None or getattr(df, "empty", True):
+        return ""
+    cols = list(df.columns)
+    out = []
+    # Include a header line only when the columns are meaningful (not auto-named)
+    meaningful = [c for c in cols if c is not None
+                  and not str(c).startswith(("col_", "Unnamed"))]
+    if len(cols) > 1 and len(meaningful) == len(cols):
+        out.append(" | ".join(str(c) for c in cols))
+    for _, row in df.head(max_rows).iterrows():
+        cells = []
+        for c in cols:
+            v = row[c]
+            try:
+                if v is None or (isinstance(v, float) and pd.isna(v)):
+                    continue
+            except Exception:
+                pass
+            sv = str(v).strip()
+            if sv and sv.lower() != "nan":
+                cells.append(sv)
+        if not cells:
+            continue
+        if len(cells) == 1:
+            out.append(cells[0])
+        elif len(cells) == 2:
+            out.append("{}: {}".format(cells[0], cells[1]))
+        else:
+            out.append(" | ".join(cells))
+    return "\n".join(out)
 
 
 def _safe_float(val) -> float:
