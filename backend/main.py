@@ -83,7 +83,7 @@ def verify_admin_key(request: Request):
 app = FastAPI(
     title="Imara",
     description="AI-powered multi-agent business consulting platform",
-    version="2.0.0",
+    version="2.1.0",
 )
 
 app.state.limiter = limiter
