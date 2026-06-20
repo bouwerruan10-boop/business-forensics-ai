@@ -17,8 +17,19 @@ from pathlib import Path
 # 2. backend/data/analyses.db (default, works on Windows/Mac/Linux)
 # 3. /tmp/bf_analyses.db (fallback if backend dir isn't writable, e.g. network mount)
 def _resolve_db_path() -> Path:
+    # 1) Explicit override.
     if os.environ.get("BF_DB_PATH"):
         return Path(os.environ["BF_DB_PATH"])
+    # 2) Railway persistent volume (set automatically when a volume is attached) —
+    #    keeps analyses/reports/share-links across redeploys instead of an ephemeral FS.
+    vol = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
+    if vol:
+        try:
+            p = Path(vol) / "analyses.db"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            return p
+        except OSError:
+            pass
     # Default: sibling data/ folder next to services/
     default = Path(__file__).parent.parent / "data" / "analyses.db"
     try:
