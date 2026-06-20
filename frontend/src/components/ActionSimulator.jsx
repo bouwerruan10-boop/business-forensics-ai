@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { getActions, simulateActions } from '../api/client'
+import { getActions, simulateActions, getLevers, monteCarlo } from '../api/client'
 import InfoTip from './InfoTip'
 
 const SCENARIOS = [
@@ -7,6 +7,7 @@ const SCENARIOS = [
   { id: 'expected', label: 'Expected', hint: '60% realised' },
   { id: 'optimistic', label: 'Best case', hint: '100% realised' },
 ]
+const BAND_LETTER = { 35: 'D', 50: 'C', 65: 'B', 80: 'A' }
 
 function money(n, cur) {
   if (n == null) return '—'
@@ -42,16 +43,18 @@ function MetricRow({ label, from, to, fmt, goodUp = true }) {
 
 export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
   const [actions, setActions] = useState([])
-  const [picks, setPicks] = useState({})       // id -> intensity (0..1)
+  const [levers, setLevers] = useState([])
+  const [picks, setPicks] = useState({})
   const [scenario, setScenario] = useState('expected')
   const [result, setResult] = useState(null)
+  const [mc, setMc] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     let on = true
-    getActions(analysisId)
-      .then(d => { if (on) setActions(d.actions || []) })
+    Promise.all([getActions(analysisId), getLevers(analysisId, 'expected')])
+      .then(([a, l]) => { if (on) { setActions(a.actions || []); setLevers(l.levers || []) } })
       .catch(e => { if (on) setError(e.message) })
     return () => { on = false }
   }, [analysisId])
@@ -64,8 +67,11 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
   useEffect(() => {
     if (!actions.length) return
     setLoading(true); setError(null)
-    simulateActions(analysisId, selected, scenario)
-      .then(setResult).catch(e => setError(e.message)).finally(() => setLoading(false))
+    const a = simulateActions(analysisId, selected, scenario).then(setResult)
+    const b = selected.length
+      ? monteCarlo(analysisId, selected).then(setMc)
+      : Promise.resolve(setMc(null))
+    Promise.all([a, b]).catch(e => setError(e.message)).finally(() => setLoading(false))
   }, [analysisId, selected, scenario, actions.length])
 
   const toggle = (id) => setPicks(p => ({ ...p, [id]: p[id] ? 0 : 1 }))
@@ -73,28 +79,41 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
 
   const b = result?.baseline, pj = result?.projected
   const scoreUp = result ? (pj.imara_score ?? 0) - (b.imara_score ?? 0) : 0
+  const nextBand = mc?.next_band_threshold ? BAND_LETTER[mc.next_band_threshold] : null
 
   return (
     <div>
       <p className="text-slate-400 text-sm mb-4 flex items-center gap-1.5">
-        Pick the actions you could take and see the projected effect on your numbers and Imara Score.
-        <InfoTip label="Action Simulator" text="A deterministic projection from your own figures: each action adjusts a driver (margin, overheads, collections, growth) and we recompute the statements, ratios and Imara Score. Outcomes are indicative estimates, scaled by how fully you expect to deliver them." />
+        Pick the actions you could take and see the projected effect — and how likely it is.
+        <InfoTip label="Action Simulator" text="A deterministic projection from your own figures. Each action adjusts a driver (margin, overheads, collections, growth); we recompute the statements, ratios and Imara Score. Incremental profit is taxed; the Likelihood is a 1,000-run Monte Carlo sampling how fully each action lands plus market noise. Indicative estimates, not guarantees." />
       </p>
 
-      {/* Scenario selector */}
+      {/* Biggest levers (tornado / sensitivity) */}
+      {levers.length > 0 && (
+        <div className="mb-4 bg-navy-card border border-white/[0.08] rounded-xl p-3">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Biggest levers — most Imara Score gain on their own</div>
+          <div className="flex flex-wrap gap-2">
+            {levers.filter(l => l.score_impact > 0 || l.profit_impact > 0).slice(0, 4).map(l => (
+              <button key={l.id} type="button" onClick={() => setPicks(p => ({ ...p, [l.id]: p[l.id] ? 0 : 1 }))}
+                className={`text-left text-xs px-3 py-1.5 rounded-lg border transition-colors ${picks[l.id] ? 'border-gold/40 bg-gold/10 text-gold' : 'border-white/10 text-slate-300 hover:border-white/20'}`}>
+                <span className="font-medium">{l.label}</span>
+                <span className="ml-2 text-emerald-400 font-semibold">{l.score_impact > 0 ? `+${l.score_impact} score` : money(l.profit_impact, currency)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 mb-4">
         {SCENARIOS.map(s => (
-          <button key={s.id} type="button" onClick={() => setScenario(s.id)}
-            aria-pressed={scenario === s.id} title={s.hint}
-            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-              scenario === s.id ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-400 hover:border-white/20 hover:text-white'}`}>
+          <button key={s.id} type="button" onClick={() => setScenario(s.id)} aria-pressed={scenario === s.id} title={s.hint}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${scenario === s.id ? 'border-gold/50 bg-gold/10 text-gold' : 'border-white/10 text-slate-400 hover:border-white/20 hover:text-white'}`}>
             {s.label}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Actions */}
         <div className="space-y-2">
           {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-400 text-xs">{error}</div>}
           {!actions.length && !error && <div className="text-slate-600 text-sm">No actions available for this analysis.</div>}
@@ -103,8 +122,7 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
             return (
               <div key={a.id} className={`rounded-xl border p-3 transition-colors ${on ? 'border-gold/30 bg-gold/[0.04]' : 'border-white/[0.08] bg-navy-card'}`}>
                 <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" checked={on} onChange={() => toggle(a.id)}
-                    className="mt-0.5 accent-[#C9A84C] w-4 h-4" aria-label={a.label} />
+                  <input type="checkbox" checked={on} onChange={() => toggle(a.id)} className="mt-0.5 accent-[#C9A84C] w-4 h-4" aria-label={a.label} />
                   <span className="flex-1 min-w-0">
                     <span className="text-white text-sm font-medium">{a.label}</span>
                     <span className="block text-slate-500 text-xs mt-0.5">{a.rationale}</span>
@@ -112,12 +130,8 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
                 </label>
                 {on && (
                   <div className="mt-2 pl-7 flex items-center gap-2">
-                    <input type="range" min="0.25" max="1" step="0.25" value={picks[a.id]}
-                      onChange={e => setIntensity(a.id, parseFloat(e.target.value))}
-                      className="flex-1 accent-[#C9A84C]" aria-label={`${a.label} intensity`} />
-                    <span className="text-[11px] text-slate-400 w-28 text-right">
-                      {Math.round((a.default ?? a.max) * (picks[a.id] || 1) * 10) / 10}{a.unit} of {a.max}{a.unit}
-                    </span>
+                    <input type="range" min="0.25" max="1" step="0.25" value={picks[a.id]} onChange={e => setIntensity(a.id, parseFloat(e.target.value))} className="flex-1 accent-[#C9A84C]" aria-label={`${a.label} intensity`} />
+                    <span className="text-[11px] text-slate-400 w-28 text-right">{Math.round((a.default ?? a.max) * (picks[a.id] || 1) * 10) / 10}{a.unit} of {a.max}{a.unit}</span>
                   </div>
                 )}
               </div>
@@ -125,11 +139,10 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
           })}
         </div>
 
-        {/* Outcome */}
         <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5">
           {result ? (
             <>
-              <div className="flex items-end justify-between mb-4">
+              <div className="flex items-end justify-between mb-3">
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Projected Imara Score</div>
                   <div className="flex items-baseline gap-2">
@@ -145,7 +158,21 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
                   </div>
                 )}
               </div>
-              <MetricRow label="Net profit" from={b.net_profit} to={pj.net_profit} fmt={v => money(v, currency)} />
+
+              {/* Likelihood (Monte Carlo) */}
+              {mc && nextBand && (
+                <div className="mb-3 bg-gold/[0.05] border border-gold/20 rounded-xl p-3">
+                  <div className="text-sm text-white">
+                    <span className="font-bold text-gold">≈{Math.round(mc.prob_reach_next_band * 100)}%</span> chance of reaching <span className="font-bold">Band {nextBand}</span>
+                    <InfoTip label="Likelihood" text={`Across ${mc.iterations} simulations that vary how fully each action lands plus market noise. Score range p10–p90: ${mc.imara_score.p10}–${mc.imara_score.p90}.`} />
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    Likely Imara Score {mc.imara_score.p10}–{mc.imara_score.p90} · net profit gain {money(mc.net_profit_delta.p10, currency)} to {money(mc.net_profit_delta.p90, currency)}
+                  </div>
+                </div>
+              )}
+
+              <MetricRow label="Net profit (after tax)" from={b.net_profit} to={pj.net_profit} fmt={v => money(v, currency)} />
               <MetricRow label="Operating profit" from={b.operating_profit} to={pj.operating_profit} fmt={v => money(v, currency)} />
               <MetricRow label="Revenue" from={b.revenue} to={pj.revenue} fmt={v => money(v, currency)} />
               <MetricRow label="Gross margin" from={b.gross_margin} to={pj.gross_margin} fmt={pct} />

@@ -18,6 +18,8 @@ from services.financial_ratios import compute_ratios, fundamentals_score
 SCENARIOS = {"optimistic": 1.0, "expected": 0.6, "pessimistic": 0.3}
 # A 1% price rise softens volume by ~0.5% (simple constant elasticity for the MVP).
 PRICE_VOLUME_ELASTICITY = -0.5
+# SA company income tax — applied to incremental operating profit so 'net' is realistic.
+TAX_RATE = 0.27
 
 
 def _num(d, k, default=0.0):
@@ -108,6 +110,13 @@ def _project(figs: dict, drivers: dict, capture: float):
     if gm_pp and rev_new > 0:
         cogs_new = max(0.0, cogs_new - rev_new * (gm_pp / 100.0))
     opex_new = opex * (1 - capture * _num(drivers, "opex_reduction_pct") / 100.0)
+    # Plausibility guards (verification sanity bounds): no negative/absurd states.
+    rev_new = max(0.0, rev_new)
+    if rev_new > 0:
+        cogs_new = min(max(cogs_new, 0.02 * rev_new), 0.98 * rev_new)
+    else:
+        cogs_new = max(0.0, cogs_new)
+    opex_new = max(0.0, opex_new)
     gross_new = rev_new - cogs_new
     operating_new = gross_new - opex_new
     net_new = operating_new - interest
@@ -171,11 +180,17 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
                         "applied": round(mag, 2), "unit": a.get("unit")})
 
     base_figs, _ = _project(figs, {}, 1.0)
+    proj_figs, cash_released = _project(figs, drivers, capture)
+    # Tax realism + baseline consistency: baseline net = the report's actual net;
+    # projected net = actual net + the AFTER-TAX incremental operating profit.
+    actual_net = _num(figs, "net_profit") or _num(base_figs, "net_profit")
+    delta_op = _num(proj_figs, "operating_profit") - _num(base_figs, "operating_profit")
+    base_figs["net_profit"] = actual_net
+    proj_figs["net_profit"] = actual_net + (delta_op * (1 - TAX_RATE) if delta_op > 0 else delta_op)
     base_ratios = compute_ratios(base_figs, industry, rev)
+    proj_ratios = compute_ratios(proj_figs, industry, rev)
     base_fund = float(report.get("financial_fundamentals_score")
                       or (fundamentals_score(base_ratios, industry).get("score") or 0))
-    proj_figs, cash_released = _project(figs, drivers, capture)
-    proj_ratios = compute_ratios(proj_figs, industry, rev)
     proj_fund = fundamentals_score(proj_ratios, industry).get("score") or 0
 
     def snap(f, ratios):
@@ -215,4 +230,89 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
         "imara_score_delta": projected["imara_score"] - (baseline["imara_score"] or 0),
         "disclaimer": ("Indicative model: deterministic projection from your figures under a {} "
                        "scenario (actions realised at {:.0f}%). Not a guarantee.".format(scenario, capture * 100)),
+    }
+
+
+# ── v2: sensitivity ranking (tornado) + Monte Carlo uncertainty ────────────
+_BAND_THRESHOLDS = (35, 50, 65, 80)  # E<35, D, C, B, A>=80
+
+
+def _next_band_threshold(score):
+    for t in _BAND_THRESHOLDS:
+        if score < t:
+            return t
+    return None
+
+
+def rank_levers(report: dict, scenario: str = "expected") -> list:
+    """Tornado/sensitivity: each action's STANDALONE impact, ranked — the biggest levers."""
+    out = []
+    for a in derive_actions(report):
+        r = apply_actions(report, [{"id": a["id"], "intensity": 1.0}], scenario)
+        out.append({"id": a["id"], "label": a["label"], "unit": a.get("unit"),
+                    "score_impact": r["imara_score_delta"],
+                    "profit_impact": r["net_profit_delta"],
+                    "cash_released": r["cash_released"]})
+    out.sort(key=lambda x: (x["score_impact"], x["profit_impact"]), reverse=True)
+    return out
+
+
+def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> dict:
+    """Probabilistic outcome: sample how fully each action lands (triangular 0.2/0.6/1.05)
+    plus market noise on revenue, over n seeded runs. Returns p10/p50/p90 of the net-profit
+    delta and the projected Imara Score, and the probability of reaching the next band."""
+    import random
+    import statistics
+    rng = random.Random(seed)
+    figs = _baseline_figs(report)
+    industry = report.get("industry_key") or "general"
+    rev = _num(figs, "revenue")
+    catalog = {a["id"]: a for a in derive_actions(report)}
+    sel = [s for s in (selected or []) if catalog.get(s.get("id"))]
+
+    base_figs, _ = _project(figs, {}, 1.0)
+    base_operating = _num(base_figs, "operating_profit")
+    actual_net = _num(figs, "net_profit") or _num(base_figs, "net_profit")
+    base_fund = float(report.get("financial_fundamentals_score")
+                      or (fundamentals_score(compute_ratios(base_figs, industry, rev), industry).get("score") or 0))
+    canonical = report.get("imara_score")
+    model_base = _estimate_imara(report, base_fund) or 0
+    base_score = canonical if canonical is not None else model_base
+
+    net_deltas = []
+    scores = []
+    for _ in range(max(1, n)):
+        drivers = {}
+        for s in sel:
+            a = catalog[s["id"]]
+            try:
+                intensity = max(0.0, min(1.0, float(s.get("intensity", 1.0))))
+            except (TypeError, ValueError):
+                intensity = 1.0
+            cap = rng.triangular(0.2, 1.05, 0.6)  # how fully this action lands
+            drivers[a["driver"]] = drivers.get(a["driver"], 0.0) + float(a.get("default", a.get("max", 0))) * intensity * cap
+        drivers["revenue_growth_pct"] = drivers.get("revenue_growth_pct", 0.0) + rng.gauss(0.0, 4.0)  # market noise (pp)
+        pf, _ = _project(figs, drivers, 1.0)
+        delta_op = _num(pf, "operating_profit") - base_operating
+        net_deltas.append((delta_op * (1 - TAX_RATE) if delta_op > 0 else delta_op))
+        fund = fundamentals_score(compute_ratios(pf, industry, rev), industry).get("score") or 0
+        sc = base_score + ((_estimate_imara(report, fund) or 0) - model_base)
+        scores.append(max(0.0, min(100.0, sc)))
+
+    def pcts(xs):
+        xs = sorted(xs)
+        if len(xs) >= 2:
+            q = statistics.quantiles(xs, n=10)
+            return {"p10": round(q[0]), "p50": round(statistics.median(xs)), "p90": round(q[8])}
+        return {"p10": round(xs[0]), "p50": round(xs[0]), "p90": round(xs[0])}
+
+    nb = _next_band_threshold(round(base_score))
+    prob = (sum(1 for sc in scores if nb is not None and sc >= nb) / len(scores)) if scores else 0.0
+    return {
+        "iterations": n, "seed": seed, "currency": report.get("currency") or "ZAR",
+        "base_score": round(base_score), "next_band_threshold": nb,
+        "prob_reach_next_band": round(prob, 3),
+        "net_profit_delta": pcts(net_deltas), "imara_score": pcts(scores),
+        "disclaimer": ("Probabilistic estimate over {} simulations sampling how fully each action "
+                       "lands plus market noise. Indicative, not a guarantee.".format(n)),
     }

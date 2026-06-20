@@ -85,3 +85,19 @@ export async function simulateActions(analysisId, actions, scenario = 'expected'
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function getLevers(analysisId, scenario = 'expected') {
+  const res = await fetch(`${BASE}/report/${analysisId}/levers?scenario=${scenario}`, { headers: authHeaders() })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function monteCarlo(analysisId, actions) {
+  const res = await fetch(`${BASE}/simulate/montecarlo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ analysis_id: analysisId, actions }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}

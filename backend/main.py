@@ -386,6 +386,26 @@ def simulate_actions(req: ActionSimRequest):
     return apply_actions(result, req.actions, req.scenario)
 
 
+@app.get("/api/report/{analysis_id}/levers")
+def report_levers(analysis_id: str, scenario: str = "expected"):
+    """Sensitivity ranking — each action's standalone impact (the biggest levers)."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.simulation import rank_levers
+    return {"levers": rank_levers(result, scenario)}
+
+
+@app.post("/api/simulate/montecarlo")
+def simulate_montecarlo(req: ActionSimRequest):
+    """Probabilistic outcome distribution + probability of reaching the next band."""
+    result = analyses.get(req.analysis_id) or get_report(req.analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.simulation import monte_carlo
+    return monte_carlo(result, req.actions)
+
+
 @app.post("/api/simulate")
 def simulate(req: SimulateRequest):
     """

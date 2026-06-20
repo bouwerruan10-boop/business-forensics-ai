@@ -492,3 +492,39 @@ def test_simulation_scenarios_scale_monotonically():
     exp = apply_actions(rep, sel, "expected")["net_profit_delta"]
     pes = apply_actions(rep, sel, "pessimistic")["net_profit_delta"]
     assert opt > exp > pes > 0
+
+
+# ── Action Simulator v2: tax, sensitivity ranking, Monte Carlo ─────────────
+def test_simulation_tax_reduces_net_gain():
+    from services.simulation import apply_actions
+    r = apply_actions(_sim_report(), [{"id": "gross_margin", "intensity": 1.0}], "optimistic")
+    # incremental net should be positive but less than the gross operating gain (tax applied)
+    op_gain = r["projected"]["operating_profit"] - r["baseline"]["operating_profit"]
+    assert 0 < r["net_profit_delta"] < op_gain  # ~73% of the operating gain
+
+def test_simulation_rank_levers_sorted():
+    from services.simulation import rank_levers
+    levers = rank_levers(_sim_report(), "expected")
+    assert len(levers) >= 4
+    scores = [l["score_impact"] for l in levers]
+    assert scores == sorted(scores, reverse=True)  # ranked, biggest first
+
+def test_simulation_monte_carlo_deterministic_and_bounded():
+    from services.simulation import monte_carlo
+    rep = _sim_report(); sel = [{"id": "gross_margin", "intensity": 1.0}]
+    a = monte_carlo(rep, sel, n=400, seed=7)
+    b = monte_carlo(rep, sel, n=400, seed=7)
+    assert a == b                                   # seeded -> reproducible
+    sc = a["imara_score"]
+    assert sc["p10"] <= sc["p50"] <= sc["p90"]      # ordered percentiles
+    assert 0.0 <= a["prob_reach_next_band"] <= 1.0  # valid probability
+    assert a["net_profit_delta"]["p50"] >= 0        # a beneficial action centres positive
+
+def test_simulation_plausibility_no_absurd_state():
+    from services.simulation import apply_actions
+    # stack everything at full optimism -> must stay plausible (positive revenue, sane margin)
+    rep = _sim_report()
+    sel = [{"id": i, "intensity": 1.0} for i in ("gross_margin", "opex", "revenue_growth", "price")]
+    r = apply_actions(rep, sel, "optimistic")
+    assert r["projected"]["revenue"] > 0
+    assert -5 <= (r["projected"]["gross_margin"] or 0) <= 100
