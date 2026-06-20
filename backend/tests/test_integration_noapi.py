@@ -1,0 +1,126 @@
+"""
+Full-pipeline integration smoke test with NO API key / NO API spend.
+
+Injects a fake Claude client (returns canned findings) and drives the real
+/api/analyze endpoint end-to-end through TestClient, then asserts the whole
+report assembled and that the five deep builds are wired through to the API:
+  - Build 3 (observability): report.llm_usage with per-model token/cost
+  - Build 4 (self-critique): report.finding_quality + per-finding quality tier
+  - Build 1 (RAG grounding): a finding cites a real SA Act
+  - Build 5 (optimiser): /optimize returns a best bundle for all objectives
+This guards against integration regressions that unit tests miss.
+"""
+import json
+import re
+import time
+
+import pytest
+
+
+class _Usage:
+    input_tokens = 1300
+    output_tokens = 450
+
+
+class _C:
+    def __init__(self, text):
+        self.text = text
+
+
+class _Msg:
+    def __init__(self, text):
+        self.content = [_C(text)]
+        self.usage = _Usage()
+
+
+_FINDINGS = json.dumps([
+    {"category": "Tax", "severity": "critical", "title": "VAT registration overdue",
+     "detail": "Turnover R12,000,000 exceeds the R1m threshold but the business is not VAT registered, breaching VAT Act 89 of 1991 s23.",
+     "financial_impact": "R 240 000 penalty + interest exposure", "recommendation": "Register for VAT within 21 business days via SARS eFiling",
+     "roi_estimate": "Avoids R 240 000 penalty", "cost_of_inaction": "Penalties compound monthly", "benchmark_reference": "VAT Act 89 of 1991, s23",
+     "data_source": "financials", "quick_win": True},
+    {"category": "Cash Flow", "severity": "high", "title": "Slow receivables collection",
+     "detail": "Debtor days ~70 vs sector 45, tying up cash.", "financial_impact": "R 450 000 cash locked up",
+     "recommendation": "Tighten collections to net-45 with deposit terms", "roi_estimate": "R 450 000 freed", "cost_of_inaction": "Ongoing cash strain",
+     "benchmark_reference": "Sector debtor days 45", "data_source": "financials", "quick_win": False},
+    {"category": "Risk", "severity": "high", "title": "Concentration risk",
+     "detail": "Vague exposure to a single channel.", "financial_impact": "Unquantified",
+     "recommendation": "Review", "roi_estimate": "TBD with client", "cost_of_inaction": "",
+     "benchmark_reference": "see analysis above", "data_source": "plan", "quick_win": False},
+])
+
+
+class _Messages:
+    def create(self, **kw):
+        msgs = kw.get("messages", [{}])
+        prompt = msgs[0].get("content", "") if msgs else ""
+        if "JSON array of findings" in prompt or "precision data extractor" in prompt:
+            return _Msg(_FINDINGS)
+        return _Msg("Analysis: gross margin 27.5% vs sector 34%; VAT Act 89 of 1991 s23 exposure; R 450 000 cash drain.")
+
+
+class _FakeClient:
+    def __init__(self):
+        self.messages = _Messages()
+
+
+_CSV = (b"Item,Amount\nRevenue,12000000\nCost of Sales,8700000\nGross Profit,3300000\n"
+        b"Operating Expenses,3000000\nOperating Profit,300000\nInterest,180000\nNet Profit,120000\n"
+        b"Accounts Receivable,2300000\nInventory,1900000\nCurrent Assets,4600000\n"
+        b"Current Liabilities,3100000\nAccounts Payable,1400000\nTotal Debt,2200000\nEquity,1800000\n")
+
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    monkeypatch.setenv("BF_DB_PATH", str(tmp_path / "test.db"))
+    import agents.base_agent as ba
+    saved = ba.client
+    ba.client = _FakeClient()            # no API; canned responses
+    from fastapi.testclient import TestClient
+    import main
+    with TestClient(main.app) as c:      # context manager fires startup -> init_db
+        yield c
+    ba.client = saved                    # restore for other tests
+
+
+def test_full_pipeline_no_api(client):
+    data = {"company_name": "Acme Trading (Pty) Ltd", "industry_key": "retail", "annual_revenue": "12000000",
+            "headcount": "12", "currency": "ZAR", "country": "South Africa", "primary_concern": "VAT and cash flow",
+            "entity_type": "Private Company (Pty) Ltd", "vat_registered": "no", "bbbee_level": "Level 4",
+            "years_in_business": "6", "file_categories": json.dumps(["financial"])}
+    r = client.post("/api/analyze", files={"files": ("financials.csv", _CSV, "text/csv")}, data=data)
+    assert r.status_code == 200
+    aid = r.json()["analysis_id"]
+
+    status = None
+    for _ in range(80):
+        status = client.get(f"/api/status/{aid}").json().get("status")
+        if status in ("complete", "error"):
+            break
+        time.sleep(0.1)
+    assert status == "complete"
+
+    rep = client.get(f"/api/report/{aid}").json()
+    assert rep.get("imara_score") is not None
+    assert rep.get("financial_ratios") and rep.get("all_findings_ranked")
+
+    # Build 3 — observability
+    usage = rep.get("llm_usage")
+    assert isinstance(usage, dict) and usage.get("calls", 0) > 0 and usage.get("by_model")
+
+    # Build 4 — self-critique
+    fq = rep.get("finding_quality")
+    assert isinstance(fq, dict) and fq.get("total", 0) > 0
+    assert any("quality" in f for f in rep["all_findings_ranked"])
+
+    # Build 1 — grounding produced a real Act citation
+    assert any(re.search(r"Act \d+ of \d{4}", (f.get("detail", "") + f.get("benchmark_reference", "")))
+               for f in rep["all_findings_ranked"])
+
+    # Build 5 — optimiser endpoint, all objectives
+    for obj in ("imara", "profit", "cash"):
+        o = client.get(f"/api/report/{aid}/optimize?objective={obj}")
+        assert o.status_code == 200 and o.json().get("best_bundle")
+
+    # usage endpoint passthrough
+    assert client.get(f"/api/report/{aid}/usage").json().get("llm_usage")
