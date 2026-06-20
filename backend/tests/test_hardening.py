@@ -1155,3 +1155,67 @@ def test_model_card_and_governance():
     assert c["method"]["weight_derivation"]["consistent"] is True
     from services.score_contract import score_contract
     assert "use_constraints" in score_contract({"imara_score": 50})
+
+
+# ── Supplier benchmarking feature ──
+
+_ITEMISED_PNL = (
+    "Operating Expenses\n"
+    "Salaries and wages 1,250,000\n"
+    "Rent 240,000\n"
+    "Bank charges 62,000\n"
+    "Telephone & postage 31,200\n"
+    "Fuel and oil 96,500\n"
+    "Insurance 54,000\n"
+    "Card machine merchant fees 41,800\n"
+    "Accounting software Xero 22,000\n"
+    "Total operating expenses 2,134,800\n"
+)
+
+
+def test_expense_line_extraction():
+    from services.expense_lines import extract_expense_lines
+    lines = extract_expense_lines(_ITEMISED_PNL)
+    cats = {l["category"] for l in lines}
+    assert {"bank_charges", "fuel", "insurance", "card_machine_fees", "telephone_data"} <= cats
+    # the 'Total operating expenses' row must be skipped (not double-counted)
+    assert not any("total" in l["raw"].lower() for l in lines)
+    assert extract_expense_lines("") == []
+
+
+def test_supplier_benchmark_engine():
+    from services.supplier_benchmark import run_supplier_benchmark
+    r = run_supplier_benchmark(_ITEMISED_PNL, revenue=4_800_000, profile={"banking_partner": "FNB"})
+    assert r["available"] and r["total_expense_lines"] >= 7
+    bank = next(o for o in r["opportunities"] if o["category"] == "bank_charges")
+    assert bank["incumbent"] == "FNB" and bank["est_saving_low"] > 0      # higher-cost incumbent -> real saving
+    assert bank["status"] == "above"
+    assert r["total_est_saving_high"] >= r["total_est_saving_low"] > 0
+    # only-totals -> gracefully unavailable
+    assert run_supplier_benchmark("Total operating expenses 2,000,000", 4_800_000)["available"] is False
+
+
+def test_supplier_catalog_integrity():
+    from services.supplier_catalog import CATALOG, category_reference
+    for key in CATALOG:
+        ref = category_reference(key)
+        assert ref["as_of"] and ref["source"]   # every entry dated + sourced (no naked figures)
+
+
+def test_supplier_switch_feeds_simulator():
+    from services.simulation import derive_actions
+    report = {"currency": "ZAR", "industry_key": "manufacturing",
+              "financial_figures": {"revenue": 4_800_000, "cogs": 3_480_000, "gross_profit": 1_320_000,
+                                    "operating_profit": 520_000, "net_profit": 380_000},
+              "financial_ratios": {}, "financial_fundamentals_score": 55,
+              "imara_components": [{"label": "Profitability", "weight": 0.25, "value": 55}],
+              "supplier_benchmark": {"available": True, "total_est_saving_low": 18_300, "total_est_saving_high": 42_000}}
+    assert any(a["id"] == "supplier_switch" and a["driver"] == "opex_reduction_pct" for a in derive_actions(report))
+
+
+def test_supplier_live_disabled_by_default():
+    from services.supplier_live import live_enabled, fetch_live_pricing, augment
+    assert live_enabled() is False
+    assert fetch_live_pricing("bank_charges", ["TymeBank"])["enabled"] is False
+    out = augment({"available": True, "opportunities": []})
+    assert out["live"]["enabled"] is False   # no-op, never breaks

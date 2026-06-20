@@ -84,6 +84,18 @@ def derive_actions(report: dict) -> list:
     out.append({"id": "revenue_growth", "driver": "revenue_growth_pct",
                 "label": "Grow revenue (win more volume)", "max": 25.0, "unit": "%", "default": 10.0,
                 "rationale": "Model winning more business at current margins."})
+    # Supplier benchmarking: a grounded opex-reduction lever from the supplier-savings engine.
+    sb = report.get("supplier_benchmark") or {}
+    if sb.get("available") and opex > 0:
+        _shi = float(sb.get("total_est_saving_high") or 0)
+        _slo = float(sb.get("total_est_saving_low") or 0)
+        if _shi > 0:
+            _mid = (_slo + _shi) / 2.0
+            out.append({"id": "supplier_switch", "driver": "opex_reduction_pct",
+                        "label": "Switch to benchmarked lower-cost suppliers",
+                        "max": round(min(100.0, _shi / opex * 100.0), 1), "unit": "%",
+                        "default": round(min(100.0, _mid / opex * 100.0), 1),
+                        "rationale": "Benchmarking flags about R{:,.0f}-R{:,.0f}/yr of supplier savings at equivalent service (bank charges, card fees, telecoms, insurance, software).".format(_slo, _shi)})
     out.append({"id": "price", "driver": "price_increase_pct",
                 "label": "Raise prices", "max": 15.0, "unit": "%", "default": 5.0,
                 "rationale": "Price rises lift margin but soften volume (elasticity modelled)."})

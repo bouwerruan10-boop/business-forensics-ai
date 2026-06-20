@@ -156,3 +156,4 @@ def test_full_pipeline_no_api(client):
     assert client.get(f"/api/report/{aid}/bank-signals").status_code == 200
     mcd = client.get("/api/v1/model-card")
     assert mcd.status_code == 200 and mcd.json()["method"]["weight_derivation"]["consistent"] is True
+    assert client.get(f"/api/report/{aid}/supplier-savings").status_code == 200

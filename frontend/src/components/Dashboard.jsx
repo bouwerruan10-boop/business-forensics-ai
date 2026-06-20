@@ -8,6 +8,7 @@ import Simulator from './Simulator'
 import ActionSimulator from './ActionSimulator'
 import EconomicEnvironment from './EconomicEnvironment'
 import BankabilityEvidence from './BankabilityEvidence'
+import SupplierSavings from './SupplierSavings'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
@@ -166,6 +167,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...((report.sa_tax_performed || report.sa_legal_performed) ? [{ id: 'sa-compliance', label: 'SA Compliance' }] : []),
     ...(report.macro_performed ? [{ id: 'economics', label: 'Economic Environment' }] : []),
     ...((report.distress_score?.available || report.bank_signals?.available) ? [{ id: 'evidence', label: 'Bankability Evidence' }] : []),
+    ...(report.supplier_benchmark?.available ? [{ id: 'suppliers', label: 'Supplier Savings' }] : []),
     { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
   ]
@@ -305,6 +307,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Independent distress cross-check, bank-statement cash-flow signals, and how to use this rating"
         >
           <BankabilityEvidence report={report} currency={report.currency} />
+        </Section>
+      )}
+
+      {/* Supplier Savings: expense benchmarking + lower-cost-supplier opportunities */}
+      {report.supplier_benchmark?.available && (
+        <Section
+          id="suppliers"
+          title="Supplier Savings"
+          subtitle="Per-line-item spend benchmarking and lower-cost suppliers at equivalent service"
+        >
+          <SupplierSavings report={report} currency={report.currency} />
         </Section>
       )}
 

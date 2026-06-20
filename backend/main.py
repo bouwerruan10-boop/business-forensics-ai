@@ -460,6 +460,21 @@ def report_bank_signals(analysis_id: str):
     return result.get("bank_signals") or {"available": False, "reason": "Not computed for this analysis."}
 
 
+@app.get("/api/report/{analysis_id}/supplier-savings")
+def report_supplier_savings(analysis_id: str, live: bool = False):
+    """Supplier benchmarking — per-line-item spend-vs-benchmark + lower-cost-supplier
+    opportunities with indicative savings. Decision-support, not an Imara Score input.
+    ?live=true augments with Bright Data cited pricing when that seam is enabled."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    sb = result.get("supplier_benchmark") or {"available": False, "reason": "Not computed for this analysis."}
+    if live and sb.get("available"):
+        from services.supplier_live import augment
+        sb = augment(dict(sb))
+    return sb
+
+
 @app.post("/api/simulate/montecarlo")
 def simulate_montecarlo(req: ActionSimRequest):
     """Probabilistic outcome distribution + probability of reaching the next band."""
@@ -703,6 +718,9 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["bank_signals"] = analyze_bank_statement(memory.uploaded_bank_text)
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
+            from services.supplier_benchmark import run_supplier_benchmark
+            _rev = report.get("annual_revenue") or (report.get("financial_figures") or {}).get("revenue") or 0
+            report["supplier_benchmark"] = run_supplier_benchmark(memory.uploaded_financial_text, _rev, profile, report.get("bank_signals"))
 
             analyses[analysis_id] = report
             save_report(analysis_id, report)
