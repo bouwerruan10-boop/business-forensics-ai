@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { getActions, simulateActions, getLevers, monteCarlo } from '../api/client'
+import { getActions, simulateActions, getLevers, monteCarlo, getOptimize } from '../api/client'
 import InfoTip from './InfoTip'
 
 const SCENARIOS = [
@@ -50,6 +50,7 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
   const [mc, setMc] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [optimal, setOptimal] = useState(null)
 
   useEffect(() => {
     let on = true
@@ -58,6 +59,14 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
       .catch(e => { if (on) setError(e.message) })
     return () => { on = false }
   }, [analysisId])
+
+  // Recommended bundle (Build 5 optimiser): best <=3 actions for Imara lift.
+  useEffect(() => {
+    let on = true
+    getOptimize(analysisId, scenario, 3, 'imara')
+      .then(o => { if (on) setOptimal(o) }).catch(() => { if (on) setOptimal(null) })
+    return () => { on = false }
+  }, [analysisId, scenario])
 
   const selected = useMemo(
     () => Object.entries(picks).filter(([, v]) => v > 0).map(([id, intensity]) => ({ id, intensity })),
@@ -76,6 +85,7 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
 
   const toggle = (id) => setPicks(p => ({ ...p, [id]: p[id] ? 0 : 1 }))
   const setIntensity = (id, v) => setPicks(p => ({ ...p, [id]: v }))
+  const applyBundle = (ids) => setPicks(Object.fromEntries((ids || []).map(id => [id, 1])))
 
   const b = result?.baseline, pj = result?.projected
   const scoreUp = result ? (pj.imara_score ?? 0) - (b.imara_score ?? 0) : 0
@@ -100,6 +110,25 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
                 <span className="ml-2 text-emerald-400 font-semibold">{l.score_impact > 0 ? `+${l.score_impact} score` : money(l.profit_impact, currency)}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {optimal?.best_bundle && optimal.best_bundle.imara_score_delta > 0 && (
+        <div className="mb-4 bg-emerald-500/[0.05] border border-emerald-500/20 rounded-xl p-3">
+          <div className="text-[11px] uppercase tracking-wider text-emerald-300/80 mb-2 flex items-center gap-1.5">
+            Recommended first moves
+            <InfoTip label="Recommended bundle" text="The best combination of up to 3 actions for Imara Score lift, found by evaluating every bundle jointly because actions interact. Ties prefer fewer actions (less effort for the same gain)." />
+          </div>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-sm text-white">
+              {optimal.best_bundle.labels.join(' + ')}
+              <span className="ml-2 text-emerald-400 font-semibold">+{optimal.best_bundle.imara_score_delta} score</span>
+            </div>
+            <button type="button" onClick={() => applyBundle(optimal.best_bundle.ids)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-emerald-400/40 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20 transition-colors font-medium">
+              Apply these
+            </button>
           </div>
         </div>
       )}

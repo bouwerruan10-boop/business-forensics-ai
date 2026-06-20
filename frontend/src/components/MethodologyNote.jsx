@@ -1,7 +1,7 @@
 // Methodology & Confidence — a transparency panel. Research shows that disclosing
 // how an analysis was produced, how confident it is, and what it could NOT verify
 // raises trust rather than lowering it. All values come from the report itself.
-import { ShieldCheck, AlertTriangle, Gauge, Database, Clock, Check, Minus } from 'lucide-react'
+import { ShieldCheck, AlertTriangle, Gauge, Database, Clock, Check, Minus, Coins } from 'lucide-react'
 import InfoTip from './InfoTip'
 
 const COVERAGE_LABELS = {
@@ -39,6 +39,8 @@ export default function MethodologyNote({ report }) {
   const runtime = report.total_runtime_seconds
   const runtimeLabel = runtime ? (runtime >= 60 ? `${Math.round(runtime / 60)}m ${Math.round(runtime % 60)}s` : `${Math.round(runtime)}s`) : null
   const confTone = confidence === 'high' ? 'emerald' : confidence === 'medium' ? 'amber' : 'slate'
+  const usage = report.llm_usage || {}
+  const aiCost = typeof usage.est_cost_usd === 'number' ? usage.est_cost_usd : null
 
   return (
     <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5 sm:p-6">
@@ -60,6 +62,7 @@ export default function MethodologyNote({ report }) {
         {checked > 0 && <Stat Icon={ShieldCheck} label="Confirmed" value={`${confirmed}`} tone="emerald" />}
         {checked > 0 && <Stat Icon={AlertTriangle} label="Conflicts" value={`${conflicts}`} tone={conflicts > 0 ? 'amber' : 'emerald'} />}
         {runtimeLabel && <Stat Icon={Clock} label="Analysis time" value={runtimeLabel} tone="slate" />}
+        {aiCost != null && <Stat Icon={Coins} label="AI cost (est.)" value={`$${aiCost.toFixed(2)}${usage.calls ? ` \u00b7 ${usage.calls} calls` : ''}`} tone="slate" />}
       </div>
 
       {conflicts > 0 && conflictTitles.length > 0 && (

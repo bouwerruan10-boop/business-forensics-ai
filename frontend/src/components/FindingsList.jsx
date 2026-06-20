@@ -39,6 +39,12 @@ function FindingCard({ finding }) {
                 ✓ Verified
               </span>
             )}
+            {finding.quality === 'weak' && (
+              <span title={`Soft finding — ${(finding.quality_flags || []).join(', ').replace(/_/g, ' ') || 'limited supporting detail'}`}
+                className="text-xs bg-slate-500/10 text-slate-400 border border-slate-500/25 rounded-full px-2 py-0.5 font-medium">
+                ◷ Soft finding
+              </span>
+            )}
             <span className="text-xs text-slate-600">{finding.agent?.replace(' Agent', '')}</span>
           </div>
           <div className="text-white text-sm font-semibold leading-snug">{finding.title}</div>
