@@ -142,3 +142,11 @@ def test_full_pipeline_no_api(client):
     fq = client.get("/api/admin/fleet-quality")
     assert fq.status_code == 200
     assert fq.json()["overall"]["runs"] >= 1 and "drift_alerts" in fq.json()
+
+    # Regression: Action Simulator endpoints must accept the REAL frontend payload
+    # (no "variable" field) — this 422'd in production before ActionSimRequest.variable
+    # was made optional.
+    sa = client.post("/api/simulate/actions", json={"analysis_id": aid, "actions": [], "scenario": "expected"})
+    assert sa.status_code == 200, sa.text
+    mc = client.post("/api/simulate/montecarlo", json={"analysis_id": aid, "actions": []})
+    assert mc.status_code == 200, mc.text

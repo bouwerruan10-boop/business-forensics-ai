@@ -348,6 +348,38 @@ def _situation_section(story, report):
 
 # ── Executive Summary ─────────────────────────────────────────────
 
+def _issue_cell(title, why, impact, is_qw):
+    """Right-hand cell for a priority-issue row: title, why-critical, impact, optional quick-win badge.
+
+    Returns a list of Flowables (ReportLab accepts a list inside a table cell).
+    All interpolated text is XML-escaped so AI-generated copy containing
+    & < > cannot break ReportLab's Paragraph parser.
+    """
+    def _esc(s):
+        return (str(s or "")
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;"))
+
+    cell = [Paragraph(_esc(title), _style(fontSize=10, fontName="Helvetica-Bold", textColor=NAVY))]
+    if why:
+        cell.append(Spacer(1, 0.05 * cm))
+        cell.append(Paragraph(_esc(why), _style(fontSize=8.5, textColor=DARK_GRAY, leading=11)))
+    if impact:
+        cell.append(Spacer(1, 0.05 * cm))
+        cell.append(Paragraph(
+            '<font color="#C9A84C"><b>Impact:</b></font> ' + _esc(impact),
+            _style(fontSize=8.5, textColor=DARK_GRAY, leading=11),
+        ))
+    if is_qw:
+        cell.append(Spacer(1, 0.08 * cm))
+        cell.append(Paragraph(
+            '<font color="#1A7A40"><b>QUICK WIN</b></font>',
+            _style(fontSize=7.5, fontName="Helvetica-Bold"),
+        ))
+    return cell
+
+
 def _executive_summary_section(story, report):
     _section_header(story, "EXECUTIVE SUMMARY")
 

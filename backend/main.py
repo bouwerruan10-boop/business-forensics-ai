@@ -132,7 +132,7 @@ class ActionSimRequest(BaseModel):
     analysis_id: str
     actions: list = []
     scenario: str = "expected"
-    variable: str
+    variable: str | None = None   # vestigial — unused by /simulate/actions & /montecarlo; optional so the frontend (which omits it) doesn't 422
 
 
 # -- Routes --------------------------------------------------------

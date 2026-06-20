@@ -1024,3 +1024,23 @@ def test_reason_codes_handles_no_components():
     from services.reason_codes import reason_codes
     r = reason_codes({"imara_score": 50})
     assert r["available"] is False and r["reasons"] == []
+
+
+def test_pdf_renders_priority_issues():
+    """Regression: _issue_cell was called but never defined, so generate_pdf_report
+    crashed (NameError -> 500 without CORS headers -> 'Failed to fetch' in the browser)
+    for ANY report containing top_priority_issues — i.e. every real report. Guard it."""
+    from services.report_generator import generate_pdf_report
+    rep = {
+        "business_name": "T", "industry_key": "manufacturing", "currency": "ZAR",
+        "imara_score": 38, "imara_band": "D", "executive_summary": "Margin <30% & COGS >70%.",
+        "imara_components": [{"label": "Profitability", "weight": 0.25, "value": 38}],
+        "top_priority_issues": [
+            {"rank": 1, "title": "Gross margin <30% vs >37%", "estimated_total_impact": "R 475 000",
+             "why_critical": "COGS > 70% & R&D < 1%", "quick_win": True},
+        ],
+        "department_findings": {}, "all_findings_ranked": [],
+    }
+    for aud in ("owner", "banker", "investor"):
+        out = generate_pdf_report(rep, aud)
+        assert out and len(out) > 1000

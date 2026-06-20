@@ -22,6 +22,7 @@ const AGENT_ORDER = [
   'Valuation Agent',
   'Forecast Agent',
   'Market Intelligence Agent',
+  'Economic Environment Agent',
   'SA Tax Compliance Agent',
   'SA Corporate Law & BBBEE Agent',
 ]
