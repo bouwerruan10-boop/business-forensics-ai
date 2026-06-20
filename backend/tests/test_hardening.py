@@ -565,3 +565,283 @@ def test_public_api_dormant_by_default(monkeypatch):
     monkeypatch.setattr(main, "PUBLIC_API", False)
     with _pt.raises(HTTPException):
         main.public_score("anything")  # gated off until the pivot
+
+
+# ── SA Compliance RAG grounding ────────────────────────────────────────────
+def test_sa_knowledge_corpus_well_formed():
+    from services.sa_knowledge import KNOWLEDGE_BASE
+    assert len(KNOWLEDGE_BASE) >= 15
+    for e in KNOWLEDGE_BASE:
+        assert e["domain"] in ("tax", "legal")
+        assert e["citation"] and any(ch.isdigit() for ch in e["citation"])  # Act number present
+        assert e["as_of"] and e["keywords"] and e["text"]
+    ids = [e["id"] for e in KNOWLEDGE_BASE]
+    assert len(ids) == len(set(ids))  # unique ids
+
+
+def test_sa_knowledge_retrieval_is_relevant_and_deterministic():
+    from services.sa_knowledge import retrieve
+    top = retrieve("must I register for VAT given turnover threshold", domain="tax", k=3)
+    assert top[0]["id"] == "vat_threshold"
+    top2 = retrieve("exempt micro enterprise BBBEE level", domain="legal", k=3)
+    assert top2[0]["id"] == "bbbee"
+    # domain filtering: a legal query never returns tax-domain entries
+    assert all(e["domain"] == "legal" for e in retrieve("director duties", domain="legal", k=5))
+    # deterministic
+    assert [e["id"] for e in retrieve("vat", "tax", 4)] == [e["id"] for e in retrieve("vat", "tax", 4)]
+
+
+def test_sa_grounding_block_carries_citations():
+    from services.sa_knowledge import retrieve_grounding
+    class M:
+        industry_key="retail"; entity_type="Pty Ltd"; primary_concern="vat"; years_in_business="5"
+        vat_registered="yes"; headcount=10; bbbee_level="Level 4"
+    g_tax = retrieve_grounding(M(), "tax")
+    g_legal = retrieve_grounding(M(), "legal")
+    assert "AUTHORITATIVE SA PROVISIONS" in g_tax and "VAT Act 89 of 1991" in g_tax
+    assert "Companies Act 71 of 2008" in g_legal
+
+
+def test_sa_agents_inject_grounding_into_prompt():
+    from agents.specialist_agents import SATaxAgent, SALegalAgent
+    from memory.shared_memory import SharedMemory
+    m = SharedMemory(); m.business_name="T"; m.industry="retail"; m.vat_registered="yes"
+    m.entity_type="Pty Ltd"; m.annual_revenue=8_000_000; m.headcount=5; m.currency="R"
+    for Agent, cite in [(SATaxAgent, "VAT Act 89 of 1991"), (SALegalAgent, "Companies Act 71 of 2008")]:
+        a = Agent(); cap = {}
+        def stub(prompt, *args, _c=cap, **kw):
+            _c.setdefault("p", prompt); return "[]"
+        a._call_claude = stub
+        a.analyze({}, m)
+        assert "AUTHORITATIVE SA PROVISIONS" in cap["p"]
+        assert cite in cap["p"]
+
+
+# ── Build 2: eval quality framework ────────────────────────────────────────
+def _fake_report():
+    return {"department_findings": {
+        "Financial": [
+            {"agent": "FinancialAgent", "severity": "high", "title": "Cash drain",
+             "detail": "Operating cash flow negative", "financial_impact": "R 450 000 annual drain",
+             "recommendation": "Renegotiate supplier terms to 60 days", "benchmark_reference": "Retail median DSO 45d"},
+        ],
+        "SA Tax": [
+            {"agent": "SA Tax Compliance Agent", "severity": "critical", "title": "VAT exposure",
+             "detail": "Turnover exceeds R1m but not VAT registered, breaching VAT Act 89 of 1991 s23",
+             "financial_impact": "R 120 000 penalty risk", "recommendation": "Register for VAT within 21 days",
+             "benchmark_reference": "VAT Act 89 of 1991, s23"},
+        ],
+    }}
+
+
+def test_grade_structure_scores_contract_compliance():
+    from evals.grader import grade_structure
+    r = grade_structure(_fake_report())
+    assert r["findings"] == 2
+    assert r["pct"]["quantified_zar"] == 100      # both cite R-amounts
+    assert r["pct"]["has_recommendation"] == 100
+    assert r["pct"]["valid_severity"] == 100
+    assert 0 <= r["score"] <= 100
+
+
+def test_grade_sa_citation_detects_grounded_citations():
+    from evals.grader import grade_sa_citation
+    r = grade_sa_citation(_fake_report())
+    assert r["sa_findings"] == 1
+    assert r["cited"] == 1 and r["score"] == 100   # SA finding cites "Act 89 of 1991, s23"
+
+
+def test_llm_judge_is_injectable_and_aggregates():
+    from evals.grader import grade_findings_with_judge, build_judge_prompt
+    # stub judge returns fixed JSON — tests aggregation without an API
+    def judge(prompt):
+        assert "specificity" in prompt and "Return ONLY JSON" in prompt
+        return '{"specificity":4,"actionability":5,"grounding":4,"severity_fit":3,"comment":"ok"}'
+    out = grade_findings_with_judge(_fake_report(), judge)
+    assert out["judged"] == 2
+    assert out["by_criterion"]["actionability"] == 5.0
+    assert out["overall_1to5"] == 4.0   # mean of 4,5,4,3
+
+
+def test_llm_judge_survives_bad_output():
+    from evals.grader import grade_findings_with_judge
+    out = grade_findings_with_judge(_fake_report(), lambda p: "not json at all")
+    assert out["judged"] == 0 and out["overall_1to5"] is None
+
+
+# ── Build 3: observability/tracing seam ────────────────────────────────────
+def test_tracing_cost_model_and_env_override(monkeypatch):
+    from services.tracing import cost_usd
+    assert cost_usd("claude-sonnet-4-6", 1_000_000, 0) == 3.0
+    assert cost_usd("claude-haiku-4-5-20251001", 0, 1_000_000) == 5.0
+    monkeypatch.setenv("IMARA_PRICE_CLAUDE_SONNET_4_6", "2.5,12.0")
+    assert cost_usd("claude-sonnet-4-6", 1_000_000, 0) == 2.5
+
+
+def test_tracing_ledger_aggregates_by_model():
+    from services.tracing import UsageLedger
+    led = UsageLedger()
+    led.record("FinancialAgent", "claude-sonnet-4-6", 2000, 800, 1200)
+    led.record("FinancialAgent", "claude-haiku-4-5-20251001", 1500, 400, 600)
+    s = led.summary()
+    assert s["calls"] == 2 and s["input_tokens"] == 3500 and s["output_tokens"] == 1200
+    assert set(s["by_model"]) == {"claude-sonnet-4-6", "claude-haiku-4-5-20251001"}
+    assert s["est_cost_usd"] > 0
+
+
+def test_tracing_record_call_is_safe_without_ledger():
+    # No active ledger -> record_call must be a no-op, never raise.
+    import importlib, services.tracing as tr
+    importlib.reload(tr)
+    assert tr.current_ledger() is None
+    tr.record_call("x", "claude-sonnet-4-6", 10, 10, 5)  # should not raise
+
+
+def test_tracing_enabled_reflects_env(monkeypatch):
+    import services.tracing as tr
+    monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("TRACING_ENABLED", raising=False)
+    assert tr.tracing_enabled() is False
+    monkeypatch.setenv("TRACING_ENABLED", "1")
+    assert tr.tracing_enabled() is True
+
+
+def test_tracing_ledger_propagates_into_parallel_workers():
+    import types
+    import agents.base_agent as ba
+    from services.tracing import new_ledger
+    from agents.parallel import run_agent_waves
+    from agents.specialist_agents import FinancialAgent, AccountingAgent
+    from memory.shared_memory import SharedMemory
+
+    class _U: input_tokens = 1000; output_tokens = 300
+    class _R:
+        usage = _U()
+        content = [types.SimpleNamespace(text="[]")]
+    ba.client = types.SimpleNamespace(messages=types.SimpleNamespace(create=lambda **k: _R()))
+
+    m = SharedMemory(business_name="T", industry_key="retail", annual_revenue=5_000_000, currency="R")
+    ledger = new_ledger()
+    run_agent_waves([FinancialAgent, AccountingAgent], {}, m, None)
+    s = ledger.summary()
+    assert s["calls"] >= 2 and s["input_tokens"] >= 2000  # recorded from worker threads
+
+
+def test_usage_summary_passes_through_llm_usage():
+    from services.score_contract import usage_summary
+    rep = {"agent_timings": [], "llm_usage": {"calls": 5, "est_cost_usd": 0.12}}
+    out = usage_summary(rep)
+    assert out["llm_usage"]["calls"] == 5 and out["llm_usage"]["est_cost_usd"] == 0.12
+
+
+# ── Build 4: deterministic finding self-critique ───────────────────────────
+def test_finding_critique_strong_vs_weak():
+    from services.finding_quality import critique_finding
+    strong = {"severity": "medium", "financial_impact": "R 450 000 annual drain",
+              "detail": "Operating cash flow negative for 4 months", "recommendation": "Renegotiate supplier terms to net-60 days",
+              "benchmark_reference": "Retail median DSO 45 days", "cost_of_inaction": "R 1.2m erosion over 3 years"}
+    flags, q = critique_finding(strong)
+    assert flags == [] and q == "strong"
+
+    weak = {"severity": "critical", "financial_impact": "Unquantified", "detail": "vague",
+            "recommendation": "Review", "benchmark_reference": "see analysis above", "cost_of_inaction": ""}
+    flags, q = critique_finding(weak)
+    assert "unquantified" in flags and "severity_impact_mismatch" in flags and q == "weak"
+
+
+def test_finding_critique_severity_mismatch_only_when_unquantified():
+    from services.finding_quality import critique_finding
+    # critical but well-quantified -> no mismatch flag
+    f = {"severity": "critical", "financial_impact": "R 2.0m SARS penalty exposure",
+         "detail": "VAT not registered above R1m threshold", "recommendation": "Register for VAT within 21 business days",
+         "benchmark_reference": "VAT Act 89 of 1991 s23", "cost_of_inaction": "Penalties compound monthly"}
+    flags, q = critique_finding(f)
+    assert "severity_impact_mismatch" not in flags and q == "strong"
+
+
+def test_critique_report_mutates_both_views_and_dedupes_summary():
+    from services.finding_quality import critique_report
+    strong = {"severity": "low", "financial_impact": "R 10 000", "detail": "d",
+              "recommendation": "Do the specific thing now", "benchmark_reference": "Sector 12%", "cost_of_inaction": "loss"}
+    weak = {"severity": "high", "financial_impact": "Unquantified", "detail": "d",
+            "recommendation": "Look", "benchmark_reference": "", "cost_of_inaction": ""}
+    rep = {"department_findings": {"Fin": [strong]}, "all_findings_ranked": [strong, weak]}
+    summ = critique_report(rep)
+    assert summ["total"] == 2 and summ["strong"] == 1 and summ["weak"] == 1   # strong counted once
+    assert strong["quality"] == "strong" and weak["quality"] == "weak"        # both views tagged
+    assert summ["strong_pct"] == 50
+    # idempotent
+    summ2 = critique_report(rep)
+    assert summ2 == summ and strong["quality_flags"] == []
+
+
+# ── Build 5: simulator bundle optimiser ────────────────────────────────────
+def _opt_report():
+    return {
+        "currency": "ZAR", "industry_key": "retail", "imara_score": 44,
+        "financial_fundamentals_score": 40,
+        "imara_components": [
+            {"label": "Profitability", "weight": 0.25, "value": 38},
+            {"label": "Liquidity", "weight": 0.15, "value": 50},
+            {"label": "Leverage", "weight": 0.15, "value": 45},
+            {"label": "Compliance", "weight": 0.15, "value": 40},
+            {"label": "Market", "weight": 0.10, "value": 55},
+            {"label": "Governance", "weight": 0.20, "value": 42},
+        ],
+        "financial_figures": {
+            "revenue": 12_000_000, "cogs": 8_700_000, "opex": 3_000_000, "interest": 180_000,
+            "receivables": 2_300_000, "inventory": 1_900_000,
+            "current_assets": 4_600_000, "current_liabilities": 3_100_000,
+            "payables": 1_400_000, "total_debt": 2_200_000, "equity": 1_800_000, "net_profit": 120_000,
+        },
+        "financial_ratios": {
+            "gross_margin": {"value": 27.5, "benchmark": 34.0},
+            "operating_margin": {"value": 2.5, "benchmark": 7.0},
+            "debtor_days": {"value": 70, "benchmark": 45},
+            "inventory_days": {"value": 80, "benchmark": 60},
+        },
+    }
+
+
+def test_optimizer_matches_bruteforce_optimum():
+    from itertools import combinations
+    from services.simulation import optimize_actions, derive_actions, apply_actions
+    rep = _opt_report()
+    opt = optimize_actions(rep, scenario="expected", max_actions=3, objective="imara")
+    ids = [a["id"] for a in derive_actions(rep)]
+    best = -1e9
+    for k in range(1, 4):
+        for combo in combinations(ids, k):
+            d = apply_actions(rep, [{"id": i, "intensity": 1.0} for i in combo], "expected")["imara_score_delta"]
+            best = max(best, d)
+    assert opt["best_bundle"]["objective_value"] == best  # provably optimal
+
+
+def test_optimizer_respects_budget_and_curve_is_monotonic():
+    from services.simulation import optimize_actions
+    rep = _opt_report()
+    opt = optimize_actions(rep, scenario="expected", max_actions=2, objective="imara")
+    assert opt["best_bundle"]["size"] <= 2                       # budget respected
+    vals = [c["objective_value"] for c in opt["marginal_curve"]]
+    assert vals == sorted(vals)                                   # more budget never hurts
+    assert opt["best_bundle"]["ids"]                              # non-empty
+
+
+def test_optimizer_tie_prefers_smaller_bundle():
+    from services.simulation import optimize_actions
+    rep = _opt_report()
+    opt = optimize_actions(rep, scenario="expected", max_actions=4, objective="imara")
+    top = opt["best_bundle"]
+    # No strictly-better-or-equal smaller bundle should be ranked below the winner.
+    for r in opt["top_bundles"]:
+        if r["objective_value"] == top["objective_value"]:
+            assert r["size"] >= top["size"]
+
+
+def test_optimizer_objectives_switch():
+    from services.simulation import optimize_actions
+    rep = _opt_report()
+    prof = optimize_actions(rep, scenario="expected", max_actions=4, objective="profit")
+    assert prof["best_bundle"]["net_profit_delta"] >= 0
+    cash = optimize_actions(rep, scenario="expected", max_actions=4, objective="cash")
+    assert cash["best_bundle"]["cash_released"] >= 0

@@ -811,7 +811,11 @@ You are direct and specific. You cite exact act sections, form numbers, and SARS
         tax_year = f"Tax Year-End: {memory.tax_year_end or 'not provided'}"
         entity = f"Entity Type: {memory.entity_type or 'not provided'} | Years in Business: {memory.years_in_business or 'unknown'}"
 
+        from services.sa_knowledge import retrieve_grounding
+        grounding = retrieve_grounding(memory, "tax")
         prompt = f"""
+{grounding}
+
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
@@ -918,7 +922,11 @@ You cite specific section numbers, act names, and CIPC form codes.""" + "\n" + F
         years = memory.years_in_business or "unknown"
         country = memory.country or "South Africa"
 
+        from services.sa_knowledge import retrieve_grounding
+        grounding = retrieve_grounding(memory, "legal")
         prompt = f"""
+{grounding}
+
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 

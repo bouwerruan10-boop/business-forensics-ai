@@ -47,12 +47,24 @@ class BaseAgent:
 
     def _call_claude(self, user_message: str, system_override: str = "", model_override: str = "") -> str:
         system = system_override or self.system_prompt
+        model = model_override or MODEL
+        import time as _time
+        _t0 = _time.perf_counter()
         response = client.messages.create(
-            model=model_override or MODEL,
+            model=model,
             max_tokens=MAX_TOKENS,
             system=system,
             messages=[{"role": "user", "content": user_message}]
         )
+        try:  # observability: attribute token usage + cost to this analysis (never fatal)
+            from services.tracing import record_call
+            _u = getattr(response, "usage", None)
+            record_call(self.name, model,
+                        getattr(_u, "input_tokens", 0) or 0,
+                        getattr(_u, "output_tokens", 0) or 0,
+                        int((_time.perf_counter() - _t0) * 1000))
+        except Exception:
+            pass
         return response.content[0].text
 
     def _build_benchmark_block(self, memory: SharedMemory) -> str:

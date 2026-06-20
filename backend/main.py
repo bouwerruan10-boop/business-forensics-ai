@@ -400,6 +400,18 @@ def report_levers(analysis_id: str, scenario: str = "expected"):
     return {"levers": rank_levers(result, scenario)}
 
 
+@app.get("/api/report/{analysis_id}/optimize")
+def report_optimize(analysis_id: str, scenario: str = "expected",
+                    max_actions: int = 3, objective: str = "imara"):
+    """Best BUNDLE of actions under an action-count budget (exhaustive, deterministic).
+    objective: imara | profit | cash."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.simulation import optimize_actions
+    return optimize_actions(result, scenario=scenario, max_actions=max_actions, objective=objective)
+
+
 @app.post("/api/simulate/montecarlo")
 def simulate_montecarlo(req: ActionSimRequest):
     """Probabilistic outcome distribution + probability of reaching the next band."""
@@ -545,6 +557,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
     """Full multi-agent analysis pipeline. Runs in a thread pool."""
     def _sync_run():
         try:
+            from services.tracing import new_ledger
+            _ledger = new_ledger()  # per-analysis token/cost ledger (contextvars)
             # 1. Parse uploaded files — route by category
             analysis_status[analysis_id]["current_agent"] = "Parsing uploaded files..."
             parsed_files = []
@@ -613,6 +627,9 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["currency"] = profile.get("currency", "ZAR")
             report["annual_revenue"] = profile.get("annual_revenue", 0)
             report["primary_concern"] = profile.get("primary_concern", "")
+            report["llm_usage"] = _ledger.summary()
+            from services.finding_quality import critique_report
+            report["finding_quality"] = critique_report(report)  # deterministic per-finding critique
 
             analyses[analysis_id] = report
             save_report(analysis_id, report)

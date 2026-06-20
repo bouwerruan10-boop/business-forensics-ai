@@ -10,6 +10,7 @@ Within a wave the agents are independent, so we fan them out across a thread poo
 deterministic regardless of which agent finishes first. Each agent is isolated:
 a failure yields no findings and never sinks the run.
 """
+import contextvars
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -42,7 +43,7 @@ def _run_wave(classes, business_data, memory, progress_callback, label, max_work
         progress_callback(label, "Running {} specialist agents in parallel...".format(len(classes)))
     collected = []
     with ThreadPoolExecutor(max_workers=min(max_workers, len(classes))) as ex:
-        futs = [ex.submit(_run_one, C, business_data, memory) for C in classes]
+        futs = [ex.submit(contextvars.copy_context().run, _run_one, C, business_data, memory) for C in classes]
         for fut in as_completed(futs):
             name, fnds, secs = fut.result()
             collected.append((name, fnds, secs))
@@ -93,7 +94,7 @@ def run_independent_agents(items, business_data, memory, progress_callback=None,
 
     results = [[] for _ in items]
     with ThreadPoolExecutor(max_workers=min(max_workers, len(items))) as ex:
-        futs = {ex.submit(_one, item): i for i, item in enumerate(items)}
+        futs = {ex.submit(contextvars.copy_context().run, _one, item): i for i, item in enumerate(items)}
         for fut in as_completed(futs):
             results[futs[fut]] = fut.result() or []
     for fnds in results:

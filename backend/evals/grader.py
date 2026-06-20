@@ -93,3 +93,108 @@ def deterministic_report(cases=None) -> dict:
     results = [grade_deterministic(c) for c in cases]
     overall = round(sum(r["score"] for r in results) / len(results)) if results else 100
     return {"overall_score": overall, "results": results}
+
+
+# ── Build 2: quality eval framework ────────────────────────────────────────
+# Two no-API graders (CI regression gates) + one LLM-as-judge semantic grader
+# (paid; injected judge_call for testability). See evals/RUBRIC.md.
+import re as _re
+
+_ZAR = _re.compile(r"R\s?\d", _re.I)
+_ACT = _re.compile(r"Act\s+\d+\s+of\s+\d{4}|\bs\s?\d+\b|section\s+\d+|Schedule", _re.I)
+
+# Pin BOTH agent and judge model versions so a silent provider update is detected.
+JUDGE_MODEL = "claude-sonnet-4-6"
+
+
+def _iter_findings(report: dict):
+    for lst in (report.get("department_findings", {}) or {}).values():
+        for f in (lst or []):
+            yield f
+
+
+def grade_structure(report: dict) -> dict:
+    """NO-API: fraction of findings satisfying the FINDING_RULES output contract.
+    A regression gate on finding quality — catches prompt drift that drops ZAR
+    quantification, recommendations, or benchmarks."""
+    findings = list(_iter_findings(report))
+    if not findings:
+        return {"findings": 0, "score": 0, "pct": {}}
+
+    def has(f, k):
+        return bool((f.get(k) or "").strip())
+
+    crit = {
+        "has_financial_impact": lambda f: has(f, "financial_impact"),
+        "quantified_zar": lambda f: bool(_ZAR.search((f.get("financial_impact", "") or "") + " " + (f.get("detail", "") or ""))),
+        "has_recommendation": lambda f: has(f, "recommendation"),
+        "valid_severity": lambda f: f.get("severity") in ("critical", "high", "medium", "low"),
+        "has_benchmark": lambda f: has(f, "benchmark_reference"),
+    }
+    n = len(findings)
+    pct = {name: round(sum(1 for f in findings if fn(f)) / n * 100) for name, fn in crit.items()}
+    return {"findings": n, "score": round(sum(pct.values()) / len(pct)), "pct": pct}
+
+
+def grade_sa_citation(report: dict) -> dict:
+    """NO-API: fraction of SA tax/legal findings that cite a specific Act/section.
+    Directly measures whether the RAG grounding (Build 1) is taking effect."""
+    sa = []
+    for f in _iter_findings(report):
+        a = (f.get("agent", "") or "").lower()
+        if any(t in a for t in ("sa ", "satax", "salegal", "tax", "legal", "bbbee")):
+            sa.append(f)
+    if not sa:
+        return {"sa_findings": 0, "cited": 0, "score": None}
+    cited = sum(1 for f in sa if _ACT.search(" ".join(
+        (f.get(k, "") or "") for k in ("detail", "recommendation", "benchmark_reference", "title"))))
+    return {"sa_findings": len(sa), "cited": cited, "score": round(cited / len(sa) * 100)}
+
+
+RUBRIC_CRITERIA = ("specificity", "actionability", "grounding", "severity_fit")
+
+
+def build_judge_prompt(finding: dict) -> str:
+    """Prompt for the LLM-as-judge. Reference-free, rubric-based (1-5 each)."""
+    return (
+        "You are a strict QA reviewer of a South African SME advisory finding. "
+        "Score the finding from 1 (poor) to 5 (excellent) on each criterion:\n"
+        "- specificity: cites concrete figures/dates/thresholds, not vague generalities\n"
+        "- actionability: the recommendation is concrete and a business owner could act on it\n"
+        "- grounding: claims are tied to the data or cited law; no fabricated facts\n"
+        "- severity_fit: the severity label matches the stated financial impact\n\n"
+        "FINDING:\n"
+        "title: {title}\nseverity: {severity}\ndetail: {detail}\n"
+        "financial_impact: {fi}\nrecommendation: {rec}\nbenchmark_reference: {bench}\n\n"
+        'Return ONLY JSON: {{"specificity":n,"actionability":n,"grounding":n,"severity_fit":n,"comment":"<=15 words"}}'
+    ).format(
+        title=finding.get("title", ""), severity=finding.get("severity", ""),
+        detail=finding.get("detail", ""), fi=finding.get("financial_impact", ""),
+        rec=finding.get("recommendation", ""), bench=finding.get("benchmark_reference", ""),
+    )
+
+
+def grade_findings_with_judge(report: dict, judge_call, sample: int = 8) -> dict:
+    """LLM-as-judge semantic quality. `judge_call(prompt:str)->str` returns the
+    judge's JSON text (injected so this is testable offline and pins the model
+    in the paid runner). Averages 1-5 scores across a sampled set of findings."""
+    findings = list(_iter_findings(report))[:sample]
+    scored, per_crit = [], {c: [] for c in RUBRIC_CRITERIA}
+    for f in findings:
+        try:
+            raw = judge_call(build_judge_prompt(f))
+            data = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+        except Exception:
+            continue
+        if all(c in data for c in RUBRIC_CRITERIA):
+            scored.append(data)
+            for c in RUBRIC_CRITERIA:
+                per_crit[c].append(float(data[c]))
+    avg = {c: round(sum(v) / len(v), 2) for c, v in per_crit.items() if v}
+    overall = round(sum(avg.values()) / len(avg), 2) if avg else None
+    return {"judged": len(scored), "by_criterion": avg, "overall_1to5": overall}
+
+
+def quality_report(report: dict) -> dict:
+    """No-API quality snapshot (structure + SA citation) for CI + ops."""
+    return {"structure": grade_structure(report), "sa_citation": grade_sa_citation(report)}

@@ -316,3 +316,64 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
         "disclaimer": ("Probabilistic estimate over {} simulations sampling how fully each action "
                        "lands plus market noise. Indicative, not a guarantee.".format(n)),
     }
+
+
+# ── v3: bundle optimiser ───────────────────────────────────────────────────
+# "Which combination of actions should I pursue first?" An SME has limited
+# capacity, so the real question is the BEST SUBSET of actions under an action-
+# count budget. Because actions interact (gross-margin + growth compound through
+# _project), greedy ranking can be wrong — so we evaluate every bundle jointly
+# via apply_actions. With <=6 candidate actions this exhaustive search is optimal
+# and cheap, and it stays fully deterministic (no LLM, no sampling).
+from itertools import combinations as _combinations
+
+
+def optimize_actions(report: dict, scenario: str = "expected",
+                     max_actions: int = 3, objective: str = "imara") -> dict:
+    actions = derive_actions(report)
+    ids = [a["id"] for a in actions]
+    labels = {a["id"]: a["label"] for a in actions}
+    try:
+        max_actions = max(1, min(int(max_actions), len(ids)))
+    except (TypeError, ValueError):
+        max_actions = min(3, len(ids))
+
+    def metric(res):
+        if objective == "profit":
+            return res["net_profit_delta"]
+        if objective == "cash":
+            return res["cash_released"]
+        return res["imara_score_delta"]
+
+    evaluated, best_by_size = [], {}
+    for k in range(1, max_actions + 1):
+        for combo in _combinations(ids, k):
+            sel = [{"id": i, "intensity": 1.0} for i in combo]
+            res = apply_actions(report, sel, scenario)
+            rec = {
+                "ids": list(combo), "labels": [labels[i] for i in combo], "size": k,
+                "objective_value": metric(res),
+                "imara_score_delta": res["imara_score_delta"],
+                "net_profit_delta": res["net_profit_delta"],
+                "cash_released": res["cash_released"],
+            }
+            evaluated.append(rec)
+            if k not in best_by_size or rec["objective_value"] > best_by_size[k]["objective_value"]:
+                best_by_size[k] = rec
+
+    # Best value first; on ties prefer the SMALLER bundle (less effort for same lift).
+    evaluated.sort(key=lambda r: (-r["objective_value"], r["size"]))
+    best = evaluated[0] if evaluated else None
+    curve = [best_by_size[k] for k in sorted(best_by_size)]
+    return {
+        "scenario": scenario, "objective": objective, "max_actions": max_actions,
+        "currency": report.get("currency") or "ZAR",
+        "best_bundle": best,
+        "top_bundles": evaluated[:5],
+        "marginal_curve": [
+            {"size": c["size"], "objective_value": c["objective_value"], "labels": c["labels"]}
+            for c in curve
+        ],
+        "disclaimer": ("Exhaustive deterministic search over action bundles under a {}-action budget "
+                       "({} scenario). Indicative model projections, not guarantees.".format(max_actions, scenario)),
+    }

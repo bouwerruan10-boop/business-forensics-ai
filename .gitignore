@@ -49,3 +49,4 @@ desktop.ini
 /tmp/
 *.pdf
 *.xlsx
+frontend/vite.config.js.timestamp-*.mjs

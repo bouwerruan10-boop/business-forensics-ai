@@ -34,4 +34,5 @@ def usage_summary(report: dict) -> dict:
         "runtime_seconds": report.get("total_runtime_seconds"),
         "financial_extraction_source": report.get("financial_extraction_source"),
         "agent_timings": timings,
+        "llm_usage": report.get("llm_usage"),
     }
