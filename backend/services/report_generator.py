@@ -380,6 +380,55 @@ def _issue_cell(title, why, impact, is_qw):
     return cell
 
 
+def _callout_box(story, title, body, bg, accent):
+    """Tinted callout box: bold accent title + body text, left accent rule.
+
+    Body text colour adapts to the background luminance so the box is legible
+    on both dark (e.g. NAVY_LITE) and light (e.g. GREEN_BG) backgrounds.
+    All interpolated text is XML-escaped.
+    """
+    def _esc(s):
+        return (str(s or "")
+                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+    try:
+        lum = 0.299 * bg.red + 0.587 * bg.green + 0.114 * bg.blue
+    except Exception:
+        lum = 1.0
+    body_color = OFF_WHITE if lum < 0.5 else DARK_GRAY
+    inner = [
+        Paragraph(_esc(title).upper(),
+                  _style(fontSize=8, fontName="Helvetica-Bold", textColor=accent, letterSpacing=1)),
+        Spacer(1, 0.12 * cm),
+        Paragraph(_esc(body), _style(fontSize=9.5, textColor=body_color, leading=13)),
+    ]
+    box = Table([[inner]], colWidths=[CONTENT_W])
+    box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), bg),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LINEBEFORE", (0, 0), (0, -1), 2, accent),
+    ]))
+    story.append(box)
+    story.append(Spacer(1, 0.2 * cm))
+
+
+def _collect_all_findings(report):
+    """Flat list of every finding dict in the report (for the severity donut)."""
+    out = []
+    dept = report.get("department_findings") or {}
+    if isinstance(dept, dict):
+        for items in dept.values():
+            if isinstance(items, list):
+                out.extend([f for f in items if isinstance(f, dict)])
+    if not out:
+        out = [f for f in (report.get("all_findings_ranked") or []) if isinstance(f, dict)]
+    if not out:
+        out = [f for f in (report.get("quick_wins") or []) if isinstance(f, dict)]
+    return out
+
+
 def _executive_summary_section(story, report):
     _section_header(story, "EXECUTIVE SUMMARY")
 

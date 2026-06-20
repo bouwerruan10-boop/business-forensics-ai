@@ -1039,7 +1039,17 @@ def test_pdf_renders_priority_issues():
             {"rank": 1, "title": "Gross margin <30% vs >37%", "estimated_total_impact": "R 475 000",
              "why_critical": "COGS > 70% & R&D < 1%", "quick_win": True},
         ],
-        "department_findings": {}, "all_findings_ranked": [],
+        # business_model_summary exercises _callout_box; department_findings exercises
+        # _collect_all_findings + severity_donut - all three were undefined helpers.
+        "business_model_summary": "B2B precision parts < automotive & mining.",
+        "quick_wins_narrative": "Quick wins worth > R200k in < 30 days.",
+        "department_findings": {"Financial Agent": [
+            {"agent": "Financial Agent", "category": "Margin", "severity": "critical",
+             "title": "Margin <30% & COGS >70%", "detail": "COGS > 70%.",
+             "financial_impact": "R 475 000", "recommendation": "Cut COGS & raise > 5%",
+             "roi_estimate": "R 580K", "quick_win": True},
+        ]},
+        "all_findings_ranked": [],
     }
     for aud in ("owner", "banker", "investor"):
         out = generate_pdf_report(rep, aud)
