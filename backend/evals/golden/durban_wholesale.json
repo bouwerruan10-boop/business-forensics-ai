@@ -1,0 +1,26 @@
+{
+  "name": "Durban Wholesale (volume, thin)",
+  "industry_key": "retail",
+  "annual_revenue": 60000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 60000000\nCost of sales: 52800000\nGross profit: 7200000\nOperating expenses: 5400000\nOperating profit: 1800000\nFinance costs: 700000\nNet profit: 300000\nCurrent assets: 12000000\nInventory: 6500000\nTrade receivables: 4200000\nCurrent liabilities: 9500000\nTrade payables: 5000000\nTotal borrowings: 5500000\nEquity: 5000000",
+  "expected_ratios": {
+    "gross_margin": 12.0,
+    "net_margin": 0.5,
+    "operating_margin": 3.0,
+    "current_ratio": 1.26,
+    "debtor_days": 25.55,
+    "debt_to_equity": 1.1,
+    "interest_coverage": 2.57
+  },
+  "expected_status": {},
+  "planted_issues": [
+    "margin",
+    "inventory",
+    "thin"
+  ],
+  "imara_band_in": [
+    "C",
+    "D"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Cape Coastal Logistics (thin)",
+  "industry_key": "logistics",
+  "annual_revenue": 35000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 35000000\nCost of sales: 28700000\nGross profit: 6300000\nOperating expenses: 5200000\nOperating profit: 1100000\nFinance costs: 350000\nNet profit: 540000\nCurrent assets: 6800000\nInventory: 300000\nTrade receivables: 4600000\nCurrent liabilities: 5500000\nTrade payables: 2400000\nTotal borrowings: 3200000\nEquity: 4000000",
+  "expected_ratios": {
+    "gross_margin": 18.0,
+    "net_margin": 1.54,
+    "operating_margin": 3.14,
+    "current_ratio": 1.24,
+    "debtor_days": 47.97,
+    "debt_to_equity": 0.8,
+    "interest_coverage": 3.14
+  },
+  "expected_status": {},
+  "planted_issues": [
+    "margin",
+    "fuel",
+    "debtor"
+  ],
+  "imara_band_in": [
+    "C",
+    "B"
+  ]
+}

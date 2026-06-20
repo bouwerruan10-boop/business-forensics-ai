@@ -1,0 +1,26 @@
+{
+  "name": "uMhlanga Hospitality (loss)",
+  "industry_key": "hospitality",
+  "annual_revenue": 9000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 9000000\nCost of sales: 3600000\nGross profit: 5400000\nOperating expenses: 6200000\nOperating profit: -800000\nFinance costs: 420000\nNet profit: -1220000\nCurrent assets: 1400000\nInventory: 250000\nTrade receivables: 600000\nCurrent liabilities: 2600000\nTrade payables: 1400000\nTotal borrowings: 4500000\nEquity: 800000",
+  "expected_ratios": {
+    "gross_margin": 60.0,
+    "net_margin": -13.56,
+    "operating_margin": -8.89,
+    "current_ratio": 0.54,
+    "debtor_days": 24.33,
+    "debt_to_equity": 5.62,
+    "interest_coverage": -1.9
+  },
+  "expected_status": {},
+  "planted_issues": [
+    "loss",
+    "occupancy",
+    "solvency"
+  ],
+  "imara_band_in": [
+    "E",
+    "D"
+  ]
+}

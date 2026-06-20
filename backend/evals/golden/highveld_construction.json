@@ -1,0 +1,26 @@
+{
+  "name": "Highveld Construction (lumpy)",
+  "industry_key": "construction",
+  "annual_revenue": 45000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 45000000\nCost of sales: 36000000\nGross profit: 9000000\nOperating expenses: 6500000\nOperating profit: 2500000\nFinance costs: 900000\nNet profit: 1100000\nCurrent assets: 14000000\nInventory: 1200000\nTrade receivables: 9500000\nCurrent liabilities: 11000000\nTrade payables: 5000000\nTotal borrowings: 7000000\nEquity: 6000000",
+  "expected_ratios": {
+    "gross_margin": 20.0,
+    "net_margin": 2.44,
+    "operating_margin": 5.56,
+    "current_ratio": 1.27,
+    "debtor_days": 77.06,
+    "debt_to_equity": 1.17,
+    "interest_coverage": 2.78
+  },
+  "expected_status": {},
+  "planted_issues": [
+    "debtor",
+    "retention",
+    "cash flow"
+  ],
+  "imara_band_in": [
+    "C",
+    "B"
+  ]
+}

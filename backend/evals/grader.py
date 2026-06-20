@@ -198,3 +198,38 @@ def grade_findings_with_judge(report: dict, judge_call, sample: int = 8) -> dict
 def quality_report(report: dict) -> dict:
     """No-API quality snapshot (structure + SA citation) for CI + ops."""
     return {"structure": grade_structure(report), "sa_citation": grade_sa_citation(report)}
+
+
+def _judge_tier(scores: dict) -> str:
+    """Collapse the judge's 1-5 criterion scores into a strong/weak verdict."""
+    vals = [float(scores[c]) for c in RUBRIC_CRITERIA if c in scores]
+    avg = sum(vals) / len(vals) if vals else 0
+    return "strong" if avg >= 3.5 else "weak"
+
+
+def load_judge_labels():
+    path = os.path.join(os.path.dirname(__file__), "judge_labels.json")
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh).get("labels", [])
+
+
+def validate_judge(judge_call, labels=None) -> dict:
+    """Measure LLM-judge agreement with HUMAN labels before trusting it at scale.
+    `judge_call(prompt)->json text`. Returns agreement % vs human strong/weak
+    verdicts (target 75-90%) plus the per-item rows so disagreements can be read."""
+    labels = labels or load_judge_labels()
+    agree, n, rows = 0, 0, []
+    for item in labels:
+        try:
+            raw = judge_call(build_judge_prompt(item["finding"]))
+            data = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+            tier = _judge_tier(data)
+        except Exception:
+            continue
+        n += 1
+        ok = (tier == item["human_label"])
+        agree += int(ok)
+        rows.append({"title": item["finding"].get("title"), "human": item["human_label"], "judge": tier, "agree": ok})
+    pct = round(agree / n * 100) if n else None
+    return {"n": n, "agreement_pct": pct, "target": "75-90",
+            "trustworthy": (pct is not None and pct >= 75), "rows": rows}

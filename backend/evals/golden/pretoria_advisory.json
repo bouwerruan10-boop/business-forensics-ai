@@ -1,0 +1,22 @@
+{
+  "name": "Pretoria Advisory (strong)",
+  "industry_key": "professional_services",
+  "annual_revenue": 8000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 8000000\nCost of sales: 2000000\nGross profit: 6000000\nOperating expenses: 4400000\nOperating profit: 1600000\nFinance costs: 50000\nNet profit: 1150000\nCurrent assets: 3000000\nInventory: 0\nTrade receivables: 700000\nCurrent liabilities: 900000\nTrade payables: 350000\nTotal borrowings: 300000\nEquity: 3500000",
+  "expected_ratios": {
+    "gross_margin": 75.0,
+    "net_margin": 14.37,
+    "operating_margin": 20.0,
+    "current_ratio": 3.33,
+    "debtor_days": 31.94,
+    "debt_to_equity": 0.09,
+    "interest_coverage": 32.0
+  },
+  "expected_status": {},
+  "planted_issues": [],
+  "imara_band_in": [
+    "A",
+    "B"
+  ]
+}

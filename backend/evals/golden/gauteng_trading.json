@@ -1,0 +1,26 @@
+{
+  "name": "Gauteng Trading (distressed)",
+  "industry_key": "general",
+  "annual_revenue": 6000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 6000000\nCost of sales: 5100000\nGross profit: 900000\nOperating expenses: 1500000\nOperating profit: -600000\nFinance costs: 350000\nNet profit: -1050000\nCurrent assets: 1600000\nInventory: 900000\nTrade receivables: 1100000\nCurrent liabilities: 3400000\nTrade payables: 1900000\nTotal borrowings: 3800000\nEquity: 400000",
+  "expected_ratios": {
+    "gross_margin": 15.0,
+    "net_margin": -17.5,
+    "operating_margin": -10.0,
+    "current_ratio": 0.47,
+    "debtor_days": 66.92,
+    "debt_to_equity": 9.5,
+    "interest_coverage": -1.71
+  },
+  "expected_status": {},
+  "planted_issues": [
+    "insolven",
+    "loss",
+    "cash"
+  ],
+  "imara_band_in": [
+    "E",
+    "D"
+  ]
+}

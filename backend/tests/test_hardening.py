@@ -845,3 +845,34 @@ def test_optimizer_objectives_switch():
     assert prof["best_bundle"]["net_profit_delta"] >= 0
     cash = optimize_actions(rep, scenario="expected", max_actions=4, objective="cash")
     assert cash["best_bundle"]["cash_released"] >= 0
+
+
+# ── Validation: expanded golden set + judge-vs-human harness ────────────────
+def test_golden_set_expanded_and_deterministic_baseline():
+    """The deterministic engine must match independent ground-truth ratios on
+    every golden case (CI gate; catches extraction/ratio regressions)."""
+    from evals.grader import load_cases, grade_deterministic
+    cases = load_cases()
+    assert len(cases) >= 12
+    for c in cases:
+        d = grade_deterministic(c)
+        assert d["passed"] == d["total"], f"{d['name']} failed: {[k for k in d['checks'] if not k['pass']]}"
+
+
+def test_validate_judge_harness_with_stub():
+    import json
+    from evals.grader import validate_judge, load_judge_labels, RUBRIC_CRITERIA
+    labels = load_judge_labels()
+    assert len(labels) >= 8 and {x["human_label"] for x in labels} == {"strong", "weak"}
+
+    def stub_judge(prompt):  # proxy: a quantified ZAR impact -> high scores
+        strong = "financial_impact: R" in prompt
+        v = 5 if strong else 2
+        d = {c: v for c in RUBRIC_CRITERIA}
+        d["comment"] = "x"
+        return json.dumps(d)
+
+    out = validate_judge(stub_judge, labels)
+    assert out["n"] == len(labels)
+    assert out["agreement_pct"] >= 70          # a sensible proxy aligns with human labels
+    assert isinstance(out["trustworthy"], bool)

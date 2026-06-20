@@ -9,7 +9,7 @@ import sys
 
 from evals.grader import (
     load_cases, grade_deterministic, grade_report,
-    grade_structure, grade_sa_citation, grade_findings_with_judge, JUDGE_MODEL,
+    grade_structure, grade_sa_citation, grade_findings_with_judge, validate_judge, JUDGE_MODEL,
 )
 
 
@@ -41,6 +41,12 @@ def main():
     from agents.ceo_agent import CEOAgent
     from memory.shared_memory import SharedMemory
     judge = _judge_call_factory()
+    vj = validate_judge(judge)
+    print("\n=== Judge validation vs human labels (gate before trusting the judge) ===")
+    print(f"  agreement {vj['agreement_pct']}% (target {vj['target']}) -> {'TRUSTWORTHY' if vj['trustworthy'] else 'NEEDS RUBRIC WORK'}")
+    for r in vj["rows"]:
+        if not r["agree"]:
+            print(f"    disagree: {r['title']}  human={r['human']} judge={r['judge']}")
     print("\n=== Full pipeline eval (LIVE — uses API) ===")
     for c in cases:
         m = SharedMemory()

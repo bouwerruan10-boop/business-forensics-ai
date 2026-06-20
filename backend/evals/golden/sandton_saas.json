@@ -1,0 +1,26 @@
+{
+  "name": "Sandton SaaS (growth loss)",
+  "industry_key": "technology",
+  "annual_revenue": 18000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 18000000\nCost of sales: 3600000\nGross profit: 14400000\nOperating expenses: 17000000\nOperating profit: -2600000\nFinance costs: 200000\nNet profit: -2800000\nCurrent assets: 9000000\nInventory: 0\nTrade receivables: 2400000\nCurrent liabilities: 3500000\nTrade payables: 1200000\nTotal borrowings: 1000000\nEquity: 12000000",
+  "expected_ratios": {
+    "gross_margin": 80.0,
+    "net_margin": -15.56,
+    "operating_margin": -14.44,
+    "current_ratio": 2.57,
+    "debtor_days": 48.67,
+    "debt_to_equity": 0.08,
+    "interest_coverage": -13.0
+  },
+  "expected_status": {},
+  "planted_issues": [
+    "burn",
+    "runway",
+    "loss"
+  ],
+  "imara_band_in": [
+    "C",
+    "B"
+  ]
+}

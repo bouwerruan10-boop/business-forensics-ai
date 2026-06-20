@@ -1,0 +1,22 @@
+{
+  "name": "Free State Precision (strong, low gearing)",
+  "industry_key": "manufacturing",
+  "annual_revenue": 28000000,
+  "currency": "ZAR",
+  "financial_text": "Revenue: 28000000\nCost of sales: 18200000\nGross profit: 9800000\nOperating expenses: 6300000\nOperating profit: 3500000\nFinance costs: 250000\nNet profit: 2350000\nCurrent assets: 11000000\nInventory: 3500000\nTrade receivables: 4000000\nCurrent liabilities: 4500000\nTrade payables: 2000000\nTotal borrowings: 2000000\nEquity: 9000000",
+  "expected_ratios": {
+    "gross_margin": 35.0,
+    "net_margin": 8.39,
+    "operating_margin": 12.5,
+    "current_ratio": 2.44,
+    "debtor_days": 52.14,
+    "debt_to_equity": 0.22,
+    "interest_coverage": 14.0
+  },
+  "expected_status": {},
+  "planted_issues": [],
+  "imara_band_in": [
+    "A",
+    "B"
+  ]
+}
