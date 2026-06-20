@@ -124,3 +124,12 @@ def test_full_pipeline_no_api(client):
 
     # usage endpoint passthrough
     assert client.get(f"/api/report/{aid}/usage").json().get("llm_usage")
+
+    # Economics agent ran in the pipeline + macro overlay endpoint works
+    assert rep.get("macro_performed") is True
+    assert rep.get("macro_overall_exposure") in ("low", "medium", "high")
+    macro = client.get(f"/api/report/{aid}/macro")
+    assert macro.status_code == 200
+    mj = macro.json()
+    assert mj["sensitivity"]["drivers"] and len(mj["stress_test"]["scenarios"]) == 3
+    assert 0 <= mj["stress_test"]["macro_resilience"] <= 100

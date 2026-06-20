@@ -876,3 +876,63 @@ def test_validate_judge_harness_with_stub():
     assert out["n"] == len(labels)
     assert out["agreement_pct"] >= 70          # a sensible proxy aligns with human labels
     assert isinstance(out["trustworthy"], bool)
+
+
+# ── Economics agent + macro stress test (economics x simulator) ────────────
+def _macro_report():
+    return {
+        "industry_key": "manufacturing", "annual_revenue": 20_000_000,
+        "imara_score": 52, "financial_fundamentals_score": 48,
+        "imara_components": [
+            {"label": "Profitability", "weight": 0.25, "value": 45},
+            {"label": "Liquidity", "weight": 0.15, "value": 55},
+            {"label": "Credit Readiness", "weight": 0.20, "value": 50},
+            {"label": "Risk & Compliance", "weight": 0.15, "value": 52},
+            {"label": "Market Visibility", "weight": 0.10, "value": 50},
+            {"label": "Operational Efficiency", "weight": 0.15, "value": 50}],
+        "financial_figures": {"revenue": 20_000_000, "cogs": 15_000_000, "gross_profit": 5_000_000,
+                              "operating_profit": 800_000, "interest": 600_000, "net_profit": 150_000,
+                              "total_debt": 6_500_000, "opex": 4_200_000, "current_assets": 5_000_000,
+                              "current_liabilities": 4_200_000, "equity": 2_500_000,
+                              "receivables": 3_200_000, "inventory": 2_600_000},
+    }
+
+
+def test_macro_sensitivity_is_firm_specific():
+    from services.macro_data import firm_macro_sensitivity
+    r = firm_macro_sensitivity(_macro_report())
+    assert r["overall_exposure"] in ("low", "medium", "high")
+    assert len(r["drivers"]) == 4 and r["top_driver"]
+    for d in r["drivers"]:
+        assert d["exposure"] in ("low", "medium", "high") and d["driver"]
+
+
+def test_macro_stress_three_weighted_scenarios():
+    from services.simulation import macro_stress_test
+    r = macro_stress_test(_macro_report())
+    assert abs(sum(s["weight"] for s in r["scenarios"]) - 1.0) < 1e-6
+    assert [s["scenario"] for s in r["scenarios"]] == ["Base", "Adverse", "Upside"]
+    assert 0 <= r["macro_resilience"] <= 100 and r["macro_resilience_label"] in ("fragile", "moderate", "robust")
+    sc = {s["scenario"]: s for s in r["scenarios"]}
+    assert sc["Adverse"]["net_profit"] <= sc["Base"]["net_profit"]          # downside can't raise profit
+    assert sc["Upside"]["net_profit"] >= sc["Base"]["net_profit"]
+
+
+def test_macro_resilience_flags_loss_flip():
+    from services.simulation import macro_stress_test
+    r = macro_stress_test(_macro_report())
+    if r["flips_to_loss_under_adverse"]:
+        assert r["macro_resilience"] <= 35 and r["macro_resilience_label"] == "fragile"
+
+
+def test_economics_agent_sets_deterministic_macro_fields_without_llm():
+    from agents.economics_agent import EconomicsAgent
+    from memory.shared_memory import SharedMemory
+    m = SharedMemory(industry_key="manufacturing", annual_revenue=20_000_000)
+    m.financial_figures = _macro_report()["financial_figures"]
+    a = EconomicsAgent()
+    a._call_claude = lambda *x, **k: "[]"                                   # stub LLM
+    a.analyze({}, m)
+    assert m.macro_performed is True
+    assert m.macro_overall_exposure in ("low", "medium", "high")
+    assert m.macro_top_driver and isinstance(m.macro_sensitivity, dict) and m.macro_sensitivity.get("drivers")

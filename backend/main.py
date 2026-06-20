@@ -412,6 +412,22 @@ def report_optimize(analysis_id: str, scenario: str = "expected",
     return optimize_actions(result, scenario=scenario, max_actions=max_actions, objective=objective)
 
 
+@app.get("/api/report/{analysis_id}/macro")
+def report_macro(analysis_id: str):
+    """Macro-economic overlay: the firm's bottom-up macro sensitivity + a
+    probability-weighted macro stress test (economics agent x simulator)."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.macro_data import firm_macro_sensitivity, SA_MACRO
+    from services.simulation import macro_stress_test
+    return {
+        "snapshot": SA_MACRO,
+        "sensitivity": firm_macro_sensitivity(result),
+        "stress_test": macro_stress_test(result),
+    }
+
+
 @app.post("/api/simulate/montecarlo")
 def simulate_montecarlo(req: ActionSimRequest):
     """Probabilistic outcome distribution + probability of reaching the next band."""

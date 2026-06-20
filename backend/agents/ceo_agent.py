@@ -11,6 +11,7 @@ import time
 from agents.base_agent import BaseAgent
 from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent
 from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
+from agents.economics_agent import EconomicsAgent
 from memory.shared_memory import SharedMemory, AgentFinding
 from config import MODEL, MAX_TOKENS, PARSE_MODEL
 
@@ -99,6 +100,8 @@ generic business language."""
                  "Reviewing SARS tax obligations..."),
                 (SALegalAgent(), "SA Corporate Law & BBBEE Agent",
                  "Reviewing Companies Act, BBBEE, POPIA, CIPC compliance..."),
+                (EconomicsAgent(), "Economic Environment Agent",
+                 "Assessing macro-economic conditions and their effect on the business..."),
             ],
             business_data, memory, progress_callback,
             header=("SA Tax Compliance Agent",
@@ -621,6 +624,13 @@ Return ONLY valid JSON.
             "sa_bbbee_analysis": memory.sa_bbbee_analysis,
             "sa_cipc_status": memory.sa_cipc_status,
             "sa_legal_performed": memory.sa_legal_performed,
+
+            # Economic Environment Agent
+            "macro_performed": memory.macro_performed,
+            "macro_summary": memory.macro_summary,
+            "macro_overall_exposure": memory.macro_overall_exposure,
+            "macro_top_driver": memory.macro_top_driver,
+            "macro_sensitivity": memory.macro_sensitivity,
 
             # SA intake profile
             "entity_type": memory.entity_type,

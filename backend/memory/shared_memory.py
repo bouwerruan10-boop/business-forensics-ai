@@ -156,6 +156,13 @@ class SharedMemory:
     sa_cipc_status: str = "unknown"          # "compliant" | "overdue" | "unknown"
     sa_legal_performed: bool = False         # True once SALegalAgent has run
 
+    # ── Economics / Macro Agent Outputs ───────────────────────────
+    macro_performed: bool = False            # True once EconomicsAgent has run
+    macro_summary: str = ""                  # injected into CEO synthesis
+    macro_overall_exposure: str = ""         # low | medium | high
+    macro_top_driver: str = ""               # the macro factor the firm is most exposed to
+    macro_sensitivity: dict = field(default_factory=dict)  # per-driver exposure profile
+
     def add_finding(self, finding):
         self.findings.append(finding)
 

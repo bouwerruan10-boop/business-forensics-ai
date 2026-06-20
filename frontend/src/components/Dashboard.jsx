@@ -5,6 +5,7 @@ import FindingsList from './FindingsList'
 import Roadmap from './Roadmap'
 import Simulator from './Simulator'
 import ActionSimulator from './ActionSimulator'
+import EconomicEnvironment from './EconomicEnvironment'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
@@ -161,6 +162,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...((report.valuation_mid > 0 || report.forecast_base_12m > 0) ? [{ id: 'valuation', label: 'Valuation & Forecast' }] : []),
     ...((report.market_search_performed || report.market_visibility_score > 0) ? [{ id: 'market', label: 'Market Intelligence' }] : []),
     ...((report.sa_tax_performed || report.sa_legal_performed) ? [{ id: 'sa-compliance', label: 'SA Compliance' }] : []),
+    ...(report.macro_performed ? [{ id: 'economics', label: 'Economic Environment' }] : []),
     { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
   ]
@@ -277,6 +279,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="SARS tax obligations, Companies Act, BBBEE, POPIA, and CIPC compliance"
         >
           <SACompliancePanel report={report} />
+        </Section>
+      )}
+
+      {/* Economic Environment (macro agent + stress test) */}
+      {report.macro_performed && (
+        <Section
+          id="economics"
+          title="Economic Environment"
+          subtitle="How the SA macro-economy affects this business — and how it holds up under a macro stress test"
+        >
+          <EconomicEnvironment analysisId={analysisId} currency={report.currency} />
         </Section>
       )}
 

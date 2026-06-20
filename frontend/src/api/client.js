@@ -102,6 +102,12 @@ export async function monteCarlo(analysisId, actions) {
   return res.json()
 }
 
+export async function getMacro(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/macro`, { headers: authHeaders() })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function getOptimize(analysisId, scenario = 'expected', maxActions = 3, objective = 'imara') {
   const q = `scenario=${scenario}&max_actions=${maxActions}&objective=${objective}`
   const res = await fetch(`${BASE}/report/${analysisId}/optimize?${q}`, { headers: authHeaders() })

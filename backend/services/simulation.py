@@ -377,3 +377,95 @@ def optimize_actions(report: dict, scenario: str = "expected",
         "disclaimer": ("Exhaustive deterministic search over action bundles under a {}-action budget "
                        "({} scenario). Indicative model projections, not guarantees.".format(max_actions, scenario)),
     }
+
+
+# ── v4: macro stress test (economics agent ↔ simulator) ────────────────────
+# Projects the firm under probability-weighted macro scenarios (IFRS-9 style:
+# base/adverse/upside), transmitting each macro shock through the firm's OWN
+# structure (floating debt, energy-intensive opex, FX-exposed costs, demand
+# cyclicality). Deterministic; reuses compute_ratios / fundamentals_score /
+# _estimate_imara. A single scenario understates risk under non-linearity, so we
+# weight three. The result is an OVERLAY (resilience view), not a Score rewrite.
+from services.macro_data import SECTOR_PROFILE, FLOATING_DEBT_SHARE, ENERGY_OPEX_FACTOR, SA_MACRO
+
+MACRO_SCENARIOS = [
+    ("Base",    0.50, dict(repo_bps=0,    inflation_pp=0,  tariff_pct=12.7, zar_pct=0,   demand_pct=1)),
+    ("Adverse", 0.25, dict(repo_bps=200,  inflation_pp=3,  tariff_pct=18.0, zar_pct=-12, demand_pct=-3)),
+    ("Upside",  0.25, dict(repo_bps=-100, inflation_pp=-1, tariff_pct=8.0,  zar_pct=8,   demand_pct=3)),
+]
+_INFLATION_PASSTHROUGH = 0.5   # firms pass ~half of cost inflation to prices
+
+
+def macro_stress_test(report: dict) -> dict:
+    figs = _baseline_figs(report)
+    industry = report.get("industry_key") or "general"
+    prof = SECTOR_PROFILE.get(industry, SECTOR_PROFILE["general"])
+    rev = _num(figs, "revenue"); cogs = _num(figs, "cogs"); opex = _num(figs, "opex")
+    op = _num(figs, "operating_profit"); interest = _num(figs, "interest")
+    debt = _num(figs, "total_debt")
+    actual_net = _num(figs, "net_profit") or (op - interest)
+    floating = debt * FLOATING_DEBT_SHARE
+    energy_opex = opex * ENERGY_OPEX_FACTOR * prof["energy"] / 0.5
+    fx_cost = (cogs + opex) * prof["fx"] * 0.4
+
+    base_score = report.get("imara_score")
+    results = []
+    for name, weight, sc in MACRO_SCENARIOS:
+        d_interest = floating * (sc["repo_bps"] / 10000.0)
+        d_energy = energy_opex * (sc["tariff_pct"] / 100.0)
+        d_inflation = (cogs + opex) * (sc["inflation_pp"] / 100.0) * (1 - _INFLATION_PASSTHROUGH)
+        d_fx = fx_cost * (-sc["zar_pct"] / 100.0)                 # weaker rand (neg) raises cost
+        demand = (sc["demand_pct"] / 100.0) * prof["demand"]
+
+        rev_new = max(0.0, rev * (1 + demand))
+        cogs_new = cogs * (1 + demand)
+        opex_new = max(0.0, opex + d_energy + d_inflation + d_fx)
+        gross_new = rev_new - cogs_new
+        op_new = gross_new - opex_new
+        pre_tax_delta = (op_new - op) - d_interest
+        net_new = actual_net + (pre_tax_delta * (1 - TAX_RATE) if pre_tax_delta > 0 else pre_tax_delta)
+
+        proj_figs = {"revenue": rev_new, "cogs": cogs_new, "gross_profit": gross_new,
+                     "operating_profit": op_new, "net_profit": net_new,
+                     "receivables": _num(figs, "receivables"), "inventory": _num(figs, "inventory"),
+                     "current_assets": _num(figs, "current_assets"), "current_liabilities": _num(figs, "current_liabilities"),
+                     "total_debt": debt, "equity": _num(figs, "equity"), "interest": interest + d_interest}
+        proj_ratios = compute_ratios(proj_figs, industry, rev)
+        proj_fund = fundamentals_score(proj_ratios, industry).get("score") or 0
+        model_proj = _estimate_imara(report, proj_fund)
+        model_base = _estimate_imara(report, report.get("financial_fundamentals_score") or proj_fund)
+        score = None
+        if base_score is not None and model_proj is not None and model_base is not None:
+            score = int(max(0, min(100, round(base_score + (model_proj - model_base)))))
+        results.append({"scenario": name, "weight": weight,
+                        "net_profit": round(net_new), "operating_profit": round(op_new),
+                        "imara_score": score})
+
+    exp_net = round(sum(r["weight"] * r["net_profit"] for r in results))
+    sc_by = {r["scenario"]: r for r in results}
+    adverse = sc_by["Adverse"]; base = sc_by["Base"]
+    score_drop = (base["imara_score"] - adverse["imara_score"]) if (base["imara_score"] is not None and adverse["imara_score"] is not None) else None
+    # Resilience reflects the ADVERSE profit outcome (the honest fragility signal),
+    # not just the sticky multi-factor Score: flipping to a loss is the strongest signal.
+    base_net = actual_net; adv_net = adverse["net_profit"]
+    res = 100 - min(50, max(0, score_drop or 0) * 5)
+    flips_to_loss = base_net > 0 and adv_net <= 0
+    if flips_to_loss:
+        res = min(res, 35)                                   # profitable today, loss under adverse
+    elif base_net > 0 and adv_net < 0.5 * base_net:
+        res = min(res, 60)                                   # >50% profit erosion
+    resilience = int(max(0, min(100, res)))
+    resilience_label = ("fragile" if resilience < 50 else "moderate" if resilience < 75 else "robust")
+    return {
+        "as_of": SA_MACRO["as_of"], "industry": industry,
+        "baseline": {"net_profit": round(actual_net), "imara_score": base_score},
+        "scenarios": results,
+        "expected_net_profit": exp_net,
+        "adverse_score_drop": score_drop,
+        "macro_resilience": resilience,
+        "macro_resilience_label": resilience_label,
+        "flips_to_loss_under_adverse": flips_to_loss,
+        "disclaimer": ("Probability-weighted macro stress (base 50% / adverse 25% / upside 25%), each shock "
+                       "transmitted through the firm's own cost, debt and demand structure. Indicative overlay, "
+                       "not a change to the headline Imara Score, and not a credit decision."),
+    }
