@@ -40,6 +40,19 @@ client = None if MOCK_MODE else anthropic.Anthropic(
 )
 
 
+
+_TRANSIENT_STATUS = {408, 409, 425, 429, 500, 502, 503, 504, 529}
+
+
+def _is_transient(exc) -> bool:
+    """Classify an exception as a transient (retryable) LLM/API error."""
+    name = type(exc).__name__.lower()
+    if any(k in name for k in ("ratelimit", "timeout", "connection", "overloaded", "internalserver", "apistatus", "serviceunavailable")):
+        return True
+    code = getattr(exc, "status_code", None)
+    return code in _TRANSIENT_STATUS
+
+
 class BaseAgent:
     name: str = "Base Agent"
     role: str = ""
@@ -50,12 +63,24 @@ class BaseAgent:
         model = model_override or MODEL
         import time as _time
         _t0 = _time.perf_counter()
-        response = client.messages.create(
-            model=model,
-            max_tokens=MAX_TOKENS,
-            system=system,
-            messages=[{"role": "user", "content": user_message}]
-        )
+        # Error-classified retries: back off on TRANSIENT errors (rate limit, overload,
+        # timeout, 5xx) and re-try; raise non-transient errors (auth, bad request) at once.
+        _attempts = 3
+        for _attempt in range(_attempts):
+            try:
+                response = client.messages.create(
+                    model=model,
+                    max_tokens=MAX_TOKENS,
+                    system=system,
+                    messages=[{"role": "user", "content": user_message}]
+                )
+                break
+            except Exception as _exc:
+                if _is_transient(_exc) and _attempt < _attempts - 1:
+                    import random as _r
+                    _time.sleep((2 ** _attempt) + _r.random())
+                    continue
+                raise
         try:  # observability: attribute token usage + cost to this analysis (never fatal)
             from services.tracing import record_call
             _u = getattr(response, "usage", None)

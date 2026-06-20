@@ -547,6 +547,17 @@ def admin_list_analyses(limit: int = 50, offset: int = 0, _admin: None = Depends
     return {"analyses": rows, "totals": totals}
 
 
+@app.get("/api/admin/fleet-quality")
+def admin_fleet_quality(limit: int = 50, recent_window: int = 8, _admin: None = Depends(verify_admin_key)):
+    """ONLINE quality monitor: aggregate per-run quality signals across recent
+    analyses + drift alerts (recent window vs baseline). Complements offline evals."""
+    from services.database import recent_reports
+    from services.fleet_quality import extract_metrics, aggregate
+    recs = recent_reports(limit)
+    records = [{"created_at": r["created_at"], "metrics": extract_metrics(r["report"])} for r in recs]
+    return aggregate(records, recent_window=recent_window)
+
+
 @app.get("/api/admin/analyses/{analysis_id}")
 def admin_get_analysis(analysis_id: str, _admin: None = Depends(verify_admin_key)):
     """Full detail for one analysis including report."""

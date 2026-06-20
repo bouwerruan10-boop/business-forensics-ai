@@ -23,12 +23,56 @@ function statusBadge(status) {
   )
 }
 
+function Metric({ label, value, tone = 'slate' }) {
+  const t = { slate: 'text-slate-200', emerald: 'text-emerald-400', amber: 'text-amber-400', red: 'text-red-400' }[tone] || 'text-slate-200'
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+      <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-1">{label}</div>
+      <div className={`text-sm font-bold ${t}`}>{value}</div>
+    </div>
+  )
+}
+
+function FleetPanel({ fleet }) {
+  if (!fleet || !fleet.overall || !fleet.overall.runs) return null
+  const o = fleet.overall
+  const alerts = fleet.drift_alerts || []
+  const healthy = fleet.healthy
+  return (
+    <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5 mb-6">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h3 className="text-white font-bold text-base">Fleet Quality <span className="text-slate-500 font-normal text-sm">· online quality monitor ({o.runs} runs)</span></h3>
+        <span className={`text-xs font-bold border rounded-full px-3 py-1 ${healthy ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' : 'bg-amber-500/10 text-amber-300 border-amber-500/30'}`}>
+          {healthy ? '✓ Stable' : `⚠ ${alerts.length} drift alert${alerts.length > 1 ? 's' : ''}`}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-3">
+        <Metric label="Avg Imara Score" value={o.avg_imara_score ?? '—'} />
+        <Metric label="Strong findings" value={o.avg_strong_pct != null ? `${o.avg_strong_pct}%` : '—'} tone={o.avg_strong_pct >= 60 ? 'emerald' : 'amber'} />
+        <Metric label="Conflict rate" value={`${o.conflict_rate_pct ?? 0}%`} tone={(o.conflict_rate_pct || 0) > 20 ? 'red' : (o.conflict_rate_pct || 0) > 0 ? 'amber' : 'emerald'} />
+        <Metric label="AI-extracted" value={`${o.ai_extraction_rate_pct ?? 0}%`} tone={(o.ai_extraction_rate_pct || 0) > 40 ? 'amber' : 'slate'} />
+        <Metric label="Avg cost / run" value={o.avg_cost_usd != null ? `$${o.avg_cost_usd}` : '—'} />
+        <Metric label="Avg runtime" value={o.avg_runtime_s != null ? `${Math.round(o.avg_runtime_s / 60)}m` : '—'} />
+      </div>
+      {alerts.length > 0 && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+          <div className="text-amber-300 text-xs font-medium mb-1">Drift vs baseline (recent {fleet.window} runs)</div>
+          <ul className="text-slate-300 text-xs space-y-0.5 list-disc list-inside">
+            {alerts.map((a, i) => <li key={i}>{a.label}: <span className="text-white font-semibold">{a.recent}</span> vs baseline {a.baseline} ({a.delta > 0 ? '+' : ''}{a.delta})</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminDashboard({ onViewReport }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [needsKey, setNeedsKey] = useState(false)
   const [keyInput, setKeyInput] = useState('')
+  const [fleet, setFleet] = useState(null)
 
   const load = async () => {
     setLoading(true); setError(null)
@@ -45,6 +89,10 @@ export default function AdminDashboard({ onViewReport }) {
       const d = await res.json()
       setNeedsKey(false)
       setData(d)
+      try {
+        const fres = await fetch(`${API_BASE}/api/admin/fleet-quality?limit=50`, { headers })
+        if (fres.ok) setFleet(await fres.json())
+      } catch { /* fleet panel is best-effort */ }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -90,6 +138,7 @@ export default function AdminDashboard({ onViewReport }) {
 
   return (
     <div>
+      <FleetPanel fleet={fleet} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-white font-bold text-lg">Analysis History</h2>

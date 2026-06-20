@@ -936,3 +936,52 @@ def test_economics_agent_sets_deterministic_macro_fields_without_llm():
     assert m.macro_performed is True
     assert m.macro_overall_exposure in ("low", "medium", "high")
     assert m.macro_top_driver and isinstance(m.macro_sensitivity, dict) and m.macro_sensitivity.get("drivers")
+
+
+# ── Fleet quality (online eval) + error-classified retries ─────────────────
+def _qrep(score, conflicts, strong_pct, cost, src="deterministic"):
+    return {"imara_score": score, "imara_band": "C",
+            "faithfulness_summary": {"conflicts": conflicts, "checked": 10},
+            "finding_quality": {"strong_pct": strong_pct, "weak": 2, "total": 20},
+            "llm_usage": {"est_cost_usd": cost, "calls": 38},
+            "financial_extraction_source": src, "total_runtime_seconds": 600,
+            "document_coverage": {"financial": True, "tax": False}}
+
+
+def test_fleet_extract_metrics():
+    from services.fleet_quality import extract_metrics
+    m = extract_metrics(_qrep(50, 0, 70, 0.28))
+    assert m["imara_score"] == 50 and m["conflicts"] == 0 and m["strong_pct"] == 70
+    assert m["doc_types"] == 1 and m["extraction_source"] == "deterministic"
+
+
+def test_fleet_aggregate_detects_drift():
+    from services.fleet_quality import extract_metrics, aggregate
+    recent = [{"created_at": "z", "metrics": extract_metrics(_qrep(40, 3, 40, 0.30))} for _ in range(8)]
+    baseline = [{"created_at": "a", "metrics": extract_metrics(_qrep(55, 0, 80, 0.28))} for _ in range(12)]
+    agg = aggregate(recent + baseline, recent_window=8)
+    assert agg["overall"]["runs"] == 20
+    assert agg["healthy"] is False and agg["drift_alerts"]
+    metrics = {a["metric"] for a in agg["drift_alerts"]}
+    assert "avg_imara_score" in metrics and "conflict_rate_pct" in metrics
+
+
+def test_fleet_healthy_when_stable():
+    from services.fleet_quality import extract_metrics, aggregate
+    recs = [{"created_at": str(i), "metrics": extract_metrics(_qrep(52, 0, 75, 0.28))} for i in range(20)]
+    agg = aggregate(recs, recent_window=8)
+    assert agg["healthy"] is True and agg["drift_alerts"] == []
+
+
+def test_is_transient_error_classification():
+    from agents.base_agent import _is_transient
+    class RateLimitError(Exception):
+        pass
+    class _Overloaded(Exception):
+        status_code = 529
+    class BadRequestError(Exception):
+        status_code = 400
+    assert _is_transient(RateLimitError()) is True
+    assert _is_transient(_Overloaded()) is True
+    assert _is_transient(BadRequestError()) is False
+    assert _is_transient(ValueError("nope")) is False

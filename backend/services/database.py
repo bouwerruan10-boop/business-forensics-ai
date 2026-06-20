@@ -265,6 +265,27 @@ def get_analysis(analysis_id: str, owner: str | None = None) -> dict | None:
             conn.close()
 
 
+def recent_reports(limit: int = 50) -> list:
+    """Load the most recent COMPLETED analyses with their full report (for fleet quality)."""
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT id, created_at, report_json FROM analyses "
+                "WHERE status = 'complete' AND report_json IS NOT NULL "
+                "ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        finally:
+            conn.close()
+    out = []
+    for r in rows:
+        try:
+            rep = json.loads(r["report_json"])
+        except Exception:
+            continue
+        out.append({"analysis_id": r["id"], "created_at": r["created_at"], "report": rep})
+    return out
+
+
 def get_report(analysis_id: str) -> dict | None:
     """Return the deserialized report dict, or None if not available."""
     with _lock:
