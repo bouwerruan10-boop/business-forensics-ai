@@ -54,6 +54,13 @@ def _get_conn() -> sqlite3.Connection:
     return conn
 
 
+def _add_owner_column(conn, table):
+    """Idempotent: add the multi-tenancy 'owner' column to an existing table."""
+    cols = [r[1] for r in conn.execute("PRAGMA table_info({})".format(table)).fetchall()]
+    if "owner" not in cols:
+        conn.execute("ALTER TABLE {} ADD COLUMN owner TEXT NOT NULL DEFAULT 'operator'".format(table))
+
+
 def init_db():
     """Create tables if they don't exist. Call once at startup."""
     _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +82,8 @@ def init_db():
                     report_json     TEXT,
                     created_at      TEXT    NOT NULL,
                     completed_at    TEXT,
-                    file_count      INTEGER DEFAULT 0
+                    file_count      INTEGER DEFAULT 0,
+                    owner           TEXT    NOT NULL DEFAULT 'operator'
                 )
             """)
             conn.execute("""
@@ -86,21 +94,26 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_analyses_created
                 ON analyses (created_at DESC)
             """)
+            for _t in ("analyses", "shares"):
+                pass  # tables created below; owner migration runs after
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS shares (
                     token       TEXT PRIMARY KEY,
                     analysis_id TEXT NOT NULL,
                     expires_at  TEXT,
                     revoked     INTEGER NOT NULL DEFAULT 0,
-                    created_at  TEXT NOT NULL
+                    created_at  TEXT NOT NULL,
+                    owner       TEXT NOT NULL DEFAULT 'operator'
                 )
             """)
+            _add_owner_column(conn, "analyses")
+            _add_owner_column(conn, "shares")
             conn.commit()
         finally:
             conn.close()
 
 
-def create_analysis(analysis_id: str, profile: dict, file_count: int = 0):
+def create_analysis(analysis_id: str, profile: dict, file_count: int = 0, owner: str = "operator"):
     """Insert a new analysis record in 'processing' state."""
     now = _utcnow()
     with _lock:
@@ -110,8 +123,8 @@ def create_analysis(analysis_id: str, profile: dict, file_count: int = 0):
                 INSERT OR IGNORE INTO analyses
                     (id, company_name, industry_key, annual_revenue,
                      headcount, currency, country, primary_concern,
-                     status, created_at, file_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?)
+                     status, created_at, file_count, owner)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'processing', ?, ?, ?)
             """, (
                 analysis_id,
                 profile.get("company_name", "Unknown"),
@@ -123,6 +136,7 @@ def create_analysis(analysis_id: str, profile: dict, file_count: int = 0):
                 profile.get("primary_concern", ""),
                 now,
                 file_count,
+                owner,
             ))
             conn.commit()
         finally:
@@ -167,7 +181,7 @@ def save_error(analysis_id: str, error: str):
             conn.close()
 
 
-def create_share(analysis_id: str, expires_at: str | None = None) -> str:
+def create_share(analysis_id: str, expires_at: str | None = None, owner: str = "operator") -> str:
     """Create an opaque public share token for an analysis (optional ISO expiry)."""
     token = secrets.token_urlsafe(16)
     now = _utcnow()
@@ -175,8 +189,8 @@ def create_share(analysis_id: str, expires_at: str | None = None) -> str:
         conn = _get_conn()
         try:
             conn.execute(
-                "INSERT INTO shares (token, analysis_id, expires_at, revoked, created_at) "
-                "VALUES (?, ?, ?, 0, ?)", (token, analysis_id, expires_at, now))
+                "INSERT INTO shares (token, analysis_id, expires_at, revoked, created_at, owner) "
+                "VALUES (?, ?, ?, 0, ?, ?)", (token, analysis_id, expires_at, now, owner))
             conn.commit()
         finally:
             conn.close()
@@ -235,14 +249,15 @@ def mark_interrupted_analyses() -> int:
             conn.close()
 
 
-def get_analysis(analysis_id: str) -> dict | None:
-    """Return a single analysis row as a dict, or None if not found."""
+def get_analysis(analysis_id: str, owner: str | None = None) -> dict | None:
+    """Return a single analysis row as a dict, or None. Optional owner filter (multi-tenant)."""
     with _lock:
         conn = _get_conn()
         try:
-            row = conn.execute(
-                "SELECT * FROM analyses WHERE id = ?", (analysis_id,)
-            ).fetchone()
+            if owner:
+                row = conn.execute("SELECT * FROM analyses WHERE id = ? AND owner = ?", (analysis_id, owner)).fetchone()
+            else:
+                row = conn.execute("SELECT * FROM analyses WHERE id = ?", (analysis_id,)).fetchone()
             if row is None:
                 return None
             return _row_to_dict(row)
@@ -266,7 +281,7 @@ def get_report(analysis_id: str) -> dict | None:
             conn.close()
 
 
-def list_analyses(limit: int = 100, offset: int = 0) -> list[dict]:
+def list_analyses(limit: int = 100, offset: int = 0, owner: str | None = None) -> list[dict]:
     """
     Return recent analyses ordered by created_at DESC.
     Excludes the full report_json blob — use get_report() for that.
@@ -274,14 +289,13 @@ def list_analyses(limit: int = 100, offset: int = 0) -> list[dict]:
     with _lock:
         conn = _get_conn()
         try:
-            rows = conn.execute("""
-                SELECT id, company_name, industry_key, annual_revenue,
-                       headcount, currency, country, primary_concern,
-                       status, error, created_at, completed_at, file_count
-                FROM analyses
-                ORDER BY created_at DESC
-                LIMIT ? OFFSET ?
-            """, (limit, offset)).fetchall()
+            _where = "WHERE owner = ?" if owner else ""
+            _params = ([owner, limit, offset] if owner else [limit, offset])
+            rows = conn.execute(
+                "SELECT id, company_name, industry_key, annual_revenue, headcount, currency, "
+                "country, primary_concern, status, error, created_at, completed_at, file_count "
+                "FROM analyses {} ORDER BY created_at DESC LIMIT ? OFFSET ?".format(_where),
+                _params).fetchall()
             return [dict(r) for r in rows]
         finally:
             conn.close()

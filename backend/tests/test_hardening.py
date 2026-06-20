@@ -528,3 +528,40 @@ def test_simulation_plausibility_no_absurd_state():
     r = apply_actions(rep, sel, "optimistic")
     assert r["projected"]["revenue"] > 0
     assert -5 <= (r["projected"]["gross_margin"] or 0) <= 100
+
+
+# ── Future-proofing seams (operator-run today; ready for the pivot) ────────
+def test_principal_defaults_to_operator():
+    from auth import get_principal, Principal
+    class _Req:
+        headers = {}
+    p = get_principal(_Req())
+    assert isinstance(p, Principal) and p.id == "operator" and p.kind == "operator"
+
+def test_score_contract_is_versioned_and_stable():
+    from services.score_contract import score_contract, SCORE_SCHEMA_VERSION
+    rep = {"imara_score": 47, "imara_band": "D", "imara_label": "At Risk", "business_name": "X",
+           "currency": "ZAR", "imara_confidence": "high", "imara_completeness": 100,
+           "imara_components": [{"label": "Profitability", "value": 40, "weight": 0.25}]}
+    c = score_contract(rep, "abc")
+    assert c["schema_version"] == SCORE_SCHEMA_VERSION
+    assert c["analysis_id"] == "abc" and c["imara_score"] == 47 and c["band"] == "D"
+    assert isinstance(c["components"], list) and "generated_at" in c
+
+def test_db_owner_isolation_seam(tmp_path, monkeypatch):
+    import services.database as db
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "t.db"); db.init_db()
+    db.create_analysis("a1", {"company_name": "X"}, 1, owner="operator")
+    db.create_analysis("a2", {"company_name": "Y"}, 1, owner="tenantA")
+    assert [r["id"] for r in db.list_analyses(owner="operator")] == ["a1"]
+    assert db.get_analysis("a2", owner="operator") is None          # isolation
+    assert db.get_analysis("a2", owner="tenantA")["id"] == "a2"
+    assert sorted(r["id"] for r in db.list_analyses()) == ["a1", "a2"]  # no filter -> all (operator mode)
+
+def test_public_api_dormant_by_default(monkeypatch):
+    import main
+    import pytest as _pt
+    from fastapi import HTTPException
+    monkeypatch.setattr(main, "PUBLIC_API", False)
+    with _pt.raises(HTTPException):
+        main.public_score("anything")  # gated off until the pivot

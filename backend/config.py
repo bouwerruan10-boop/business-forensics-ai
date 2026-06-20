@@ -22,3 +22,9 @@ if not ANTHROPIC_API_KEY and not MOCK_MODE:
         "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key.\n"
         "Tip: set MOCK_MODE=true in .env to run a live demo without an API key."
     )
+
+# ── Future-proofing flags (operator-run today; flip on the pivot to mass distribution) ──
+MULTI_TENANT = os.getenv("MULTI_TENANT", "false").lower() in ("true", "1", "yes")
+PUBLIC_API = os.getenv("PUBLIC_API", "false").lower() in ("true", "1", "yes")
+DEFAULT_OWNER = os.getenv("DEFAULT_OWNER", "operator")
+API_VERSION = "v1"

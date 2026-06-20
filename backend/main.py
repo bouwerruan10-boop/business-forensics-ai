@@ -37,6 +37,9 @@ from services.database import (
 )
 from agents.ceo_agent import CEOAgent
 from memory.shared_memory import SharedMemory
+from auth import get_principal, Principal
+from config import PUBLIC_API, API_VERSION
+from services.score_contract import score_contract, usage_summary
 
 # -- Rate limiter setup -------------------------------------------
 # Configurable via RATE_LIMIT env var, default: 3 per hour
@@ -171,6 +174,7 @@ async def analyze(
     # e.g. '["financial","bank","tax"]'
     file_categories: Optional[str] = Form("[]"),
     _api_key: None = Depends(verify_api_key),
+    principal: Principal = Depends(get_principal),
 ):
     """Accept files + business profile. Returns analysis_id to poll."""
     import json as _json
@@ -222,7 +226,7 @@ async def analyze(
     }
 
     # Persist the new analysis record immediately
-    create_analysis(analysis_id, profile, file_count=len(file_data))
+    create_analysis(analysis_id, profile, file_count=len(file_data), owner=principal.id)
 
     background_tasks.add_task(_run_analysis, analysis_id, file_data, profile)
     return {"analysis_id": analysis_id, "message": "Analysis started"}
@@ -266,7 +270,7 @@ def get_report_endpoint(analysis_id: str):
 
 
 @app.post("/api/report/{analysis_id}/share")
-def create_report_share(analysis_id: str, expires_in_days: int = 0):
+def create_report_share(analysis_id: str, expires_in_days: int = 0, principal: Principal = Depends(get_principal)):
     """Create a public, optionally-expiring share link for a report."""
     if not db_get_analysis(analysis_id):
         raise HTTPException(status_code=404, detail="Analysis not found")
@@ -274,7 +278,7 @@ def create_report_share(analysis_id: str, expires_in_days: int = 0):
     if expires_in_days and expires_in_days > 0:
         from datetime import datetime, timezone, timedelta
         expires_at = (datetime.now(timezone.utc) + timedelta(days=expires_in_days)).isoformat()
-    token = create_share(analysis_id, expires_at)
+    token = create_share(analysis_id, expires_at, owner=principal.id)
     return {"token": token, "expires_at": expires_at}
 
 
@@ -404,6 +408,32 @@ def simulate_montecarlo(req: ActionSimRequest):
         raise HTTPException(status_code=404, detail="Analysis not found")
     from services.simulation import monte_carlo
     return monte_carlo(result, req.actions)
+
+
+@app.get("/api/v1/score/{analysis_id}")
+def public_score(analysis_id: str):
+    """Stable, versioned Imara Score contract for external (B2B) consumers.
+    Dormant until PUBLIC_API=true (operator-run today)."""
+    if not PUBLIC_API:
+        raise HTTPException(status_code=404, detail="Public API is not enabled.")
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return score_contract(result, analysis_id)
+
+
+@app.get("/api/report/{analysis_id}/usage")
+def report_usage(analysis_id: str):
+    """Per-analysis usage summary (metering-ready)."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return usage_summary(result)
+
+
+@app.get("/api/v1/health")
+def health_v1():
+    return {"status": "ok", "api_version": API_VERSION}
 
 
 @app.post("/api/simulate")
