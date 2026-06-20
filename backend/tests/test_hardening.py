@@ -1076,3 +1076,82 @@ def test_pdf_self_heals_bad_markup_in_findings():
     for aud in ("owner", "investor", "banker"):
         out = generate_pdf_report(rep, aud)
         assert out and len(out) > 1000
+
+
+# ── Research-cycle builds: distress anchor, bank signals, AHP, fairness, model card ──
+
+def test_altman_z_em_anchor():
+    from services.distress_score import altman_z_em
+    healthy = {"total_assets": 5_000_000, "current_assets": 2_000_000, "current_liabilities": 800_000,
+               "equity": 3_000_000, "retained_earnings": 1_500_000, "operating_profit": 900_000}
+    r = altman_z_em(healthy, "B")
+    assert r["available"] and r["zone"] == "safe" and r["z_score"] > 2.6
+    assert r["convergence"]["agrees"] is True
+    distressed = {"total_assets": 3_000_000, "current_assets": 600_000, "current_liabilities": 1_400_000,
+                  "equity": 200_000, "retained_earnings": -900_000, "operating_profit": -300_000}
+    assert altman_z_em(distressed, "E")["zone"] == "distress"
+    # P&L only -> gracefully unavailable, never fabricated
+    assert altman_z_em({"revenue": 4_800_000, "operating_profit": 140_000}, "D")["available"] is False
+
+
+def test_extractor_picks_up_balance_sheet_fields():
+    from services.financial_ratios import extract_financials
+    figs = extract_financials("Total assets 5,000,000\nTotal liabilities 2,000,000\nRetained earnings 1,500,000\n")
+    assert figs.get("total_assets") == 5_000_000
+    assert figs.get("total_liabilities") == 2_000_000
+    assert figs.get("retained_earnings") == 1_500_000
+
+
+def test_bank_signals():
+    from services.bank_signals import analyze_bank_statement
+    stmt = ("Date Description Amount Balance\n"
+            "2026-01-03 Salary deposit EFT credit 45,000.00 52,000.00\n"
+            "2026-01-09 Debit order RETURNED unpaid R/D -1,500.00 47,300.00\n"
+            "2026-02-07 Debit order rent Dr -22,000.00 -9,500.00\n"
+            "2026-02-18 Debit order insufficient funds reversal -1,500.00 -11,350.00\n"
+            "2026-03-01 Deposit received credit 30,000.00 18,650.00\n")
+    r = analyze_bank_statement(stmt)
+    assert r["available"] and r["returned_debit_orders"] >= 2
+    assert r["negative_balance_rows"] >= 1
+    assert r["bank_health_tier"] == "weak" and r["bank_health_score"] < 50
+    assert analyze_bank_statement("")["available"] is False
+
+
+def test_ahp_weight_derivation_consistent():
+    from services.ahp import imara_weight_derivation
+    d = imara_weight_derivation()
+    assert d["consistent"] is True and d["consistency_ratio"] < 0.10
+    assert abs(sum(d["derived_weights"].values()) - 1.0) < 1e-6
+    w = d["derived_weights"]
+    assert w["Profitability"] > w["Credit Readiness"] > w["Legal Compliance"]
+
+
+def test_bbbee_excluded_from_legal_risk_score():
+    """Fairness: a critical B-BBEE finding must NOT drive the legal risk score (and the Imara Score)."""
+    from agents.specialist_agents import SALegalAgent
+    from memory.shared_memory import SharedMemory, AgentFinding
+    agent = SALegalAgent()
+    mem = SharedMemory(business_name="T", bbbee_level="Non-Compliant")
+    findings = [
+        AgentFinding(agent="SA Legal", category="BBBEE", severity="critical",
+                     title="B-BBEE non-compliant (Level 8)", detail="Low B-BBEE scorecard limits tenders.",
+                     financial_impact="R0", recommendation="x", roi_estimate="x"),
+        AgentFinding(agent="SA Legal", category="CIPC", severity="low",
+                     title="Annual return due soon", detail="CIPC annual return filing.",
+                     financial_impact="R450", recommendation="file", roi_estimate="x"),
+    ]
+    agent._call_claude = lambda *a, **k: ""
+    agent._parse_findings = lambda raw, memory: findings
+    agent.analyze({}, mem)
+    assert mem.sa_legal_risk_score == 20, mem.sa_legal_risk_score   # 'low' non-BBBEE, NOT critical=85
+    assert mem.sa_bbbee_analysis["finding_count"] == 1
+
+
+def test_model_card_and_governance():
+    from services.model_card import model_card
+    c = model_card()
+    for sec in ("intended_use", "method", "evaluation", "fairness", "limitations", "governance"):
+        assert sec in c
+    assert c["method"]["weight_derivation"]["consistent"] is True
+    from services.score_contract import score_contract
+    assert "use_constraints" in score_contract({"imara_score": 50})

@@ -150,3 +150,9 @@ def test_full_pipeline_no_api(client):
     assert sa.status_code == 200, sa.text
     mc = client.post("/api/simulate/montecarlo", json={"analysis_id": aid, "actions": []})
     assert mc.status_code == 200, mc.text
+
+    # Research-cycle builds: distress anchor, bank signals, model card
+    assert client.get(f"/api/report/{aid}/distress").status_code == 200
+    assert client.get(f"/api/report/{aid}/bank-signals").status_code == 200
+    mcd = client.get("/api/v1/model-card")
+    assert mcd.status_code == 200 and mcd.json()["method"]["weight_derivation"]["consistent"] is True

@@ -7,6 +7,7 @@ import Roadmap from './Roadmap'
 import Simulator from './Simulator'
 import ActionSimulator from './ActionSimulator'
 import EconomicEnvironment from './EconomicEnvironment'
+import BankabilityEvidence from './BankabilityEvidence'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
@@ -164,6 +165,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...((report.market_search_performed || report.market_visibility_score > 0) ? [{ id: 'market', label: 'Market Intelligence' }] : []),
     ...((report.sa_tax_performed || report.sa_legal_performed) ? [{ id: 'sa-compliance', label: 'SA Compliance' }] : []),
     ...(report.macro_performed ? [{ id: 'economics', label: 'Economic Environment' }] : []),
+    ...((report.distress_score?.available || report.bank_signals?.available) ? [{ id: 'evidence', label: 'Bankability Evidence' }] : []),
     { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
   ]
@@ -292,6 +294,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="How the SA macro-economy affects this business — and how it holds up under a macro stress test"
         >
           <EconomicEnvironment analysisId={analysisId} currency={report.currency} />
+        </Section>
+      )}
+
+      {/* Bankability Evidence: Z'' anchor + bank signals + decision-support framing */}
+      {(report.distress_score?.available || report.bank_signals?.available) && (
+        <Section
+          id="evidence"
+          title="Bankability Evidence"
+          subtitle="Independent distress cross-check, bank-statement cash-flow signals, and how to use this rating"
+        >
+          <BankabilityEvidence report={report} currency={report.currency} />
         </Section>
       )}
 

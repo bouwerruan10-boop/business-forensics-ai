@@ -439,6 +439,27 @@ def report_reasons(analysis_id: str):
     return reason_codes(result)
 
 
+@app.get("/api/report/{analysis_id}/distress")
+def report_distress(analysis_id: str):
+    """Altman Z''-score (emerging markets) — an independent, published distress
+    model used as an external convergent-validity cross-check on the Imara Score."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.distress_score import altman_z_em
+    return result.get("distress_score") or altman_z_em(result.get("financial_figures") or {}, result.get("imara_band", ""))
+
+
+@app.get("/api/report/{analysis_id}/bank-signals")
+def report_bank_signals(analysis_id: str):
+    """Deterministic bank-statement cash-flow signals (bounced debit orders, overdraft,
+    cash-flow direction, cadence) — decision-support evidence, not an Imara Score input."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return result.get("bank_signals") or {"available": False, "reason": "Not computed for this analysis."}
+
+
 @app.post("/api/simulate/montecarlo")
 def simulate_montecarlo(req: ActionSimRequest):
     """Probabilistic outcome distribution + probability of reaching the next band."""
@@ -447,6 +468,14 @@ def simulate_montecarlo(req: ActionSimRequest):
         raise HTTPException(status_code=404, detail="Analysis not found")
     from services.simulation import monte_carlo
     return monte_carlo(result, req.actions)
+
+
+@app.get("/api/v1/model-card")
+def public_model_card():
+    """Imara Score model card (governance \"nutrition label\"): intended use, method,
+    AHP weight derivation, eval baselines, fairness stance, limitations, NCA/POPIA framing."""
+    from services.model_card import model_card
+    return model_card()
 
 
 @app.get("/api/v1/score/{analysis_id}")
@@ -668,6 +697,12 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["llm_usage"] = _ledger.summary()
             from services.finding_quality import critique_report
             report["finding_quality"] = critique_report(report)  # deterministic per-finding critique
+            from services.distress_score import altman_z_em
+            report["distress_score"] = altman_z_em(report.get("financial_figures") or {}, report.get("imara_band", ""))
+            from services.bank_signals import analyze_bank_statement
+            report["bank_signals"] = analyze_bank_statement(memory.uploaded_bank_text)
+            from services.governance import decision_support_notice
+            report["decision_support"] = decision_support_notice()
 
             analyses[analysis_id] = report
             save_report(analysis_id, report)

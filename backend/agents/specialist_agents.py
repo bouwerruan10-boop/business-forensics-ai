@@ -999,16 +999,30 @@ For each issue, calculate the estimated maximum financial liability under the re
         # Set summary fields on memory
         if findings:
             severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-            top = sorted(findings, key=lambda f: severity_order.get(f.severity, 0), reverse=True)
-            memory.sa_legal_summary = f"{len(findings)} legal findings | Top: {top[0].title}" if top else ""
+            # Fairness (Responsible-Score): B-BBEE level is a transformation / commercial-access
+            # attribute tied to ownership demographics, NOT a creditworthiness signal. Keep
+            # B-BBEE findings as informational context but EXCLUDE them from the legal risk
+            # score that feeds the Imara Score, so a firm's ownership profile can never lower
+            # its bankability rating. See MODEL_CARD.md (Fairness).
+            def _is_bbbee(f):
+                t = (f.title + " " + f.detail).lower()
+                return ("bbbee" in t or "b-bbee" in t or "broad-based black" in t
+                        or "bee level" in t or "bee scorecard" in t or "bee compliance" in t
+                        or "bee certificate" in t)
+            bbbee_findings = [f for f in findings if _is_bbbee(f)]
+            scored = [f for f in findings if not _is_bbbee(f)]
+            top = sorted(scored, key=lambda f: severity_order.get(f.severity, 0), reverse=True)
             risk_map = {"critical": 85, "high": 65, "medium": 40, "low": 20}
             memory.sa_legal_risk_score = risk_map.get(top[0].severity, 30) if top else 10
-            # Build BBBEE analysis summary
-            bbbee_findings = [f for f in findings if "bbbee" in f.title.lower() or "bee" in f.title.lower() or "bbbee" in f.detail.lower()]
+            memory.sa_legal_summary = (
+                f"{len(findings)} legal findings | Top: {top[0].title}" if top
+                else f"{len(findings)} legal finding(s); B-BBEE treated as informational only"
+            )
             memory.sa_bbbee_analysis = {
                 "declared_level": bbbee,
                 "finding_count": len(bbbee_findings),
                 "risk_flags": [f.title for f in bbbee_findings],
+                "treatment": "informational — commercial / transformation context, excluded from the bankability score",
             }
         else:
             memory.sa_legal_summary = "No major legal compliance issues identified."

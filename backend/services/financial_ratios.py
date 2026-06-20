@@ -75,6 +75,9 @@ _LABELS = [
     ("payables",           [r"trade payables", r"accounts payable", r"trade creditors", r"\bcreditors\b", r"payables"]),
     ("total_debt",         [r"interest.bearing (?:debt|borrowings)", r"total (?:debt|borrowings)", r"\bborrowings\b", r"long.term loans?"]),
     ("equity",             [r"shareholders.? equity", r"total equity", r"\bequity\b", r"net assets"]),
+    ("total_assets",        [r"total assets"]),
+    ("total_liabilities",   [r"total liabilities"]),
+    ("retained_earnings",   [r"retained earnings", r"retained income", r"accumulated profits?", r"accumulated (?:loss|losses|surplus|deficit)"]),
     ("cash",               [r"cash and cash equivalents", r"cash and equivalents", r"\bcash\b"]),
 ]
 
@@ -245,6 +248,7 @@ KNOWN_FIGURE_FIELDS = (
     "revenue", "cogs", "gross_profit", "operating_profit", "net_profit",
     "current_assets", "inventory", "receivables", "current_liabilities",
     "payables", "total_debt", "equity", "interest",
+    "total_assets", "total_liabilities", "retained_earnings",
 )
 
 

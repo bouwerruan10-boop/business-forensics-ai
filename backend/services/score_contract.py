@@ -5,6 +5,7 @@ Kept separate and versioned (schema_version) so the public /api/v1/score endpoin
 one source of truth that can evolve via optional fields without breaking integrators.
 """
 from datetime import datetime, timezone
+from services.governance import decision_support_notice
 
 SCORE_SCHEMA_VERSION = "1.0"
 
@@ -22,6 +23,7 @@ def score_contract(report: dict, analysis_id: str | None = None) -> dict:
         "confidence": report.get("imara_confidence"),
         "completeness": report.get("imara_completeness"),
         "components": report.get("imara_components") or [],
+        "use_constraints": decision_support_notice(),
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
