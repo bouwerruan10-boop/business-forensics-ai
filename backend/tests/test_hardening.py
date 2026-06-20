@@ -441,3 +441,54 @@ def test_validate_financials():
     assert validate_financials({"revenue": 1000, "cogs": 600, "gross_profit": 400, "operating_profit": 500})["ok"] is False
     # negative balance-sheet item -> flagged
     assert validate_financials({"revenue": 100, "equity": -5})["ok"] is False
+
+
+# ── Action Simulator (deterministic prescriptive engine) ───────────────────
+def _sim_report():
+    from services.financial_ratios import compute_ratios, fundamentals_score
+    figs = {"revenue": 8000000, "cogs": 6400000, "gross_profit": 1600000,
+            "operating_profit": 200000, "net_profit": 50000, "receivables": 1200000,
+            "inventory": 900000, "current_assets": 2400000, "current_liabilities": 1600000,
+            "payables": 700000, "total_debt": 1800000, "equity": 2000000, "interest": 180000}
+    ratios = compute_ratios(figs, "retail_general", 8000000)
+    fund = fundamentals_score(ratios, "retail_general").get("score") or 0
+    comps = [{"label": "Profitability", "value": 40, "weight": 0.25},
+             {"label": "Credit Readiness", "value": 55, "weight": 0.20},
+             {"label": "Risk & Compliance", "value": 60, "weight": 0.15}]
+    composite = round((40*0.25 + 55*0.20 + 60*0.15) / 0.60)
+    return {"financial_figures": figs, "financial_ratios": ratios, "industry_key": "retail_general",
+            "annual_revenue": 8000000, "currency": "ZAR", "financial_fundamentals_score": fund,
+            "imara_score": composite, "imara_components": comps}
+
+def test_simulation_derive_actions_grounded():
+    from services.simulation import derive_actions
+    ids = {a["id"] for a in derive_actions(_sim_report())}
+    # low gross margin + high debtor/inventory days + low operating margin -> all gap actions present
+    assert {"gross_margin", "debtor_days", "inventory_days", "opex", "revenue_growth", "price"} <= ids
+
+def test_simulation_no_actions_is_no_change():
+    from services.simulation import apply_actions
+    r = apply_actions(_sim_report(), [], "expected")
+    assert r["net_profit_delta"] == 0
+    assert r["imara_score_delta"] == 0
+    assert r["projected"] == r["baseline"]
+
+def test_simulation_action_improves_outcome():
+    from services.simulation import apply_actions
+    rep = _sim_report()
+    gm = apply_actions(rep, [{"id": "gross_margin", "intensity": 1.0}], "expected")
+    assert gm["projected"]["gross_profit"] > gm["baseline"]["gross_profit"]
+    assert gm["net_profit_delta"] > 0
+    assert gm["projected"]["fundamentals_score"] >= gm["baseline"]["fundamentals_score"]
+    assert gm["imara_score_delta"] >= 0
+    # collecting faster frees cash
+    dd = apply_actions(rep, [{"id": "debtor_days", "intensity": 1.0}], "expected")
+    assert dd["cash_released"] > 0
+
+def test_simulation_scenarios_scale_monotonically():
+    from services.simulation import apply_actions
+    rep = _sim_report(); sel = [{"id": "gross_margin", "intensity": 1.0}]
+    opt = apply_actions(rep, sel, "optimistic")["net_profit_delta"]
+    exp = apply_actions(rep, sel, "expected")["net_profit_delta"]
+    pes = apply_actions(rep, sel, "pessimistic")["net_profit_delta"]
+    assert opt > exp > pes > 0

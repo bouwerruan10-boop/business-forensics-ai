@@ -124,6 +124,11 @@ class SimulateRequest(BaseModel):
     analysis_id: str
     scenario: str
     change_percent: float
+
+class ActionSimRequest(BaseModel):
+    analysis_id: str
+    actions: list = []
+    scenario: str = "expected"
     variable: str
 
 
@@ -359,6 +364,26 @@ def get_credit_summary(analysis_id: str):
         "forecast_assumptions": result.get("forecast_assumptions", []),
         "currency": result.get("currency", "ZAR"),
     }
+
+
+@app.get("/api/report/{analysis_id}/actions")
+def list_simulation_actions(analysis_id: str):
+    """Candidate improvement actions derived from this report's ratios vs sector."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.simulation import derive_actions
+    return {"actions": derive_actions(result)}
+
+
+@app.post("/api/simulate/actions")
+def simulate_actions(req: ActionSimRequest):
+    """Project the outcome of taking the selected actions (deterministic model)."""
+    result = analyses.get(req.analysis_id) or get_report(req.analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.simulation import apply_actions
+    return apply_actions(result, req.actions, req.scenario)
 
 
 @app.post("/api/simulate")

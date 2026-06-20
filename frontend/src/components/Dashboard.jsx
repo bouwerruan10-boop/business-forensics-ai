@@ -4,6 +4,7 @@ import FinancialRatios from './FinancialRatios'
 import FindingsList from './FindingsList'
 import Roadmap from './Roadmap'
 import Simulator from './Simulator'
+import ActionSimulator from './ActionSimulator'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
@@ -160,7 +161,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...((report.valuation_mid > 0 || report.forecast_base_12m > 0) ? [{ id: 'valuation', label: 'Valuation & Forecast' }] : []),
     ...((report.market_search_performed || report.market_visibility_score > 0) ? [{ id: 'market', label: 'Market Intelligence' }] : []),
     ...((report.sa_tax_performed || report.sa_legal_performed) ? [{ id: 'sa-compliance', label: 'SA Compliance' }] : []),
-    { id: 'simulator', label: 'What-If Simulator' },
+    { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
   ]
 
@@ -282,10 +283,10 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
       {/* Digital Twin Simulator */}
       <Section
         id="simulator"
-        title="What-If Simulator"
-        subtitle="Model financial scenarios using your actual revenue and industry benchmark cost ratios"
+        title="Action Simulator"
+        subtitle="See the projected outcome of the actions you could take — on your numbers and your Imara Score"
       >
-        <Simulator analysisId={analysisId} currency={report.currency} />
+        <ActionSimulator analysisId={analysisId} currency={report.currency} />
       </Section>
 
       {/* Methodology & confidence */}

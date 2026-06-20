@@ -69,3 +69,19 @@ export async function simulate(analysisId, variable, changePercent, scenario) {
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function getActions(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/actions`, { headers: authHeaders() })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function simulateActions(analysisId, actions, scenario = 'expected') {
+  const res = await fetch(`${BASE}/simulate/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ analysis_id: analysisId, actions, scenario }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
