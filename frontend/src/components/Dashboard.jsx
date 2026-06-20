@@ -1,5 +1,6 @@
 import ScoreCards from './ScoreCards'
 import ImaraScoreHero from './ImaraScoreHero'
+import ScoreReasons from './ScoreReasons'
 import FinancialRatios from './FinancialRatios'
 import FindingsList from './FindingsList'
 import Roadmap from './Roadmap'
@@ -195,6 +196,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         subtitle="Calculated from findings severity and financial impact across all departments"
       >
         <ImaraScoreHero report={report} />
+        <ScoreReasons analysisId={analysisId} />
         <ScoreCards scores={report.scores || {}} report={report} />
       </Section>
 

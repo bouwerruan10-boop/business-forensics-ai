@@ -133,3 +133,12 @@ def test_full_pipeline_no_api(client):
     mj = macro.json()
     assert mj["sensitivity"]["drivers"] and len(mj["stress_test"]["scenarios"]) == 3
     assert 0 <= mj["stress_test"]["macro_resilience"] <= 100
+
+    # Reason codes (explainability) + Fleet Quality online monitor
+    reasons = client.get(f"/api/report/{aid}/reasons").json()
+    assert reasons["available"] is True and reasons["reasons"]
+    imp = [x["impact"] for x in reasons["reasons"]]
+    assert imp == sorted(imp, reverse=True)
+    fq = client.get("/api/admin/fleet-quality")
+    assert fq.status_code == 200
+    assert fq.json()["overall"]["runs"] >= 1 and "drift_alerts" in fq.json()

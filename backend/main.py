@@ -428,6 +428,17 @@ def report_macro(analysis_id: str):
     }
 
 
+@app.get("/api/report/{analysis_id}/reasons")
+def report_reasons(analysis_id: str):
+    """Imara Score reason codes: the principal factors affecting the score,
+    ordered by impact, derived deterministically from the score components."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.reason_codes import reason_codes
+    return reason_codes(result)
+
+
 @app.post("/api/simulate/montecarlo")
 def simulate_montecarlo(req: ActionSimRequest):
     """Probabilistic outcome distribution + probability of reaching the next band."""

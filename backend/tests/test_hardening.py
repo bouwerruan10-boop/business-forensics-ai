@@ -985,3 +985,42 @@ def test_is_transient_error_classification():
     assert _is_transient(_Overloaded()) is True
     assert _is_transient(BadRequestError()) is False
     assert _is_transient(ValueError("nope")) is False
+
+
+# ── Score reason codes (explainability) ────────────────────────────────────
+def _reason_report():
+    return {"imara_score": 47, "imara_band": "D", "credit_grade": "C",
+            "imara_components": [
+                {"label": "Profitability", "weight": 0.25, "value": 38},
+                {"label": "Credit Readiness", "weight": 0.20, "value": 42},
+                {"label": "Risk & Compliance", "weight": 0.15, "value": 55},
+                {"label": "Operational Efficiency", "weight": 0.15, "value": 48},
+                {"label": "Market Visibility", "weight": 0.10, "value": 60},
+                {"label": "Legal Compliance", "weight": 0.15, "value": 92}],
+            "financial_ratios": {"net_margin": {"value": 0.9, "benchmark": 7.0},
+                                 "debtor_days": {"value": 70, "benchmark": 45}}}
+
+
+def test_reason_codes_ordered_by_impact_with_drivers():
+    from services.reason_codes import reason_codes
+    r = reason_codes(_reason_report())
+    assert r["available"] is True and r["reasons"]
+    impacts = [x["impact"] for x in r["reasons"]]
+    assert impacts == sorted(impacts, reverse=True)               # ordered, biggest drag first
+    assert r["reasons"][0]["factor"] == "Profitability"           # weight 0.25 x (100-38) is the largest shortfall
+    assert "Net margin 0.9%" in r["reasons"][0]["detail"]         # tied to the concrete number
+    assert any("Credit grade C" in x["detail"] for x in r["reasons"])
+
+
+def test_reason_codes_skips_near_perfect_and_lists_strengths():
+    from services.reason_codes import reason_codes
+    r = reason_codes(_reason_report())
+    # Legal Compliance at 92 is a strength, not a principal reason
+    assert all(x["factor"] != "Legal Compliance" for x in r["reasons"])
+    assert any(s["factor"] == "Legal Compliance" for s in r["strengths"])
+
+
+def test_reason_codes_handles_no_components():
+    from services.reason_codes import reason_codes
+    r = reason_codes({"imara_score": 50})
+    assert r["available"] is False and r["reasons"] == []
