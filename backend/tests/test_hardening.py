@@ -1054,3 +1054,25 @@ def test_pdf_renders_priority_issues():
     for aud in ("owner", "banker", "investor"):
         out = generate_pdf_report(rep, aud)
         assert out and len(out) > 1000
+
+
+def test_pdf_self_heals_bad_markup_in_findings():
+    """Regression: a finding whose AI text contains ReportLab-breaking markup
+    (an unclosed <b>, a bare <token, a raw &) must NOT 500 the PDF export.
+    This is the exact failure that made owner/investor PDFs return 'Failed to
+    fetch' in production while banker (which filtered that finding out) worked.
+    The _para() wrapper retries with escaped text instead of crashing."""
+    from services.report_generator import generate_pdf_report
+    evil = {"agent": "StrategyAgent", "category": "S", "severity": "high",
+            "title": "Use <b>bold restructuring",
+            "detail": "Unclosed <b>tag; also <EBITDA and a raw & ampersand.",
+            "financial_impact": "R 1.2M", "recommendation": "Fix <i>italics",
+            "roi_estimate": "R 800K", "benchmark_reference": "<peer", "quick_win": False}
+    rep = {"business_name": "T", "industry_key": "manufacturing", "currency": "ZAR",
+           "imara_score": 38, "imara_band": "D", "executive_summary": "x",
+           "imara_components": [{"label": "P", "weight": 0.25, "value": 40}],
+           "department_findings": {"Strategy Agent": [evil]},
+           "all_findings_ranked": [evil], "quick_wins": []}
+    for aud in ("owner", "investor", "banker"):
+        out = generate_pdf_report(rep, aud)
+        assert out and len(out) > 1000

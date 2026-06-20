@@ -46,6 +46,25 @@ MARGIN = 1.8 * cm
 CONTENT_W = PAGE_W - 2 * MARGIN
 
 
+_RealParagraph = Paragraph
+
+
+def _para(text, style=None, *args, **kwargs):
+    """Build a Paragraph that can never abort the PDF with a ReportLab
+    paraparser error. AI-generated text may contain <...> tokens or a stray &
+    that ReportLab's mini-XML parser rejects ("unclosed tags" / "unknown tag");
+    when that happens, retry with the text fully XML-escaped, and as a last
+    resort fall back to empty so the PDF export always succeeds."""
+    try:
+        return _RealParagraph(text, style, *args, **kwargs)
+    except Exception:
+        safe = (str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+        try:
+            return _RealParagraph(safe, style, *args, **kwargs)
+        except Exception:
+            return _RealParagraph("", style, *args, **kwargs)
+
+
 # ── Entry point ───────────────────────────────────────────────────
 
 def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
@@ -170,7 +189,7 @@ def _cover_page(story, report):
 
     # ── Top header band ──
     story.append(Spacer(1, 0.6 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "BUSINESS FORENSICS AI",
         _style(fontSize=9, fontName="Helvetica-Bold", textColor=GOLD,
                letterSpacing=2.5, alignment=TA_LEFT)
@@ -180,7 +199,7 @@ def _cover_page(story, report):
     story.append(Spacer(1, 2 * cm))
 
     # ── Report label ──
-    story.append(Paragraph(
+    story.append(_para(
         "FORENSIC BUSINESS ANALYSIS",
         _style(fontSize=9, fontName="Helvetica", textColor=MID_GRAY,
                letterSpacing=3, alignment=TA_LEFT)
@@ -188,13 +207,13 @@ def _cover_page(story, report):
     story.append(Spacer(1, 0.5 * cm))
 
     # ── Client name ──
-    story.append(Paragraph(
+    story.append(_para(
         biz,
         _style(fontSize=36, fontName="Helvetica-Bold", textColor=NAVY,
                leading=40, alignment=TA_LEFT)
     ))
     story.append(Spacer(1, 0.4 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         f"{industry}  ·  {country}  ·  {today}" if country else f"{industry}  ·  {today}",
         _style(fontSize=10, textColor=DARK_GRAY, alignment=TA_LEFT)
     ))
@@ -233,13 +252,13 @@ def _cover_page(story, report):
     story.append(Spacer(1, 3 * cm))
 
     # ── Confidentiality notice ──
-    story.append(Paragraph(
+    story.append(_para(
         "STRICTLY CONFIDENTIAL",
         _style(fontSize=8, fontName="Helvetica-Bold", textColor=DARK_GRAY,
                letterSpacing=1.5, alignment=TA_LEFT)
     ))
     story.append(Spacer(1, 0.15 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "This report has been prepared exclusively for the management of the above-named entity. "
         "It contains sensitive financial and operational findings derived from proprietary business data. "
         "Distribution, reproduction, or disclosure to any third party without prior written consent is prohibited.",
@@ -262,8 +281,8 @@ def _toc_section(story, report):
     for num, title in sections:
         row = Table(
             [[
-                Paragraph(f"{num}.", _style(fontSize=10, fontName="Helvetica-Bold", textColor=GOLD)),
-                Paragraph(title, _style(fontSize=10, textColor=NAVY)),
+                _para(f"{num}.", _style(fontSize=10, fontName="Helvetica-Bold", textColor=GOLD)),
+                _para(title, _style(fontSize=10, textColor=NAVY)),
             ]],
             colWidths=[0.7 * cm, CONTENT_W - 0.7 * cm],
         )
@@ -293,9 +312,9 @@ def _situation_section(story, report):
     scr_data = [
         [_scr_label("SITUATION"), _scr_label("COMPLICATION"), _scr_label("RESOLUTION")],
         [
-            Paragraph(situation or "—", _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
-            Paragraph(complication or "—", _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
-            Paragraph(resolution or "—", _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
+            _para(situation or "—", _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
+            _para(complication or "—", _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
+            _para(resolution or "—", _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
         ],
     ]
     scr_w = CONTENT_W / 3
@@ -323,16 +342,16 @@ def _situation_section(story, report):
         ro_data = []
         if risks:
             ro_data.append([
-                Paragraph("KEY RISKS", _style(fontSize=8, fontName="Helvetica-Bold",
+                _para("KEY RISKS", _style(fontSize=8, fontName="Helvetica-Bold",
                            textColor=RED, letterSpacing=1)),
-                Paragraph("KEY OPPORTUNITIES", _style(fontSize=8, fontName="Helvetica-Bold",
+                _para("KEY OPPORTUNITIES", _style(fontSize=8, fontName="Helvetica-Bold",
                            textColor=GREEN, letterSpacing=1)),
             ])
             risk_text = "\n".join(f"• {r}" for r in risks[:4])
             opp_text  = "\n".join(f"• {o}" for o in opps[:4])
             ro_data.append([
-                Paragraph(risk_text, _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
-                Paragraph(opp_text,  _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
+                _para(risk_text, _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
+                _para(opp_text,  _style(fontSize=9, leading=13, textColor=DARK_GRAY)),
             ])
         ro_tbl = Table(ro_data, colWidths=[CONTENT_W / 2] * 2)
         ro_tbl.setStyle(TableStyle([
@@ -361,19 +380,19 @@ def _issue_cell(title, why, impact, is_qw):
                 .replace("<", "&lt;")
                 .replace(">", "&gt;"))
 
-    cell = [Paragraph(_esc(title), _style(fontSize=10, fontName="Helvetica-Bold", textColor=NAVY))]
+    cell = [_para(_esc(title), _style(fontSize=10, fontName="Helvetica-Bold", textColor=NAVY))]
     if why:
         cell.append(Spacer(1, 0.05 * cm))
-        cell.append(Paragraph(_esc(why), _style(fontSize=8.5, textColor=DARK_GRAY, leading=11)))
+        cell.append(_para(_esc(why), _style(fontSize=8.5, textColor=DARK_GRAY, leading=11)))
     if impact:
         cell.append(Spacer(1, 0.05 * cm))
-        cell.append(Paragraph(
+        cell.append(_para(
             '<font color="#C9A84C"><b>Impact:</b></font> ' + _esc(impact),
             _style(fontSize=8.5, textColor=DARK_GRAY, leading=11),
         ))
     if is_qw:
         cell.append(Spacer(1, 0.08 * cm))
-        cell.append(Paragraph(
+        cell.append(_para(
             '<font color="#1A7A40"><b>QUICK WIN</b></font>',
             _style(fontSize=7.5, fontName="Helvetica-Bold"),
         ))
@@ -396,10 +415,10 @@ def _callout_box(story, title, body, bg, accent):
         lum = 1.0
     body_color = OFF_WHITE if lum < 0.5 else DARK_GRAY
     inner = [
-        Paragraph(_esc(title).upper(),
+        _para(_esc(title).upper(),
                   _style(fontSize=8, fontName="Helvetica-Bold", textColor=accent, letterSpacing=1)),
         Spacer(1, 0.12 * cm),
-        Paragraph(_esc(body), _style(fontSize=9.5, textColor=body_color, leading=13)),
+        _para(_esc(body), _style(fontSize=9.5, textColor=body_color, leading=13)),
     ]
     box = Table([[inner]], colWidths=[CONTENT_W])
     box.setStyle(TableStyle([
@@ -441,7 +460,7 @@ def _executive_summary_section(story, report):
         ("Risk",            scores.get("risk", 0),            "Audit & legal"),
     ]
     score_data = [
-        [Paragraph(s[0], _style(fontSize=8, fontName="Helvetica-Bold", textColor=WHITE,
+        [_para(s[0], _style(fontSize=8, fontName="Helvetica-Bold", textColor=WHITE,
                                 alignment=TA_CENTER))
          for s in score_items],
         [_score_cell(s[1], s[2]) for s in score_items],
@@ -529,7 +548,7 @@ def _executive_summary_section(story, report):
     summary = report.get("executive_summary") or report.get("summary", "")
     for para in summary.split("\n\n"):
         if para.strip():
-            story.append(Paragraph(
+            story.append(_para(
                 para.strip(),
                 _style(fontSize=9.5, leading=15, textColor=DARK_GRAY, alignment=TA_JUSTIFY)
             ))
@@ -539,7 +558,7 @@ def _executive_summary_section(story, report):
     top_issues = report.get("top_priority_issues", [])
     if top_issues:
         story.append(Spacer(1, 0.3 * cm))
-        story.append(Paragraph(
+        story.append(_para(
             "PRIORITY ISSUES",
             _style(fontSize=8, fontName="Helvetica-Bold", textColor=NAVY, letterSpacing=1.5)
         ))
@@ -555,7 +574,7 @@ def _executive_summary_section(story, report):
 
             row = Table(
                 [[
-                    Paragraph(
+                    _para(
                         f'<font color="#C9A84C">#{rank}</font>',
                         _style(fontSize=11, fontName="Helvetica-Bold", alignment=TA_CENTER)
                     ),
@@ -624,7 +643,7 @@ def _department_findings_section(story, report, audience: str = "owner"):
         # Agent sub-header
         story.append(Spacer(1, 0.5 * cm))
         story.append(KeepTogether([
-            Paragraph(
+            _para(
                 agent_name.upper(),
                 _style(fontSize=10, fontName="Helvetica-Bold", textColor=GOLD)
             ),
@@ -659,9 +678,9 @@ def _finding_card(story, f: dict, severity: str):
     # Title row
     title_row = Table(
         [[
-            Paragraph(label, _style(fontSize=7, fontName="Helvetica-Bold",
+            _para(label, _style(fontSize=7, fontName="Helvetica-Bold",
                                     textColor=WHITE, alignment=TA_CENTER)),
-            Paragraph(
+            _para(
                 f'{"⚡ " if qw else ""}{title}',
                 _style(fontSize=10, fontName="Helvetica-Bold", textColor=NAVY)
             ),
@@ -681,7 +700,7 @@ def _finding_card(story, f: dict, severity: str):
     # Detail
     if detail:
         inner.append(Spacer(1, 0.1 * cm))
-        inner.append(Paragraph(
+        inner.append(_para(
             detail,
             _style(fontSize=8.5, leading=13, textColor=DARK_GRAY, alignment=TA_JUSTIFY)
         ))
@@ -689,7 +708,7 @@ def _finding_card(story, f: dict, severity: str):
     # Benchmark row
     if bench:
         inner.append(Spacer(1, 0.1 * cm))
-        inner.append(Paragraph(
+        inner.append(_para(
             f"📊  {bench}",
             _style(fontSize=8, textColor=MID_GRAY, leading=11)
         ))
@@ -708,7 +727,7 @@ def _finding_card(story, f: dict, severity: str):
     if metrics:
         inner.append(Spacer(1, 0.1 * cm))
         for m in metrics:
-            inner.append(Paragraph(
+            inner.append(_para(
                 m,
                 _style(fontSize=8, leading=12, textColor=DARK_GRAY)
             ))
@@ -716,7 +735,7 @@ def _finding_card(story, f: dict, severity: str):
     # Recommendation
     if rec:
         inner.append(Spacer(1, 0.1 * cm))
-        inner.append(Paragraph(
+        inner.append(_para(
             f"→  {rec}",
             _style(fontSize=8.5, fontName="Helvetica-Bold", textColor=GREEN, leading=12)
         ))
@@ -753,24 +772,24 @@ def _cover_page_banker(story, report):
     fraud_risk   = report.get("fraud_risk_level", "unknown").upper()
 
     story.append(Spacer(1, 0.6 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "BUSINESS FORENSICS AI  ·  CREDIT ASSESSMENT",
         _style(fontSize=9, fontName="Helvetica-Bold", textColor=GOLD, letterSpacing=2.5)
     ))
     story.append(Spacer(1, 0.2 * cm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=GOLD))
     story.append(Spacer(1, 2 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "CREDIT ASSESSMENT REPORT",
         _style(fontSize=9, fontName="Helvetica", textColor=MID_GRAY, letterSpacing=3)
     ))
     story.append(Spacer(1, 0.5 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         biz,
         _style(fontSize=36, fontName="Helvetica-Bold", textColor=NAVY, leading=40)
     ))
     story.append(Spacer(1, 0.4 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         f"{industry}  ·  {country}  ·  {today}" if country else f"{industry}  ·  {today}",
         _style(fontSize=10, textColor=DARK_GRAY)
     ))
@@ -816,12 +835,12 @@ def _cover_page_banker(story, report):
     ]))
     story.append(tbl)
     story.append(Spacer(1, 3 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "PREPARED FOR CREDIT / LENDING INSTITUTION — STRICTLY CONFIDENTIAL",
         _style(fontSize=8, fontName="Helvetica-Bold", textColor=DARK_GRAY, letterSpacing=1)
     ))
     story.append(Spacer(1, 0.15 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "This credit assessment has been generated by Imara for use by authorised "
         "financial institutions in evaluating lending or facility applications. It does not constitute "
         "a formal credit opinion and must be used in conjunction with your institution's own due diligence.",
@@ -846,24 +865,24 @@ def _cover_page_investor(story, report):
     health   = scores.get("business_health", 0)
 
     story.append(Spacer(1, 0.6 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "BUSINESS FORENSICS AI  ·  INVESTMENT ANALYSIS",
         _style(fontSize=9, fontName="Helvetica-Bold", textColor=GOLD, letterSpacing=2.5)
     ))
     story.append(Spacer(1, 0.2 * cm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=GOLD))
     story.append(Spacer(1, 2 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "INVESTMENT ANALYSIS REPORT",
         _style(fontSize=9, fontName="Helvetica", textColor=MID_GRAY, letterSpacing=3)
     ))
     story.append(Spacer(1, 0.5 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         biz,
         _style(fontSize=36, fontName="Helvetica-Bold", textColor=NAVY, leading=40)
     ))
     story.append(Spacer(1, 0.4 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         f"{industry}  ·  {country}  ·  {today}" if country else f"{industry}  ·  {today}",
         _style(fontSize=10, textColor=DARK_GRAY)
     ))
@@ -900,12 +919,12 @@ def _cover_page_investor(story, report):
     ]))
     story.append(tbl)
     story.append(Spacer(1, 3 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "PREPARED FOR INVESTOR / ACQUIRER — STRICTLY CONFIDENTIAL",
         _style(fontSize=8, fontName="Helvetica-Bold", textColor=DARK_GRAY, letterSpacing=1)
     ))
     story.append(Spacer(1, 0.15 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "This investment analysis has been generated by Imara. Valuations are "
         "indicative estimates based on AI-derived financial data and industry benchmarks. They do "
         "not constitute a formal valuation opinion. Engage a qualified valuator or M&A advisor "
@@ -919,7 +938,7 @@ def _cover_page_investor(story, report):
 
 def _scr_label(text: str):
     """Return a centred, GOLD-tinted header paragraph for SCR table headers."""
-    return Paragraph(
+    return _para(
         text,
         _style(fontSize=8, fontName="Helvetica-Bold", textColor=GOLD_LITE,
                alignment=TA_CENTER, letterSpacing=1)
@@ -938,7 +957,7 @@ def _score_cell(score: int, subtitle: str):
         f'<font name="Helvetica-Bold" size="18" color="#{_hex(col)}">{score}</font><br/>'
         f'<font name="Helvetica" size="7" color="#{_hex(MID_GRAY)}">{subtitle}</font>'
     )
-    return Paragraph(lines, _style(alignment=TA_CENTER, leading=14))
+    return _para(lines, _style(alignment=TA_CENTER, leading=14))
 
 
 def _style(**kwargs):
@@ -959,7 +978,7 @@ def _style(**kwargs):
 def _section_header(story, title: str):
     """Gold underlined section header."""
     story.append(Spacer(1, 0.3 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         title,
         ParagraphStyle("_sh", fontName="Helvetica-Bold", fontSize=8,
                        textColor=GOLD, charSpace=2, spaceBefore=0)
@@ -1018,14 +1037,14 @@ def _imara_score_block(story, report):
 
     left = Table(
         [
-            [Paragraph(str(score), _style(fontSize=44, fontName="Helvetica-Bold",
+            [_para(str(score), _style(fontSize=44, fontName="Helvetica-Bold",
                                           textColor=col, alignment=TA_CENTER))],
-            [Paragraph("OUT OF 100", _style(fontSize=7, textColor=MID_GRAY,
+            [_para("OUT OF 100", _style(fontSize=7, textColor=MID_GRAY,
                                             alignment=TA_CENTER, letterSpacing=1))],
-            [Paragraph("Band " + str(band) + "  ·  " + str(label),
+            [_para("Band " + str(band) + "  ·  " + str(label),
                        _style(fontSize=9, fontName="Helvetica-Bold",
                               textColor=col, alignment=TA_CENTER))],
-            [Paragraph(
+            [_para(
                 ("Confidence: " + confidence + ("  ·  " + str(completeness) + "% of signals"
                  if completeness is not None else "")) if confidence else "",
                 _style(fontSize=7, textColor=MID_GRAY, alignment=TA_CENTER))],
@@ -1042,9 +1061,9 @@ def _imara_score_block(story, report):
     ]))
 
     rows = [[
-        Paragraph("COMPONENT", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE)),
-        Paragraph("SCORE", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE, alignment=TA_CENTER)),
-        Paragraph("WEIGHT", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE, alignment=TA_CENTER)),
+        _para("COMPONENT", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE)),
+        _para("SCORE", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE, alignment=TA_CENTER)),
+        _para("WEIGHT", _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE, alignment=TA_CENTER)),
     ]]
     comp_tbl_style = [
         ("BACKGROUND", (0, 0), (-1, 0), NAVY),
@@ -1061,9 +1080,9 @@ def _imara_score_block(story, report):
         wpct = int(round(c.get("weight", 0) * 100))
         vc = GREEN if v >= 70 else AMBER if v >= 40 else RED
         rows.append([
-            Paragraph(str(c.get("label", "")), _style(fontSize=8, textColor=DARK_GRAY)),
-            Paragraph(str(v), _style(fontSize=8, fontName="Helvetica-Bold", textColor=vc, alignment=TA_CENTER)),
-            Paragraph(str(wpct) + "%", _style(fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER)),
+            _para(str(c.get("label", "")), _style(fontSize=8, textColor=DARK_GRAY)),
+            _para(str(v), _style(fontSize=8, fontName="Helvetica-Bold", textColor=vc, alignment=TA_CENTER)),
+            _para(str(wpct) + "%", _style(fontSize=8, textColor=MID_GRAY, alignment=TA_CENTER)),
         ])
         if ri % 2 == 0:
             comp_tbl_style.append(("BACKGROUND", (0, ri), (-1, ri), OFF_WHITE))
@@ -1092,14 +1111,14 @@ def _financial_ratios_section(story, report):
     if fund:
         title += "  ·  SCORE " + str(fund) + "/100"
     _section_header(story, title)
-    story.append(Paragraph(
+    story.append(_para(
         "Computed directly from the financial statements (arithmetic, not AI-generated). "
         "Each figure is traceable to its source line items.",
         _style(fontSize=8, textColor=MID_GRAY, leading=11)))
     story.append(Spacer(1, 0.2 * cm))
 
     stat_col = {"good": GREEN, "warning": AMBER, "critical": RED}
-    head = [Paragraph(h, _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE))
+    head = [_para(h, _style(fontSize=6.5, fontName="Helvetica-Bold", textColor=WHITE))
             for h in ("METRIC", "VALUE", "BENCHMARK", "STATUS", "SOURCE FIGURES")]
     rows = [head]
     style = [
@@ -1118,11 +1137,11 @@ def _financial_ratios_section(story, report):
         val = ("%g%s" % (v, unit)) if v is not None else "—"
         col = stat_col.get(r.get("status"), MID_GRAY)
         rows.append([
-            Paragraph(str(r.get("label", "")), _style(fontSize=8, fontName="Helvetica-Bold", textColor=NAVY)),
-            Paragraph(val, _style(fontSize=8, fontName="Helvetica-Bold", textColor=col)),
-            Paragraph(str(r.get("benchmark", "")), _style(fontSize=8, textColor=DARK_GRAY)),
-            Paragraph(str(r.get("status", "")).title(), _style(fontSize=8, textColor=col)),
-            Paragraph(str(r.get("source", "")), _style(fontSize=7, textColor=MID_GRAY)),
+            _para(str(r.get("label", "")), _style(fontSize=8, fontName="Helvetica-Bold", textColor=NAVY)),
+            _para(val, _style(fontSize=8, fontName="Helvetica-Bold", textColor=col)),
+            _para(str(r.get("benchmark", "")), _style(fontSize=8, textColor=DARK_GRAY)),
+            _para(str(r.get("status", "")).title(), _style(fontSize=8, textColor=col)),
+            _para(str(r.get("source", "")), _style(fontSize=7, textColor=MID_GRAY)),
         ])
         if ri % 2 == 0:
             style.append(("BACKGROUND", (0, ri), (-1, ri), OFF_WHITE))
@@ -1204,11 +1223,11 @@ def _traffic_light_section(story, report):
         hrow, vrow = [], []
         font_sz = 14 if start == 8 else 16
         for label, val_str, col, bg in cells[start:start + 4]:
-            hrow.append(Paragraph(
+            hrow.append(_para(
                 label, _style(fontSize=7, fontName="Helvetica-Bold",
                               textColor=WHITE, alignment=TA_CENTER)
             ))
-            vrow.append(Paragraph(
+            vrow.append(_para(
                 val_str, _style(fontSize=font_sz, fontName="Helvetica-Bold",
                                 textColor=col, alignment=TA_CENTER)
             ))
@@ -1221,7 +1240,7 @@ def _traffic_light_section(story, report):
     # RAG legend
     story.append(Spacer(1, 0.4 * cm))
     legend = Table(
-        [[Paragraph(
+        [[_para(
             '<font color="#1A7A40">■</font> Good  '
             '<font color="#C9820A">■</font> Caution  '
             '<font color="#C0392B">■</font> Action Required',
@@ -1262,12 +1281,12 @@ def _credit_readiness_section(story, report):
     grade_hex = _hex(grade_color)
     score_tbl = Table(
         [[
-            Paragraph(
+            _para(
                 ('<font size="42" color="#' + score_hex + '"><b>' + str(credit_score) + '</b></font>'
                  '<br/><font size="8" color="#888888">Credit Readiness Score  /100</font>'),
                 _style(fontSize=42, alignment=TA_CENTER, leading=50)
             ),
-            Paragraph(
+            _para(
                 ('<font size="56" color="#' + grade_hex + '"><b>' + credit_grade + '</b></font>'
                  '<br/><font size="8" color="#555555">' + grade_desc + '</font>'),
                 _style(fontSize=56, alignment=TA_CENTER, leading=60)
@@ -1297,16 +1316,16 @@ def _credit_readiness_section(story, report):
         b_rows = barriers  + [""] * (max_rows - len(barriers))
         sb_data = [
             [
-                Paragraph("STRENGTHS", _style(fontSize=7, fontName="Helvetica-Bold",
+                _para("STRENGTHS", _style(fontSize=7, fontName="Helvetica-Bold",
                                               textColor=GREEN, letterSpacing=1)),
-                Paragraph("BARRIERS", _style(fontSize=7, fontName="Helvetica-Bold",
+                _para("BARRIERS", _style(fontSize=7, fontName="Helvetica-Bold",
                                              textColor=RED, letterSpacing=1)),
             ]
         ]
         for s, b in zip(s_rows, b_rows):
             sb_data.append([
-                Paragraph(s, _style(fontSize=8, textColor=DARK_GRAY)) if s else Paragraph("", _style()),
-                Paragraph(b, _style(fontSize=8, textColor=DARK_GRAY)) if b else Paragraph("", _style()),
+                _para(s, _style(fontSize=8, textColor=DARK_GRAY)) if s else _para("", _style()),
+                _para(b, _style(fontSize=8, textColor=DARK_GRAY)) if b else _para("", _style()),
             ])
         sb_tbl = Table(sb_data, colWidths=[CONTENT_W / 2, CONTENT_W / 2])
         sb_tbl.setStyle(TableStyle([
@@ -1329,12 +1348,12 @@ def _credit_readiness_section(story, report):
     # Funding products
     if products:
         prod_str = "  ·  ".join(products)
-        story.append(Paragraph(
+        story.append(_para(
             "RECOMMENDED FUNDING PRODUCTS",
             _style(fontSize=7, fontName="Helvetica-Bold", textColor=NAVY, letterSpacing=1)
         ))
         story.append(Spacer(1, 0.15 * cm))
-        story.append(Paragraph(
+        story.append(_para(
             prod_str,
             _style(fontSize=9, textColor=DARK_GRAY)
         ))
@@ -1370,19 +1389,19 @@ def _valuation_section(story, report):
 
     val_data = [
         [
-            Paragraph("BEAR CASE", _style(fontSize=7, fontName="Helvetica-Bold",
+            _para("BEAR CASE", _style(fontSize=7, fontName="Helvetica-Bold",
                                           textColor=WHITE, alignment=TA_CENTER)),
-            Paragraph("BASE CASE", _style(fontSize=7, fontName="Helvetica-Bold",
+            _para("BASE CASE", _style(fontSize=7, fontName="Helvetica-Bold",
                                           textColor=WHITE, alignment=TA_CENTER)),
-            Paragraph("BULL CASE", _style(fontSize=7, fontName="Helvetica-Bold",
+            _para("BULL CASE", _style(fontSize=7, fontName="Helvetica-Bold",
                                           textColor=WHITE, alignment=TA_CENTER)),
         ],
         [
-            Paragraph(bear_str, _style(fontSize=18, fontName="Helvetica-Bold",
+            _para(bear_str, _style(fontSize=18, fontName="Helvetica-Bold",
                                        textColor=RED, alignment=TA_CENTER)),
-            Paragraph(base_str, _style(fontSize=18, fontName="Helvetica-Bold",
+            _para(base_str, _style(fontSize=18, fontName="Helvetica-Bold",
                                        textColor=NAVY, alignment=TA_CENTER)),
-            Paragraph(bull_str, _style(fontSize=18, fontName="Helvetica-Bold",
+            _para(bull_str, _style(fontSize=18, fontName="Helvetica-Bold",
                                        textColor=GREEN, alignment=TA_CENTER)),
         ],
     ]
@@ -1430,7 +1449,7 @@ def _valuation_section(story, report):
     ]))
     story.append(det_tbl)
     story.append(Spacer(1, 0.4 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "Indicative only. Engage a registered Business Valuator (SAVCA/SAICA) for a formal opinion.",
         _style(fontSize=7.5, textColor=MID_GRAY, leading=11)
     ))
@@ -1461,19 +1480,19 @@ def _forecast_section(story, report):
 
     f_data = [
         [
-            Paragraph("BULL SCENARIO", _style(fontSize=7, fontName="Helvetica-Bold",
+            _para("BULL SCENARIO", _style(fontSize=7, fontName="Helvetica-Bold",
                                               textColor=WHITE, alignment=TA_CENTER)),
-            Paragraph("BASE SCENARIO", _style(fontSize=7, fontName="Helvetica-Bold",
+            _para("BASE SCENARIO", _style(fontSize=7, fontName="Helvetica-Bold",
                                               textColor=WHITE, alignment=TA_CENTER)),
-            Paragraph("BEAR SCENARIO", _style(fontSize=7, fontName="Helvetica-Bold",
+            _para("BEAR SCENARIO", _style(fontSize=7, fontName="Helvetica-Bold",
                                               textColor=WHITE, alignment=TA_CENTER)),
         ],
         [
-            Paragraph(_fv(bull), _style(fontSize=16, fontName="Helvetica-Bold",
+            _para(_fv(bull), _style(fontSize=16, fontName="Helvetica-Bold",
                                         textColor=GREEN, alignment=TA_CENTER)),
-            Paragraph(_fv(base), _style(fontSize=16, fontName="Helvetica-Bold",
+            _para(_fv(base), _style(fontSize=16, fontName="Helvetica-Bold",
                                         textColor=GOLD, alignment=TA_CENTER)),
-            Paragraph(_fv(bear), _style(fontSize=16, fontName="Helvetica-Bold",
+            _para(_fv(bear), _style(fontSize=16, fontName="Helvetica-Bold",
                                         textColor=RED, alignment=TA_CENTER)),
         ],
     ]
@@ -1495,12 +1514,12 @@ def _forecast_section(story, report):
 
     if assns:
         story.append(Spacer(1, 0.3 * cm))
-        story.append(Paragraph(
+        story.append(_para(
             "ASSUMPTIONS",
             _style(fontSize=7, fontName="Helvetica-Bold", textColor=DARK_GRAY, letterSpacing=1)
         ))
         for a in assns:
-            story.append(Paragraph(
+            story.append(_para(
                 "→  " + a,
                 _style(fontSize=8, textColor=MID_GRAY, leading=12)
             ))
@@ -1531,13 +1550,13 @@ def _fraud_risk_section(story, report):
 
     badge_data = [
         [
-            Paragraph(level.upper() + " RISK",
+            _para(level.upper() + " RISK",
                       _style(fontSize=22, fontName="Helvetica-Bold",
                              textColor=level_color, alignment=TA_CENTER)),
-            Paragraph(str(score) + "/100",
+            _para(str(score) + "/100",
                       _style(fontSize=22, fontName="Helvetica-Bold",
                              textColor=level_color, alignment=TA_CENTER)),
-            Paragraph(desc,
+            _para(desc,
                       _style(fontSize=8, textColor=DARK_GRAY, leading=12, alignment=TA_CENTER)),
         ]
     ]
@@ -1557,19 +1576,19 @@ def _fraud_risk_section(story, report):
     story.append(Spacer(1, 0.4 * cm))
 
     if indicators:
-        story.append(Paragraph(
+        story.append(_para(
             "INDICATORS DETECTED",
             _style(fontSize=7, fontName="Helvetica-Bold", textColor=RED, letterSpacing=1)
         ))
         story.append(Spacer(1, 0.15 * cm))
         for i, flag in enumerate(indicators, 1):
-            story.append(Paragraph(
+            story.append(_para(
                 str(i) + ".  " + flag,
                 _style(fontSize=8.5, textColor=DARK_GRAY, leading=13)
             ))
         story.append(Spacer(1, 0.3 * cm))
 
-    story.append(Paragraph(
+    story.append(_para(
         "Findings are indicative anomaly signals, not evidence of criminal conduct. "
         "Engage a Certified Fraud Examiner (CFE) for any formal investigation.",
         _style(fontSize=7.5, textColor=MID_GRAY, leading=11)
@@ -1584,7 +1603,7 @@ def _roadmap_section(story, report):
 
     roadmap = report.get("implementation_roadmap", [])
     if not roadmap:
-        story.append(Paragraph(
+        story.append(_para(
             "Roadmap data not available.",
             _style(fontSize=9, textColor=MID_GRAY)
         ))
@@ -1602,10 +1621,10 @@ def _roadmap_section(story, report):
 
         # Phase header
         hdr_data = [[
-            Paragraph(priority or ("PHASE " + str(i + 1)),
+            _para(priority or ("PHASE " + str(i + 1)),
                       _style(fontSize=7, fontName="Helvetica-Bold",
                              textColor=col, letterSpacing=1)),
-            Paragraph(phase_name,
+            _para(phase_name,
                       _style(fontSize=10, fontName="Helvetica-Bold", textColor=NAVY)),
         ]]
         hdr_tbl = Table(hdr_data, colWidths=[CONTENT_W * 0.2, CONTENT_W * 0.8])
@@ -1623,7 +1642,7 @@ def _roadmap_section(story, report):
         story.append(Spacer(1, 0.1 * cm))
 
         if focus:
-            story.append(Paragraph(
+            story.append(_para(
                 focus,
                 _style(fontSize=8.5, textColor=MID_GRAY, leading=12)
             ))
@@ -1637,19 +1656,19 @@ def _roadmap_section(story, report):
             line = "→  " + action_text
             if owner:
                 line += "   [" + owner + "]"
-            story.append(Paragraph(
+            story.append(_para(
                 line,
                 _style(fontSize=8.5, textColor=DARK_GRAY, leading=13)
             ))
             if impact:
-                story.append(Paragraph(
+                story.append(_para(
                     "   " + impact,
                     _style(fontSize=8, textColor=col, leading=11)
                 ))
 
         if expected:
             story.append(Spacer(1, 0.15 * cm))
-            story.append(Paragraph(
+            story.append(_para(
                 "Expected impact: " + expected,
                 _style(fontSize=8, fontName="Helvetica-Bold", textColor=GREEN)
             ))
@@ -1663,7 +1682,7 @@ def _roadmap_section(story, report):
 def _closing_section(story, report):
     story.append(PageBreak())
     story.append(Spacer(1, 3 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "BUSINESS FORENSICS AI",
         _style(fontSize=11, fontName="Helvetica-Bold", textColor=GOLD,
                letterSpacing=3, alignment=TA_CENTER)
@@ -1671,13 +1690,13 @@ def _closing_section(story, report):
     story.append(Spacer(1, 0.3 * cm))
     story.append(HRFlowable(width="60%", thickness=0.5, color=GOLD))
     story.append(Spacer(1, 1 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "CONFIDENTIALITY NOTICE",
         _style(fontSize=8, fontName="Helvetica-Bold", textColor=DARK_GRAY,
                letterSpacing=2, alignment=TA_CENTER)
     ))
     story.append(Spacer(1, 0.4 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "This report has been prepared by Imara and is intended solely for the "
         "use of the named recipient(s). The information contained herein is confidential and "
         "may not be reproduced, distributed, or disclosed to any third party without the prior "
@@ -1686,14 +1705,14 @@ def _closing_section(story, report):
         _style(fontSize=8.5, textColor=MID_GRAY, leading=13, alignment=TA_JUSTIFY)
     ))
     story.append(Spacer(1, 0.5 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         "Financial projections and valuations do not constitute advice and should not be "
         "relied upon as the sole basis for any business, investment, or lending decision. "
         "Engage qualified professionals \u2014 CA(SA), CFE, registered valuator \u2014 for formal opinions.",
         _style(fontSize=8.5, textColor=MID_GRAY, leading=13, alignment=TA_JUSTIFY)
     ))
     story.append(Spacer(1, 1.5 * cm))
-    story.append(Paragraph(
+    story.append(_para(
         date.today().strftime("%d %B %Y"),
         _style(fontSize=8, textColor=DARK_GRAY, alignment=TA_CENTER)
     ))
