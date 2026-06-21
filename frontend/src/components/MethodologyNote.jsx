@@ -125,6 +125,27 @@ export default function MethodologyNote({ report }) {
         </div>
       )}
 
+      {(report.input_security?.injection_detected || report.input_security?.pii_redacted > 0) && (
+        <div className="mb-4">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+            Input security
+            <InfoTip label="Why it matters" text="Uploaded documents are scanned before any agent reads them: instructions planted in a document to manipulate the analysis are neutralised, and obvious personal data (emails, ID/card numbers) is redacted. Deterministic - figures are never altered, and the Score is unaffected." />
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {report.input_security.injection_detected && (
+              <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border bg-amber-400/10 text-amber-300 border-amber-400/25">
+                {report.input_security.injection_count} injected instruction{report.input_security.injection_count === 1 ? '' : 's'} neutralised
+              </span>
+            )}
+            {report.input_security.pii_redacted > 0 && (
+              <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border bg-white/[0.03] text-slate-400 border-white/10">
+                {report.input_security.pii_redacted} PII item{report.input_security.pii_redacted === 1 ? '' : 's'} redacted
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="text-slate-400 text-xs leading-relaxed">
         <span className="text-slate-300 font-medium">What this is — and isn&apos;t.</span> This report is decision-support, not
         a substitute for a registered auditor, business valuator, or tax practitioner.

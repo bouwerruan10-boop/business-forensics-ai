@@ -894,6 +894,12 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
                 uploaded_plan_text="\n\n".join(category_texts["business_plan"]),
             )
 
+            # 2b. Input-security guard: defang prompt-injection + redact PII in the
+            # uploaded document text BEFORE any agent reads it (deterministic; figures
+            # are never altered). Closes the one injection gap the pressure test flagged.
+            from services.input_guard import sanitize_inputs
+            business_data, input_security = sanitize_inputs(memory, business_data)
+
             # 3. Progress callback for frontend polling
             def on_progress(agent, message):
                 analysis_status[analysis_id]["current_agent"] = agent
@@ -933,6 +939,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["cashflow_13week"] = cashflow_from_report(report, memory)
             from services.agent_consistency import analyze_consistency
             report["cross_agent_consistency"] = analyze_consistency(report.get("all_findings_ranked") or [])
+            report["input_security"] = input_security
 
             report = finite_safe(report)  # root-cause: strip NaN/inf once -> every consumer + the stored JSON is safe
             report["analysis_id"] = analysis_id  # ensure the report (and audit record) carry their id
