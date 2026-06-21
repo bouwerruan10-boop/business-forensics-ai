@@ -12,7 +12,17 @@ Design (driver-based scenario model, FP&A best practice):
                                                score and an estimated Imara Score, plus
                                                cash released and per-action contributions.
 """
+import math
 from services.financial_ratios import compute_ratios, fundamentals_score
+
+
+def _fin_or_none(x):
+    """Finite number or None — so a non-finite imara_score never reaches int(round())."""
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return None
+    return x if math.isfinite(x) else None
 
 # Actions rarely land at 100%. Realisation haircut by named scenario (base/best/worst).
 SCENARIOS = {"optimistic": 1.0, "expected": 0.6, "pessimistic": 0.3}
@@ -158,16 +168,39 @@ def _estimate_imara(report: dict, new_fund: float):
     """Project the Imara Score by moving Profitability's fundamentals-anchored portion
     (0.6 weight) and holding the LLM-driven components constant, then re-normalising."""
     comps = report.get("imara_components") or []
-    old_fund = float(report.get("financial_fundamentals_score") or 0)
-    if not comps:
+    try:
+        old_fund = float(report.get("financial_fundamentals_score") or 0)
+    except (TypeError, ValueError):
+        old_fund = 0.0
+    if not math.isfinite(old_fund):
+        old_fund = 0.0
+    try:
+        new_fund = float(new_fund)
+    except (TypeError, ValueError):
+        new_fund = old_fund
+    if not math.isfinite(new_fund):
+        new_fund = old_fund
+    if not isinstance(comps, list) or not comps:
         return report.get("imara_score")
     total_w = 0.0; acc = 0.0
     for c in comps:
-        w = float(c.get("weight") or 0); v = float(c.get("value") or 0)
+        if not isinstance(c, dict):
+            continue
+        try:
+            w = float(c.get("weight") or 0); v = float(c.get("value") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(w):
+            w = 0.0
+        if not math.isfinite(v):
+            v = 0.0
         if c.get("label") == "Profitability" and old_fund:
             v = max(0.0, min(100.0, v + 0.6 * (new_fund - old_fund)))
         total_w += w; acc += v * w
-    return int(round(acc / total_w)) if total_w else report.get("imara_score")
+    if not total_w:
+        return report.get("imara_score")
+    result = acc / total_w
+    return int(round(result)) if math.isfinite(result) else report.get("imara_score")
 
 
 def apply_actions(report: dict, selected: list, scenario: str = "expected") -> dict:
@@ -231,7 +264,7 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
     model_base = _estimate_imara(report, base_fund) or 0
     model_proj = _estimate_imara(report, proj_fund) or 0
     score_delta = model_proj - model_base
-    canonical = report.get("imara_score")
+    canonical = _fin_or_none(report.get("imara_score"))
     base_score = canonical if canonical is not None else model_base
     baseline = snap(base_figs, base_ratios)
     baseline["fundamentals_score"] = int(round(base_fund))
@@ -428,7 +461,7 @@ def macro_stress_test(report: dict) -> dict:
     energy_opex = opex * ENERGY_OPEX_FACTOR * prof["energy"] / 0.5
     fx_cost = (cogs + opex) * prof["fx"] * 0.4
 
-    base_score = report.get("imara_score")
+    base_score = _fin_or_none(report.get("imara_score"))
     results = []
     for name, weight, sc in MACRO_SCENARIOS:
         d_interest = floating * (sc["repo_bps"] / 10000.0)

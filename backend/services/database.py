@@ -320,7 +320,8 @@ def get_report(analysis_id: str) -> dict | None:
             ).fetchone()
             if row is None or not row["report_json"]:
                 return None
-            return json.loads(row["report_json"])
+            from services.jsonsafe import finite_safe
+            return finite_safe(json.loads(row["report_json"]))
         finally:
             conn.close()
 

@@ -115,3 +115,28 @@ def test_safe_json_response_strips_nonfinite():
     import main
     r = main.SafeJSONResponse(content={"x": float("nan"), "y": [float("inf")], "z": 1.5})
     assert json.loads(r.body.decode()) == {"x": None, "y": [None], "z": 1.5}
+
+
+def test_get_report_sanitises_nonfinite(tmp_path, monkeypatch):
+    """Legacy DB reports with NaN/inf are finite-safe when read (before any endpoint touches them)."""
+    import json
+    from pathlib import Path
+    import services.database as db
+    monkeypatch.setattr(db, "_DB_PATH", Path(str(tmp_path / "r.db")))
+    db.init_db()
+    db.create_analysis("r1", {"company_name": "X"})
+    db.save_report("r1", {"imara_score": float("nan"), "financial_figures": {"revenue": float("inf")}})
+    rep = db.get_report("r1")
+    json.dumps(rep, allow_nan=False)
+    assert rep["imara_score"] is None and rep["financial_figures"]["revenue"] is None
+
+
+def test_estimate_imara_robust_to_nonfinite():
+    """The score-projection used by /macro + /simulate never crashes on non-finite/None/wrong-typed input."""
+    from services.simulation import _estimate_imara
+    for rep in ({"imara_components": [{"label": "Profitability", "value": float("nan"), "weight": 0.25}],
+                 "imara_score": 50, "financial_fundamentals_score": float("nan")},
+                {"imara_components": "nope", "imara_score": 40},
+                {"imara_components": [{"value": None, "weight": None}, "junk"], "imara_score": 60}):
+        out = _estimate_imara(rep, float("inf"))
+        assert out is None or isinstance(out, (int, float))
