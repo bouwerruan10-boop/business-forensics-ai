@@ -14,6 +14,7 @@ Deterministic: regex + arithmetic only. Amounts come from the uploaded financial
 text — nothing is invented. Every add-back is INDICATIVE and labelled
 "confirm with the owner". Output is decision-support, never an Imara Score input.
 """
+import math
 import re
 
 __all__ = ["normalize_earnings", "detect_loan_account"]
@@ -49,16 +50,19 @@ def _num(v):
     """Coerce possibly-string/None figure to float (defensive — see distress_score)."""
     if v is None:
         return None
-    if isinstance(v, (int, float)):
-        return float(v)
-    s = str(v).strip().replace(" ", "").replace(",", "").replace("R", "").replace("ZAR", "")
-    neg = s.startswith("(") and s.endswith(")")
-    s = s.strip("()")
     try:
-        f = float(s)
-        return -f if neg else f
-    except ValueError:
+        if isinstance(v, (int, float)):
+            f = float(v)
+        else:
+            s = str(v).strip().replace(" ", "").replace(",", "").replace("R", "").replace("ZAR", "")
+            neg = s.startswith("(") and s.endswith(")")
+            s = s.strip("()")
+            f = float(s)
+            if neg:
+                f = -f
+    except (ValueError, TypeError):
         return None
+    return f if math.isfinite(f) else None  # reject NaN/inf -> keeps output JSON-compliant
 
 
 def _first_amount(line):

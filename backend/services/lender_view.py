@@ -14,22 +14,27 @@ decision and NOT an Imara Score input (consistent with the FAIS/NCA framing).
 No figure is invented: inputs come from uploaded text or computed arithmetic.
 """
 
+import math
+
 __all__ = ["run_lender_view"]
 
 
 def _num(v):
     if v is None:
         return None
-    if isinstance(v, (int, float)):
-        return float(v)
-    s = str(v).strip().replace(" ", "").replace(",", "").replace("R", "").replace("ZAR", "")
-    neg = s.startswith("(") and s.endswith(")")
-    s = s.strip("()")
     try:
-        f = float(s)
-        return -f if neg else f
-    except ValueError:
+        if isinstance(v, (int, float)):
+            f = float(v)
+        else:
+            s = str(v).strip().replace(" ", "").replace(",", "").replace("R", "").replace("ZAR", "")
+            neg = s.startswith("(") and s.endswith(")")
+            s = s.strip("()")
+            f = float(s)
+            if neg:
+                f = -f
+    except (ValueError, TypeError):
         return None
+    return f if math.isfinite(f) else None  # reject NaN/inf -> keeps output JSON-compliant
 
 
 # Indicative assumptions (clearly stated so a lender can override).

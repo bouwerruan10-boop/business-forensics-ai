@@ -109,3 +109,14 @@ def test_lender_view_no_bank_is_graceful():
 def test_lender_view_handles_empty_inputs():
     lv = run_lender_view({}, {}, {})
     assert lv["available"] and "decline_risk" in lv
+
+
+def test_nonfinite_figures_stay_json_safe():
+    """NaN/inf figures must not leak into outputs (would break JSON / the frontend)."""
+    import json, math
+    for figs in ({"ebitda": float("nan")}, {"ebitda": float("inf")}, {"operating_profit": "inf"}):
+        nm = normalize_earnings(figs, "Donations 50 000\n")
+        lv = run_lender_view(figs, {"available": False}, nm, 1_000_000)
+        json.dumps(nm, allow_nan=False)   # raises if NaN/inf present
+        json.dumps(lv, allow_nan=False)
+        assert nm["available"] is False
