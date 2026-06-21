@@ -47,11 +47,15 @@ Write like a CFO briefing a board: direct, quantified, ranked by financial impac
 
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
+        from services.derived_metrics import ebitda_bridge_block
+        bridge = ebitda_bridge_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{bridge}
 
 FINANCIAL DATA FROM UPLOADED FILES:
 {json.dumps(business_data.get('financial', {}), indent=2)[:4000]}
@@ -435,11 +439,15 @@ For each procurement finding:
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
         data = business_data.get('procurement', business_data.get('inventory', business_data.get('general', {})))
+        from services.derived_metrics import procurement_wc_block
+        wc = procurement_wc_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{wc}
 
 PROCUREMENT AND INVENTORY DATA:
 {json.dumps(data, indent=2)[:4000]}
@@ -692,6 +700,8 @@ End your analysis with a JSON block in this exact format:
         banking = f"Primary Bank: {memory.banking_partner or 'not provided'} | Report audience: {memory.report_audience}"
         from services.sa_rates import sa_rates_block
         rates = sa_rates_block()
+        from services.derived_metrics import dscr_block
+        dscr = dscr_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
@@ -702,6 +712,8 @@ BANKING PROFILE:
 {banking}
 
 {rates}
+
+{dscr}
 
 FINANCIAL RECORDS:
 {financial_text[:3000]}
@@ -976,6 +988,8 @@ You cite specific section numbers, act names, and CIPC form codes.""" + "\n" + F
 
         from services.sa_knowledge import retrieve_grounding
         grounding = retrieve_grounding(memory, "legal")
+        from services.derived_metrics import pis_block
+        pis = pis_block(memory)
         prompt = f"""
 {grounding}
 
@@ -993,6 +1007,8 @@ Country: {country}
 
 DATA PROVIDED:
 {data_context}
+
+{pis}
 
 TASK — Conduct a full South African corporate law and compliance review. Evaluate:
 
