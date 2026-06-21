@@ -36,3 +36,30 @@ def test_pdf_includes_tax_when_available():
 
 def test_pdf_safe_without_tax():
     assert generate_pdf_report(dict(_BASE), audience="banker")[:4] == b"%PDF"
+
+
+# ── Robustness: None-valued keys must not crash either exporter (pressure-test finds) ──
+_NONE_NUMS = {"available": True, "currency": "ZAR", "total_saving_high": None, "summary": None,
+              "disclaimer": None, "opportunities": [{"name": None, "eligible": None, "quantified": True,
+                                                      "est_saving_high": None, "basis": None, "action": None}]}
+_NONE_OPPS = {"available": True, "currency": "ZAR", "total_saving_high": 1000, "opportunities": None}
+
+
+def test_html_handles_none_valued_fields():
+    # total_saving_high=None and a quantified opportunity with est_saving_high=None
+    assert isinstance(generate_html_report({**_BASE, "tax_optimization": _NONE_NUMS}), str)
+    # opportunities present but None
+    assert isinstance(generate_html_report({**_BASE, "tax_optimization": _NONE_OPPS}), str)
+
+
+def test_pdf_handles_none_valued_fields():
+    assert generate_pdf_report({**_BASE, "tax_optimization": _NONE_NUMS}, audience="owner")[:4] == b"%PDF"
+    assert generate_pdf_report({**_BASE, "tax_optimization": _NONE_OPPS}, audience="owner")[:4] == b"%PDF"
+
+
+def test_html_escapes_injection_in_tax_fields():
+    hostile = {"available": True, "currency": "ZAR", "total_saving_high": 50000, "summary": "<script>alert(1)</script>",
+               "opportunities": [{"name": "<script>evil</script>", "eligible": "x", "quantified": True,
+                                  "est_saving_high": 50000, "basis": "a<b", "action": "a"}]}
+    h = generate_html_report({**_BASE, "tax_optimization": hostile})
+    assert "<script>alert(1)</script>" not in h and "&lt;script&gt;" in h

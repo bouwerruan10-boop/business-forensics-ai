@@ -501,17 +501,18 @@ def generate_html_report(report: dict) -> str:
     _tx = report.get("tax_optimization") or {}
     if _tx.get("available"):
         _tcur = _tx.get("currency", "ZAR")
-        _ttotal = _tx.get("total_saving_high", 0)
+        _ttotal = _tx.get("total_saving_high", 0) or 0
 
         def _tesc(t):
             return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         _trows = ""
-        for _o in _tx.get("opportunities", []):
+        for _o in (_tx.get("opportunities") or []):
+            _osav = _o.get("est_saving_high") or 0
             if _o.get("quantified"):
-                _amt = f'<span style="color:{GREEN};font-weight:700">save {_tcur} {_o.get("est_saving_high", 0):,.0f}</span>'
-            elif _o.get("est_saving_high"):
-                _amt = f'<span style="color:{AMBER}">up to {_tcur} {_o.get("est_saving_high", 0):,.0f} (unconfirmed)</span>'
+                _amt = f'<span style="color:{GREEN};font-weight:700">save {_tcur} {_osav:,.0f}</span>'
+            elif _osav:
+                _amt = f'<span style="color:{AMBER}">up to {_tcur} {_osav:,.0f} (unconfirmed)</span>'
             else:
                 _amt = f'<span style="color:{GRAY}">potential</span>'
             _trows += (f'<div style="padding:8px 0;border-bottom:1px solid #eee">'

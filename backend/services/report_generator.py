@@ -1002,7 +1002,7 @@ def _tax_optimisation_section(story, report):
                        _style(fontSize=14, fontName="Helvetica-Bold", textColor=GREEN)))
     story.append(_para(_esc(tx.get("summary", "")), _style(fontSize=9, textColor=NAVY)))
     story.append(Spacer(1, 0.3 * cm))
-    for o in tx.get("opportunities", []):
+    for o in (tx.get("opportunities") or []):
         if o.get("quantified"):
             amt = "save " + _fv(o.get("est_saving_high"))
         elif o.get("est_saving_high"):
