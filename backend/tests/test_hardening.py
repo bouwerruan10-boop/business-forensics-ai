@@ -1324,3 +1324,20 @@ def test_distress_handles_string_figures():
     r = altman_z_em(figs, "C")
     assert r["available"] and r["z_score"] is not None
     assert altman_z_em({"total_assets": "n/a", "equity": "unknown"}, "C")["available"] is False
+
+
+def test_demo_showcases_new_panels():
+    """The demo is the primary sales surface — it must showcase the newest panels and
+    register so fetch-based panels resolve. Guards against the demo going stale again."""
+    import main
+    d = main.DEMO_REPORT
+    assert d.get("imara_score") and len(d.get("imara_components", [])) == 8
+    assert d["distress_score"]["available"]
+    assert d["supplier_benchmark"]["available"] and d["supplier_benchmark"]["total_est_saving_high"] > 0
+    assert d["bank_signals"]["available"]
+    assert d.get("macro_performed") and d.get("decision_support")
+    assert "demo-001" in main.analyses
+    from fastapi.testclient import TestClient
+    with TestClient(main.app) as c:
+        for ep in ["/distress", "/supplier-savings", "/reasons", "/macro", "/actions"]:
+            assert c.get(f"/api/report/demo-001{ep}").status_code == 200, ep

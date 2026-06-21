@@ -985,6 +985,86 @@ DEMO_REPORT = {
 }
 
 
+def _enrich_demo():
+    """Compute the newer panels for the demo via the REAL engines (so the showcase is
+    consistent and current) and register it so fetch-based panels (reasons / macro /
+    simulator) resolve for analysis_id 'demo-001'. The demo is the primary sales surface."""
+    from services.financial_ratios import compute_ratios, fundamentals_score
+    from services.distress_score import altman_z_em
+    from services.supplier_benchmark import run_supplier_benchmark
+    from services.bank_signals import analyze_bank_statement
+    from services.governance import decision_support_notice
+
+    figs = {
+        "revenue": 24_500_000, "cogs": 20_090_000, "gross_profit": 4_410_000,
+        "operating_profit": 735_000, "net_profit": 380_000, "opex": 3_675_000,
+        "current_assets": 4_600_000, "current_liabilities": 6_700_000, "inventory": 3_900_000,
+        "receivables": 3_600_000, "payables": 4_100_000, "total_debt": 4_200_000,
+        "equity": 1_400_000, "interest": 520_000, "cash": 300_000,
+        "total_assets": 9_800_000, "total_liabilities": 8_400_000, "retained_earnings": -700_000,
+    }
+    DEMO_REPORT["financial_figures"] = figs
+    DEMO_REPORT["financial_ratios"] = compute_ratios(figs, "retail", 24_500_000)
+    DEMO_REPORT["financial_fundamentals_score"] = fundamentals_score(DEMO_REPORT["financial_ratios"], "retail").get("score") or 0
+    DEMO_REPORT["financial_extraction_source"] = "deterministic"
+
+    DEMO_REPORT.update({
+        "imara_score": 48, "imara_band": "D", "imara_label": "At Risk", "imara_color": "#fb923c",
+        "imara_completeness": 100, "imara_confidence": "high",
+        "imara_components": [
+            {"label": "Profitability", "value": 28, "weight": 0.25},
+            {"label": "Credit Readiness", "value": 61, "weight": 0.20},
+            {"label": "Risk & Compliance", "value": 42, "weight": 0.15},
+            {"label": "Operational Efficiency", "value": 50, "weight": 0.10},
+            {"label": "Financial Integrity", "value": 62, "weight": 0.10},
+            {"label": "Market Visibility", "value": 55, "weight": 0.10},
+            {"label": "Tax Compliance", "value": 70, "weight": 0.05},
+            {"label": "Legal Compliance", "value": 60, "weight": 0.05},
+        ],
+    })
+
+    DEMO_REPORT["distress_score"] = altman_z_em(figs, "D")
+    DEMO_REPORT["supplier_benchmark"] = run_supplier_benchmark(
+        "Bank charges 185,000\nCard machine merchant fees 430,000\nTelephone and data 96,000\n"
+        "Insurance 142,000\nFuel 78,000\nAccounting software Pastel 36,000\n",
+        24_500_000, {"banking_partner": "Standard Bank"})
+    DEMO_REPORT["bank_signals"] = analyze_bank_statement(
+        "Date Description Amount Balance\n"
+        "2026-01-03 Card settlement credit 820,000 410,000\n"
+        "2026-01-08 Debit order supplier RETURNED unpaid R/D -95,000 315,000\n"
+        "2026-01-22 Rent debit -180,000 -45,000\n"
+        "2026-02-05 Card settlement credit 760,000 690,000\n"
+        "2026-02-19 Debit order insurance insufficient funds reversal -42,000 -12,000\n"
+        "2026-03-02 Card settlement credit 690,000 615,000\n"
+        "2026-03-10 Overdraft interest charge -22,000 588,000\n")
+    DEMO_REPORT["decision_support"] = decision_support_notice()
+    DEMO_REPORT["macro_performed"] = True
+    DEMO_REPORT["macro_summary"] = ("Retail margins are exposed to inflation on the cost base and "
+        "rand-driven import costs; interest-rate sensitivity is moderate on the existing debt.")
+    DEMO_REPORT["macro_overall_exposure"] = "medium"
+    DEMO_REPORT["macro_top_driver"] = "Inflation / input costs"
+
+    DEMO_REPORT["quick_wins"] = [f for f in DEMO_REPORT["all_findings_ranked"] if f.get("quick_win")]
+    DEMO_REPORT["quick_wins_narrative"] = ("Five quick wins (each under 30 days) recover an estimated "
+        "R760k in margin and remove R180k of CCMA risk at minimal cost.")
+    _crit = [f for f in DEMO_REPORT["all_findings_ranked"] if f.get("severity") == "critical"][:5]
+    DEMO_REPORT["top_priority_issues"] = [
+        {"rank": i + 1, "title": f["title"], "estimated_total_impact": f.get("financial_impact", ""),
+         "why_critical": f.get("recommendation", ""), "quick_win": f.get("quick_win", False)}
+        for i, f in enumerate(_crit)]
+
+    DEMO_REPORT["document_coverage"] = {"financial": True, "bank": True, "tax": False,
+                                        "legal": False, "hr": True, "business_plan": False}
+    DEMO_REPORT["llm_usage"] = {"calls": 38, "tokens": 214000, "est_cost_usd": 0.29,
+        "by_model": {"claude-sonnet-4-6": 0.24, "claude-haiku-4-5-20251001": 0.05}}
+    DEMO_REPORT["total_runtime_seconds"] = 642
+
+    analyses["demo-001"] = DEMO_REPORT
+
+
+_enrich_demo()
+
+
 @app.get("/api/demo")
 def demo_report():
     """Returns a fully-populated demo report for UI testing — no API key or file upload required."""
