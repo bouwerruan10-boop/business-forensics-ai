@@ -20,12 +20,14 @@ export default function LenderView({ analysisId, currency = 'ZAR' }) {
   const [lv, setLv] = useState(null)
   const [nm, setNm] = useState(null)
   const [error, setError] = useState(null)
+  const [packUrl, setPackUrl] = useState(null)
 
   useEffect(() => {
     let on = true
-    import('../api/client').then(({ getLenderView, getNormalization }) => {
+    import('../api/client').then(({ getLenderView, getNormalization, getBankReadyPackUrl }) => {
       getLenderView(analysisId).then(d => { if (on) setLv(d) }).catch(e => { if (on) setError(e.message) })
       getNormalization(analysisId).then(d => { if (on) setNm(d) }).catch(() => {})
+      if (on) setPackUrl(getBankReadyPackUrl(analysisId))
     })
     return () => { on = false }
   }, [analysisId])
@@ -54,6 +56,12 @@ export default function LenderView({ analysisId, currency = 'ZAR' }) {
           <span className="text-slate-500 text-xs uppercase tracking-wide">decline risk: <span className={r.c}>{lv.decline_risk}</span></span>
         </div>
         <p className="text-slate-300 text-sm mt-1.5 leading-relaxed">{lv.verdict}</p>
+        {packUrl && (
+          <a href={packUrl} target="_blank" rel="noopener noreferrer"
+             className="inline-flex items-center gap-1.5 mt-3 text-xs font-semibold bg-white/10 hover:bg-white/15 border border-white/15 rounded-lg px-3 py-1.5 text-white transition-colors">
+            ⬇ Download Bank-Ready Pack (PDF)
+          </a>
+        )}
       </div>
 
       {/* Reasons + fixes */}

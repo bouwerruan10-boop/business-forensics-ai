@@ -529,6 +529,22 @@ def report_lender_view(analysis_id: str):
     return result.get("lender_view") or {"available": False, "reason": "Not computed for this analysis."}
 
 
+@app.get("/api/report/{analysis_id}/bank-ready-pack")
+def report_bank_ready_pack(analysis_id: str):
+    """Bank-Ready Pack — a deterministic, lender-facing PDF bundling normalised earnings
+    (Adjusted EBITDA + owner add-backs), bank-conduct evidence + reconciliation, indicative
+    affordability and the readiness fixes — the bundle SA banks ask self-employed applicants
+    for. Decision-support to get application-ready; not a credit decision."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.bank_ready_pack import generate_bank_ready_pack
+    pdf_bytes = generate_bank_ready_pack(result)
+    biz = (result.get("business_name") or "business").replace(" ", "_")
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="%s_Bank_Ready_Pack.pdf"' % biz})
+
+
 @app.get("/api/report/{analysis_id}/supplier-savings")
 def report_supplier_savings(analysis_id: str, live: bool = False):
     """Supplier benchmarking — per-line-item spend-vs-benchmark + lower-cost-supplier

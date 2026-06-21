@@ -126,6 +126,10 @@ export async function getNormalization(analysisId) {
   return res.json()
 }
 
+export function getBankReadyPackUrl(analysisId) {
+  return `${BASE}/report/${analysisId}/bank-ready-pack`
+}
+
 export async function getOptimize(analysisId, scenario = 'expected', maxActions = 3, objective = 'imara') {
   const q = `scenario=${scenario}&max_actions=${maxActions}&objective=${objective}`
   const res = await fetch(`${BASE}/report/${analysisId}/optimize?${q}`, { headers: authHeaders() })
