@@ -140,3 +140,15 @@ def test_estimate_imara_robust_to_nonfinite():
                 {"imara_components": [{"value": None, "weight": None}, "junk"], "imara_score": 60}):
         out = _estimate_imara(rep, float("inf"))
         assert out is None or isinstance(out, (int, float))
+
+
+def test_compute_ratios_robust_to_string_and_nonfinite_figures():
+    """The core ratio engine must not crash on string/None/NaN/inf figure values."""
+    import json
+    from services.financial_ratios import compute_ratios
+    for figs in ({"revenue": "12 000 000", "net_profit": "(500)"},
+                 {"revenue": float("inf"), "operating_profit": "abc"},
+                 {"revenue": 1e308, "cogs": float("nan")},
+                 {"revenue": None, "gross_profit": True}):
+        r = compute_ratios(figs, "retail", 1_000_000)
+        json.dumps(r, allow_nan=False)   # finite-safe, no crash

@@ -155,8 +155,9 @@ analysis_status: dict = {}
 
 class SimulateRequest(BaseModel):
     analysis_id: str
-    scenario: str
-    change_percent: float
+    variable: str = "revenue"   # revenue | labor_cost | ... (what-if lever; restored - handler reads req.variable)
+    scenario: str = ""
+    change_percent: float = 0.0
 
 class ActionSimRequest(BaseModel):
     analysis_id: str

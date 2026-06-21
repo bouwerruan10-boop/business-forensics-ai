@@ -117,7 +117,19 @@ def _src(**figs):
 def compute_ratios(figures: dict, industry_key: str = "general", annual_revenue: float = 0.0) -> dict:
     """Compute credit/health ratios from extracted figures + profile revenue.
     Each result: {value, unit, benchmark, status, source}. Only computable ones returned."""
-    f = dict(figures or {})
+    import math as _math
+    def _fnum(v):
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, (int, float)):
+            return float(v) if _math.isfinite(v) else None
+        try:
+            x = float(str(v).strip().replace(" ", "").replace(",", "").replace("R", "").replace("ZAR", "").strip("()"))
+            return x if _math.isfinite(x) else None
+        except (ValueError, TypeError):
+            return None
+    f = {k: _fnum(v) for k, v in (figures or {}).items()}
+    f = {k: v for k, v in f.items() if v is not None}  # only keep finite numeric figures
     if annual_revenue and "revenue" not in f:
         f["revenue"] = float(annual_revenue)
     bm = get_benchmarks(industry_key) or {}
