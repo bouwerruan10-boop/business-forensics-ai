@@ -1270,3 +1270,45 @@ def test_simulator_opex_double_count_capped():
     s_both = apply_actions(report, [{"id": "opex", "intensity": 1.0}, {"id": "supplier_switch", "intensity": 1.0}],
                            "expected")["projected"]["imara_score"]
     assert s_both <= s_opex + 1   # combined opex reduction capped at max(), not summed
+
+
+# ── Validation harness + calibration ──
+
+def _synth_pairs(n=140, seed=7):
+    import random
+    random.seed(seed)
+    out = []
+    for _ in range(n):
+        bad = random.random() < 0.3
+        out.append({"imara_score": round(max(0, min(100, random.gauss(40 if bad else 67, 12)))),
+                    "label": 1 if bad else 0})
+    return out
+
+
+def test_validation_discrimination():
+    from services.validation import discrimination
+    d = discrimination(_synth_pairs())
+    assert d["available"] and 0.5 < d["auc"] <= 1.0 and abs(d["gini"] - (2 * d["auc"] - 1)) < 0.01
+    # reliability should TREND down: the lowest score band is much riskier than the highest
+    rates = [b["bad_rate"] for b in d["reliability"]]
+    assert rates[0] > rates[-1] + 0.3
+    # cold-start guard
+    assert discrimination(_synth_pairs(n=10))["available"] is False
+
+
+def test_zscore_proxy_backtest():
+    from services.validation import zscore_proxy_backtest
+    reports = [{"report": {"imara_score": s, "distress_score": {"available": True, "zone": z}}}
+               for s, z in [(30, "distress"), (28, "distress"), (72, "safe"), (80, "safe"),
+                            (45, "grey"), (33, "distress"), (66, "safe")] * 4]
+    r = zscore_proxy_backtest(reports)
+    assert r["available"] and r["auc"] is not None and "proxy" in r
+
+
+def test_score_calibration():
+    from services.score_calibration import calibrate, calibrated_pd
+    c = calibrate(_synth_pairs(n=160))
+    assert c["calibrated"] and c["brier"] < 0.25
+    pd20, pd80 = c["example_pd"]["20"], c["example_pd"]["80"]
+    assert pd20 > pd80   # higher score -> lower probability of distress
+    assert calibrate(_synth_pairs(n=10))["calibrated"] is False   # AHP prior stands

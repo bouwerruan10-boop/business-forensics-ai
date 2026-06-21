@@ -134,6 +134,14 @@ class ActionSimRequest(BaseModel):
     scenario: str = "expected"
     variable: str | None = None   # vestigial — unused by /simulate/actions & /montecarlo; optional so the frontend (which omits it) doesn't 422
 
+class OutcomeIn(BaseModel):
+    analysis_id: str
+    outcome_type: str          # default|repaid|funded|declined|external_score
+    label: int | None = None   # 1=bad/default, 0=good (when applicable)
+    value: float | None = None # numeric (e.g. external bureau score)
+    note: str = ""
+    source: str = ""
+
 
 # -- Routes --------------------------------------------------------
 
@@ -488,9 +496,21 @@ def simulate_montecarlo(req: ActionSimRequest):
 @app.get("/api/v1/model-card")
 def public_model_card():
     """Imara Score model card (governance \"nutrition label\"): intended use, method,
-    AHP weight derivation, eval baselines, fairness stance, limitations, NCA/POPIA framing."""
+    AHP weight derivation, eval baselines, fairness stance, limitations, NCA/POPIA framing.
+    Also surfaces the live Z-double-prime proxy discrimination when enough analyses exist."""
     from services.model_card import model_card
-    return model_card()
+    card = model_card()
+    try:
+        from services.database import recent_reports
+        from services.validation import zscore_proxy_backtest
+        zp = zscore_proxy_backtest(recent_reports(200))
+        if zp.get("available"):
+            card["evaluation"]["live_zscore_discrimination"] = {
+                "auc": zp.get("auc"), "gini": zp.get("gini"), "n": zp.get("n"),
+                "basis": "Altman Z-double-prime distress-zone proxy over recent analyses (not real outcomes)"}
+    except Exception:
+        pass
+    return card
 
 
 @app.get("/api/v1/score/{analysis_id}")
@@ -611,6 +631,34 @@ def admin_fleet_quality(limit: int = 50, recent_window: int = 8, _admin: None = 
     recs = recent_reports(limit)
     records = [{"created_at": r["created_at"], "metrics": extract_metrics(r["report"])} for r in recs]
     return aggregate(records, recent_window=recent_window)
+
+
+@app.post("/api/admin/outcomes")
+def admin_record_outcome(body: OutcomeIn, _admin: None = Depends(verify_admin_key)):
+    """Record a real-world outcome for an analysis (the raw material for calibration)."""
+    from services.database import record_outcome, get_report
+    if not get_report(body.analysis_id):
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    record_outcome(body.analysis_id, body.outcome_type, body.label, body.value, body.note, body.source)
+    return {"recorded": True, "analysis_id": body.analysis_id, "outcome_type": body.outcome_type}
+
+
+@app.get("/api/admin/validation")
+def admin_validation(limit: int = 200, _admin: None = Depends(verify_admin_key)):
+    """Model validation evidence: discrimination (AUC/Gini/KS + reliability) on REAL
+    recorded outcomes, plus a Z''-proxy backtest computed NOW from existing analyses."""
+    from services.database import outcomes_with_scores, recent_reports
+    from services.validation import validation_report
+    return validation_report(outcomes_with_scores(), recent_reports(limit))
+
+
+@app.get("/api/admin/calibration")
+def admin_calibration(min_n: int = 50, _admin: None = Depends(verify_admin_key)):
+    """Platt calibration of the Imara Score -> probability-of-distress from recorded
+    outcomes. Returns {calibrated: False} until enough data (AHP prior stands)."""
+    from services.database import outcomes_with_scores
+    from services.score_calibration import calibrate
+    return calibrate(outcomes_with_scores(), min_n=min_n)
 
 
 @app.get("/api/admin/analyses/{analysis_id}")

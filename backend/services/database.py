@@ -106,6 +106,18 @@ def init_db():
                     owner       TEXT NOT NULL DEFAULT 'operator'
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS outcomes (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    analysis_id  TEXT NOT NULL,
+                    outcome_type TEXT NOT NULL,
+                    label        INTEGER,
+                    value        REAL,
+                    note         TEXT,
+                    source       TEXT,
+                    recorded_at  TEXT NOT NULL
+                )
+            """)
             _add_owner_column(conn, "analyses")
             _add_owner_column(conn, "shares")
             conn.commit()
@@ -368,3 +380,46 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
             d["report"] = None
         del d["report_json"]
     return d
+
+
+def record_outcome(analysis_id, outcome_type, label=None, value=None, note="", source=""):
+    """Record a real-world outcome for an analysis (the raw material for calibration):
+    outcome_type e.g. 'default'|'repaid'|'funded'|'declined'|'external_score'; label is a
+    binary 1=bad/default / 0=good when applicable; value carries a numeric (e.g. bureau score)."""
+    from datetime import datetime, timezone
+    with _lock:
+        conn = _get_conn()
+        try:
+            conn.execute(
+                "INSERT INTO outcomes (analysis_id, outcome_type, label, value, note, source, recorded_at) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (analysis_id, outcome_type, label, value, note, source,
+                 datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+        finally:
+            conn.close()
+    return True
+
+
+def outcomes_with_scores():
+    """Join binary-labelled outcomes to their analysis's stored Imara Score —
+    [(analysis_id, imara_score, label)] — the input to discrimination/calibration."""
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT o.analysis_id AS aid, o.label AS label, a.report_json AS rj "
+                "FROM outcomes o JOIN analyses a ON a.id = o.analysis_id "
+                "WHERE o.label IS NOT NULL AND a.report_json IS NOT NULL").fetchall()
+        finally:
+            conn.close()
+    out = []
+    for r in rows:
+        try:
+            rep = json.loads(r["rj"])
+        except Exception:
+            continue
+        sc = rep.get("imara_score")
+        if sc is not None:
+            out.append({"analysis_id": r["aid"], "imara_score": sc, "label": int(r["label"])})
+    return out

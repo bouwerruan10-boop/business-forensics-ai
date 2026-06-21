@@ -157,3 +157,10 @@ def test_full_pipeline_no_api(client):
     mcd = client.get("/api/v1/model-card")
     assert mcd.status_code == 200 and mcd.json()["method"]["weight_derivation"]["consistent"] is True
     assert client.get(f"/api/report/{aid}/supplier-savings").status_code == 200
+
+    # Validation harness: record an outcome + admin validation/calibration endpoints respond
+    ro = client.post("/api/admin/outcomes", json={"analysis_id": aid, "outcome_type": "default", "label": 1})
+    assert ro.status_code == 200 and ro.json()["recorded"] is True
+    assert client.get("/api/admin/validation").status_code == 200
+    cal = client.get("/api/admin/calibration")
+    assert cal.status_code == 200 and "calibrated" in cal.json()
