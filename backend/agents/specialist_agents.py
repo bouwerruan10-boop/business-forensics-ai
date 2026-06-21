@@ -627,9 +627,12 @@ You evaluate the business the way a credit committee would:
 - Funder fit for SA: commercial banks vs development funders (SEFA, IDC, NEF) vs alternative lenders
 
 Score the business 0-100 for credit readiness, assign a grade (A 80-100, B 60-79, C 40-59,
-D 20-39, F <20), and identify the specific barriers and strengths. Then recommend the funding
-products that realistically fit (e.g. asset finance, invoice discounting, term loan, overdraft,
-SEFA / IDC development funding, merchant cash advance).
+D 20-39, F <20), and identify the specific barriers and strengths. Then, as OBJECTIVE,
+ILLUSTRATIVE information, list the TYPES of funding a business with this profile typically
+qualifies for (e.g. asset finance, invoice discounting, term loan, overdraft, SEFA / IDC
+development funding, merchant cash advance). Describe product TYPES only — do NOT recommend a
+specific provider or state that a particular product is suitable for this client (this keeps
+the report objective information, not regulated financial advice under FAIS).
 
 End your analysis with a JSON block in this exact format:
 {

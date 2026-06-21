@@ -89,7 +89,8 @@ function ProductBadges({ products }) {
   if (!products?.length) return null
   return (
     <div>
-      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Recommended Funding Products</div>
+      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Funding options for this profile</div>
+      <p className="text-slate-600 text-[11px] mb-2 italic">Illustrative examples of product types this profile typically qualifies for — objective information, not a recommendation that any product is suitable for you, and not financial advice.</p>
       <div className="flex flex-wrap gap-2">
         {products.map((p, i) => (
           <span key={i} className="text-xs bg-[#0D2540] border border-gold/20 text-gold/80 rounded-full px-3 py-1">

@@ -7,7 +7,7 @@ human-in-the-loop) and POPIA (transparency) context.
 
 DECISION_SUPPORT = {
     "classification": "decision-support analytics",
-    "is_not": "a credit score, a creditworthiness determination, or a lending decision",
+    "is_not": "a credit score, a creditworthiness determination, a lending decision, or a recommendation that any particular financial product is suitable for you",
     "intended_use": ("Supports a registered credit provider's own NCA affordability assessment "
                      "and a human analyst's judgement. A person must make the final credit decision."),
     "nca": ("Not a substitute for the pre-agreement affordability assessment required by the "
@@ -15,6 +15,7 @@ DECISION_SUPPORT = {
             "not be used to enable reckless credit (s80)."),
     "popia": ("Processes business and financial information provided by the client; figures are "
               "extracted deterministically and shown with their source (POPIA, Act 4 of 2013)."),
+    "fais": ("Provides objective analysis and information only — not advice that any financial product is suitable for you (it falls under the FAIS Act s1(3)(a) analysis/objective-information exemption) and not an intermediary service."),
     "fairness": ("B-BBEE status and other transformation/ownership attributes are treated as "
                  "informational context only and never lower the Score."),
     "human_in_the_loop": True,
