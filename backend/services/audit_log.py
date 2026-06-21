@@ -10,6 +10,7 @@ Deterministic; never fatal to an analysis.
 """
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 
 from config import MODEL, PARSE_MODEL, MODEL_FALLBACKS, IMARA_ENGINE_VERSION
@@ -26,6 +27,15 @@ def _h(text: str) -> str:
     return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
 
 
+def _finite(v):
+    """Keep the record strict-JSON safe: drop non-finite numbers (NaN/inf); pass others through."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return v if math.isfinite(v) else None
+    return v
+
+
 def build_audit_record(report: dict, inputs_text: str = "") -> dict:
     report = report or {}
     figs = report.get("financial_figures")
@@ -38,10 +48,10 @@ def build_audit_record(report: dict, inputs_text: str = "") -> dict:
         "analysis_id": report.get("analysis_id"),
         "business_name": report.get("business_name"),
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "imara_score": report.get("imara_score"),
+        "imara_score": _finite(report.get("imara_score")),
         "imara_band": report.get("imara_band"),
         "imara_confidence": report.get("imara_confidence"),
-        "imara_completeness": report.get("imara_completeness"),
+        "imara_completeness": _finite(report.get("imara_completeness")),
         "financial_extraction_source": report.get("financial_extraction_source"),
         "figures_hash": _h(json.dumps(figs, sort_keys=True, default=str)),
         "inputs_hash": _h(inputs_text),

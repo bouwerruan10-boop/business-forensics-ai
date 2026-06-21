@@ -87,3 +87,14 @@ def test_audit_record_never_stores_raw_documents():
     assert "SECRET RAW BANK STATEMENT" not in str(rec)   # only hashes stored (POPIA)
     assert rec["inputs_hash"] and rec["figures_hash"]
     assert rec["models"]["model"] and "fallbacks" in rec["models"]
+
+
+def test_audit_record_json_safe_with_nonfinite():
+    """A report with NaN/inf score/figures must still yield a strict-JSON-safe audit record."""
+    import json, math
+    from services.audit_log import build_audit_record
+    for rep in ({"imara_score": float("nan"), "imara_completeness": float("inf"),
+                 "financial_figures": {"revenue": float("inf")}},
+                {"imara_score": 1e400, "business_name": "X"}):
+        rec = build_audit_record(rep, "inputs")
+        json.dumps(rec, allow_nan=False)   # raises if a non-finite leaked through
