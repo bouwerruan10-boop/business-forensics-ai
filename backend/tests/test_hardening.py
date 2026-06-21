@@ -1312,3 +1312,15 @@ def test_score_calibration():
     pd20, pd80 = c["example_pd"]["20"], c["example_pd"]["80"]
     assert pd20 > pd80   # higher score -> lower probability of distress
     assert calibrate(_synth_pairs(n=10))["calibrated"] is False   # AHP prior stands
+
+
+def test_distress_handles_string_figures():
+    """Pressure-test fix: figures arriving as strings (possible from AI extraction)
+    must not 500 the Z'' endpoint."""
+    from services.distress_score import altman_z_em
+    figs = {"total_assets": "5,000,000", "total_liabilities": "2,000,000", "equity": "3,000,000",
+            "current_assets": "2,000,000", "current_liabilities": "800,000",
+            "retained_earnings": "1,500,000", "operating_profit": "900,000"}
+    r = altman_z_em(figs, "C")
+    assert r["available"] and r["z_score"] is not None
+    assert altman_z_em({"total_assets": "n/a", "equity": "unknown"}, "C")["available"] is False

@@ -49,13 +49,25 @@ def altman_z_em(figures: dict, imara_band: str = "") -> dict:
     (e.g. only a P&L was uploaded) — Imara never fabricates the missing items.
     """
     f = figures or {}
-    ta = f.get("total_assets")
-    tl = f.get("total_liabilities")
-    eq = f.get("equity")
-    re_ = f.get("retained_earnings")
-    ebit = f.get("operating_profit")
-    ca = f.get("current_assets")
-    cl = f.get("current_liabilities")
+
+    def _n(v):
+        """Coerce to float defensively (handles strings like '1,000', None, junk)."""
+        if v is None:
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        try:
+            return float(str(v).replace(",", "").replace(" ", "").replace("R", "").replace("$", ""))
+        except (ValueError, TypeError):
+            return None
+
+    ta = _n(f.get("total_assets"))
+    tl = _n(f.get("total_liabilities"))
+    eq = _n(f.get("equity"))
+    re_ = _n(f.get("retained_earnings"))
+    ebit = _n(f.get("operating_profit"))
+    ca = _n(f.get("current_assets"))
+    cl = _n(f.get("current_liabilities"))
 
     # Fill what the accounting identity A = L + E lets us derive (no fabrication).
     if tl is None and ta is not None and eq is not None:
