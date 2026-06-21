@@ -496,6 +496,38 @@ def generate_html_report(report: dict) -> str:
           <p class="disclaimer">Indicative estimates. Engage a registered valuator before transacting.</p>
         </div>"""
 
+    # ── Tax Me If You Can — legal tax savings ──────────────────────
+    tax_html = ""
+    _tx = report.get("tax_optimization") or {}
+    if _tx.get("available"):
+        _tcur = _tx.get("currency", "ZAR")
+        _ttotal = _tx.get("total_saving_high", 0)
+
+        def _tesc(t):
+            return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        _trows = ""
+        for _o in _tx.get("opportunities", []):
+            if _o.get("quantified"):
+                _amt = f'<span style="color:{GREEN};font-weight:700">save {_tcur} {_o.get("est_saving_high", 0):,.0f}</span>'
+            elif _o.get("est_saving_high"):
+                _amt = f'<span style="color:{AMBER}">up to {_tcur} {_o.get("est_saving_high", 0):,.0f} (unconfirmed)</span>'
+            else:
+                _amt = f'<span style="color:{GRAY}">potential</span>'
+            _trows += (f'<div style="padding:8px 0;border-bottom:1px solid #eee">'
+                       f'<strong>{_tesc(_o.get("name"))}</strong> '
+                       f'<em style="color:{GRAY}">[{_tesc(_o.get("eligible"))}]</em> &nbsp; {_amt}<br>'
+                       f'<span style="font-size:12px;color:{DARK}">{_tesc(_o.get("basis"))}</span><br>'
+                       f'<span style="font-size:12px;color:{GRAY}">Action: {_tesc(_o.get("action"))}</span></div>')
+        tax_html = f"""
+        <div class="section-block">
+          <h2 class="section-title">TAX ME IF YOU CAN \u2014 LEGAL TAX SAVINGS</h2>
+          <p style="font-size:20px;font-weight:800;color:{GREEN};margin:4px 0">Estimated quantifiable annual saving: {_tcur} {_ttotal:,.0f}</p>
+          <p style="font-size:13px;color:{NAVY}">{_tesc(_tx.get("summary", ""))}</p>
+          {_trows}
+          <p style="font-size:11px;color:{GRAY};font-style:italic;margin-top:8px">{_tesc(_tx.get("disclaimer", ""))}</p>
+        </div>"""
+
     # ── CSS ────────────────────────────────────────────────────────
     css = f"""
     :root {{
@@ -851,6 +883,7 @@ def generate_html_report(report: dict) -> str:
 <!-- ── VALUATION ──────────────────────────────────────────── -->
 <div id="page-valuation" class="page">
   {val_html or '<div class="section-block"><p>Valuation data not available. Provide audited financials.</p></div>'}
+  {tax_html}
 </div>
 
 <!-- ── FORECAST ───────────────────────────────────────────── -->

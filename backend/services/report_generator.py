@@ -143,6 +143,11 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
         _fraud_risk_section(story, report)
         story.append(PageBreak())
 
+    # ── Tax Me If You Can — legal tax savings (when applicable) ────
+    if (report.get("tax_optimization") or {}).get("available"):
+        _tax_optimisation_section(story, report)
+        story.append(PageBreak())
+
     # ── Roadmap + closing ─────────────────────────────────────────
     _roadmap_section(story, report)
     _closing_section(story, report)
@@ -971,6 +976,45 @@ def _style(**kwargs):
         **kwargs,
     )
     return ps
+
+
+def _tax_optimisation_section(story, report):
+    """Tax Me If You Can — legal SA tax-optimisation savings (deterministic)."""
+    tx = report.get("tax_optimization") or {}
+    if not tx.get("available"):
+        return
+    _section_header(story, "TAX ME IF YOU CAN  -  LEGAL TAX SAVINGS")
+    cur = tx.get("currency", "ZAR")
+    muted = colors.HexColor("#5A6B7A")
+
+    def _fv(v):
+        v = v or 0
+        if v >= 1_000_000:
+            return "{} {:.1f}M".format(cur, v / 1_000_000)
+        if v >= 1_000:
+            return "{} {:.0f}K".format(cur, v / 1_000)
+        return "{} {:.0f}".format(cur, v)
+
+    def _esc(t):
+        return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    story.append(_para("Estimated quantifiable annual saving: <b>{}</b>".format(_fv(tx.get("total_saving_high", 0))),
+                       _style(fontSize=14, fontName="Helvetica-Bold", textColor=GREEN)))
+    story.append(_para(_esc(tx.get("summary", "")), _style(fontSize=9, textColor=NAVY)))
+    story.append(Spacer(1, 0.3 * cm))
+    for o in tx.get("opportunities", []):
+        if o.get("quantified"):
+            amt = "save " + _fv(o.get("est_saving_high"))
+        elif o.get("est_saving_high"):
+            amt = "up to " + _fv(o.get("est_saving_high")) + " (unconfirmed)"
+        else:
+            amt = "potential"
+        story.append(_para("<b>{}</b>  [{}]  -  {}".format(_esc(o.get("name")), _esc(o.get("eligible")), amt),
+                           _style(fontSize=9.5, fontName="Helvetica-Bold", textColor=NAVY)))
+        story.append(_para(_esc(o.get("basis")), _style(fontSize=8.5, textColor=muted)))
+        story.append(_para("Action: " + _esc(o.get("action")), _style(fontSize=8.5, textColor=muted)))
+        story.append(Spacer(1, 0.15 * cm))
+    story.append(_para(_esc(tx.get("disclaimer", "")), _style(fontSize=7.5, textColor=muted)))
 
 
 def _section_header(story, title: str):
