@@ -8,6 +8,7 @@ never feeds the Imara Score (decision-support / opportunity only). Feeds the Act
 Simulator's opex lever so the user can see the projected Score uplift if they act.
 """
 
+import re
 from services.expense_lines import extract_expense_lines
 from services.supplier_catalog import category_reference
 
@@ -46,13 +47,29 @@ def run_supplier_benchmark(financial_text: str, revenue, profile=None, bank_sign
         # ── Layer B: lower-cost supplier substitution ──
         providers = ref.get("low_cost_providers") or []
         sav = ref.get("typical_savings_pct")
-        incumbent = profile.get("banking_partner") if (cat == "bank_charges" and banking_partner) else None
+        raw_low = (line.get("raw") or "").lower()
+
+        def _match(names):
+            for n in (names or []):
+                if re.search(r"\b" + re.escape(n.lower()) + r"\b", raw_low):
+                    return n
+            return None
+
+        # Incumbent: the banking partner from the profile, else a higher-cost provider
+        # named in the expense line itself (e.g. "Telephone Vodacom contract").
+        detected = _match(ref.get("higher_cost_incumbents"))
+        if cat == "bank_charges" and banking_partner:
+            incumbent = banking_partner
+            incumbent_higher = any(h in banking_partner.lower() for h in ref.get("higher_cost_incumbents", []))
+        else:
+            incumbent = detected
+            incumbent_higher = detected is not None
+        already_low = _match(ref.get("low_cost_providers")) is not None   # already on a cheap provider
+
         save_low = save_high = None
         confidence = "low"
-        if line.get("substitutable") and providers and sav:
+        if line.get("substitutable") and providers and sav and not already_low:
             sl, sh = sav
-            incumbent_higher = bool(incumbent) and any(
-                h in incumbent.lower() for h in ref.get("higher_cost_incumbents", []))
             if incumbent_higher:
                 save_low, save_high, confidence = round(sl * spend, 2), round(sh * spend, 2), "medium"
             elif status == "above":
@@ -77,12 +94,24 @@ def run_supplier_benchmark(financial_text: str, revenue, profile=None, bank_sign
 
     opportunities.sort(key=lambda o: (o["est_saving_high"] or o["over_benchmark"] or 0, o["spend"]), reverse=True)
 
+    # Realism cap: total identified savings shouldn't exceed a sane share of total spend
+    # (a generally-bloated cost base must not produce an absurd total / Score jump).
+    total_spend = sum(float(l["amount"]) for l in lines)
+    capped = False
+    _cap = 0.25 * total_spend
+    if _cap > 0 and total_high > _cap:
+        _ratio = _cap / total_high if total_high else 1.0
+        total_low = round(total_low * _ratio, 2)
+        total_high = round(_cap, 2)
+        capped = True
+
     return {
         "available": True,
         "total_expense_lines": len(lines),
         "total_est_saving_low": round(total_low, 2),
         "total_est_saving_high": round(total_high, 2),
         "total_est_saving_pct_of_revenue": round(total_high / revenue * 100, 2) if revenue else None,
+        "capped_for_realism": capped,
         "opportunities": opportunities,
         "note": ("Deterministic spend-vs-benchmark + lower-cost-supplier suggestions. Savings are "
                  "indicative ranges off your actual spend at EQUIVALENT service — verify current quotes."),

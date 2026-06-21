@@ -39,18 +39,32 @@ _EXPENSE_LABELS = [
 _AMOUNT = re.compile(r"-?\(?\s*(?:r|zar|\$)?\s*\d{1,3}(?:[ ,]\d{3})*(?:\.\d{2})?\)?", re.I)
 # lines that are totals/subtotals/section headers — don't double-count
 _SKIP = re.compile(r"\btotal\b|\bsub[- ]?total\b|gross profit|net profit|operating profit|\brevenue\b|\bturnover\b|cost of sales", re.I)
+# Stop extracting at the notes section — only the face of the income statement, so a
+# category broken down in the notes is not double-counted against its summary line.
+_NOTES_HEADER = re.compile(r"notes to the (?:annual |consolidated )?(?:financial statements|accounts)", re.I)
 
 
 def _amount(line: str):
+    """The line's CURRENT-period amount. Comparative statements show current + prior
+    year side by side (current is conventionally the first/left data column), so we
+    take the FIRST money-like value, not the largest. 'Money-like' = has a thousands
+    separator/decimal OR is >= 100, which also filters note-reference integers
+    (e.g. the '5' in 'Note 5 Telephone 18,000')."""
     vals = []
     for tok in _AMOUNT.findall(line):
         digits = re.sub(r"[^\d.]", "", tok.replace(" ", ""))
-        if digits and digits != ".":
-            try:
-                vals.append(float(digits))
-            except ValueError:
-                pass
-    return max(vals) if vals else None  # the line amount (largest number on the row)
+        if not digits or digits == ".":
+            continue
+        try:
+            v = float(digits)
+        except ValueError:
+            continue
+        money_like = ("," in tok) or ("." in digits) or v >= 100
+        vals.append((v, money_like))
+    if not vals:
+        return None
+    money = [v for (v, m) in vals if m]
+    return money[0] if money else vals[0][0]
 
 
 def extract_expense_lines(text: str) -> list:
@@ -59,7 +73,11 @@ def extract_expense_lines(text: str) -> list:
     order = []
     for ln in text.splitlines():
         s = ln.strip()
-        if not s or _SKIP.search(s):
+        if not s:
+            continue
+        if _NOTES_HEADER.search(s):
+            break  # face of the statement only
+        if _SKIP.search(s):
             continue
         low = s.lower()
         for key, label, pats, sub in _EXPENSE_LABELS:
@@ -68,7 +86,12 @@ def extract_expense_lines(text: str) -> list:
                 if amt is None or amt <= 0:
                     break
                 if key in agg:
-                    agg[key]["amount"] += amt
+                    # Keep the LARGEST single row for a category (the face/summary line),
+                    # NOT the sum — avoids double-counting a summary line plus its notes
+                    # breakdown. (Trade-off: genuinely separate same-category rows undercount.)
+                    if amt > agg[key]["amount"]:
+                        agg[key]["amount"] = amt
+                        agg[key]["raw"] = s[:80]
                 else:
                     agg[key] = {"category": key, "label": label, "amount": amt,
                                 "substitutable": sub, "raw": s[:80]}

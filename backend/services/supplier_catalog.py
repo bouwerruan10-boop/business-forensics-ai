@@ -38,7 +38,7 @@ CATALOG = {
         "benchmark_pct": (0.3, 1.5),
         "equivalence": "Business voice + data / fibre line of comparable speed and cap.",
         "low_cost_providers": ["Afrihost", "Webafrica", "Rain", "Telkom LIT", "MTN Business deals"],
-        "higher_cost_incumbents": ["vodacom", "mtn contract"],
+        "higher_cost_incumbents": ["vodacom", "mtn", "telkom mobile"],
         "typical_savings_pct": (0.15, 0.40),
     },
     "fuel": {
@@ -51,8 +51,8 @@ CATALOG = {
     "insurance": {
         "benchmark_pct": (0.3, 1.5),
         "equivalence": "Comparable business cover (assets, liability, BI) and excess structure — re-broke, don't just drop cover.",
-        "low_cost_providers": ["King Price Business", "Naked", "OUTsurance Business", "Hollard", "PSG / broker re-quote"],
-        "higher_cost_incumbents": [],
+        "low_cost_providers": ["King Price Business", "Naked", "OUTsurance Business", "PSG / broker re-quote"],
+        "higher_cost_incumbents": ["santam", "old mutual", "hollard", "momentum"],
         "typical_savings_pct": (0.10, 0.30),
     },
     "accounting_software": {

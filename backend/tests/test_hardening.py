@@ -1219,3 +1219,54 @@ def test_supplier_live_disabled_by_default():
     assert fetch_live_pricing("bank_charges", ["TymeBank"])["enabled"] is False
     out = augment({"available": True, "opportunities": []})
     assert out["live"]["enabled"] is False   # no-op, never breaks
+
+
+# ── Supplier benchmarking robustness fixes ──
+
+def test_expense_lines_current_year_and_no_double_count():
+    from services.expense_lines import extract_expense_lines
+    # comparative columns: must take the CURRENT-year (first) figure, not the largest
+    two = extract_expense_lines("Telephone 28,000 35,000\nBank charges 62,000 58,000\n")
+    amt = {r["category"]: r["amount"] for r in two}
+    assert amt["telephone_data"] == 28000 and amt["bank_charges"] == 62000
+    # summary line + notes breakdown must NOT double-count (keep the largest single row)
+    dd = extract_expense_lines("Telephone & data 31,200\nNote 5 Telephone 18,000\nNote 5 Data 13,200\n")
+    tel = next(r for r in dd if r["category"] == "telephone_data")
+    assert tel["amount"] == 31200
+
+
+def test_supplier_incumbent_detection_and_suppression():
+    from services.supplier_benchmark import run_supplier_benchmark
+    r = run_supplier_benchmark(
+        "Telephone Vodacom contract 95,000\nInsurance Santam premium 80,000\nBank charges TymeBank 9,000\n",
+        4_800_000, profile={})
+    by = {o["category"]: o for o in r["opportunities"]}
+    assert by["telephone_data"]["incumbent"] == "vodacom" and by["telephone_data"]["est_saving_low"] > 0
+    assert by["insurance"]["incumbent"] == "santam" and by["insurance"]["est_saving_low"] > 0
+    # already on a low-cost provider -> no switch pushed
+    assert by["bank_charges"]["est_saving_low"] is None
+
+
+def test_supplier_total_savings_realism_cap():
+    from services.supplier_benchmark import run_supplier_benchmark
+    # wildly above-benchmark lines -> total must be capped at <= 25% of total spend
+    stmt = "Bank charges 400,000\nCard machine merchant fees 350,000\nTelephone 300,000\nInsurance 250,000\n"
+    r = run_supplier_benchmark(stmt, 4_800_000, profile={"banking_partner": "FNB"})
+    total_spend = sum(o["spend"] for o in r["opportunities"])
+    assert r["total_est_saving_high"] <= 0.25 * total_spend + 1
+    assert "capped_for_realism" in r
+
+
+def test_simulator_opex_double_count_capped():
+    from services.simulation import apply_actions
+    report = {"currency": "ZAR", "industry_key": "manufacturing",
+              "financial_figures": {"revenue": 4_800_000, "cogs": 3_480_000, "gross_profit": 1_320_000,
+                                    "operating_profit": 300_000, "net_profit": 180_000},
+              "financial_ratios": {"operating_margin": {"value": 6.25, "benchmark": 12.0}},
+              "financial_fundamentals_score": 45,
+              "imara_components": [{"label": "Profitability", "weight": 0.25, "value": 45}],
+              "supplier_benchmark": {"available": True, "total_est_saving_low": 18_300, "total_est_saving_high": 42_000}}
+    s_opex = apply_actions(report, [{"id": "opex", "intensity": 1.0}], "expected")["projected"]["imara_score"]
+    s_both = apply_actions(report, [{"id": "opex", "intensity": 1.0}, {"id": "supplier_switch", "intensity": 1.0}],
+                           "expected")["projected"]["imara_score"]
+    assert s_both <= s_opex + 1   # combined opex reduction capped at max(), not summed

@@ -191,6 +191,14 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
         applied.append({"id": a["id"], "label": a["label"], "driver": a["driver"],
                         "applied": round(mag, 2), "unit": a.get("unit")})
 
+    # Avoid double-counting overlapping opex levers: the generic "Trim overheads" and the
+    # grounded "Switch suppliers" both reduce opex, and supplier savings are a SUBSET of
+    # overhead reduction (not additive). Cap their combined reduction at the largest single
+    # opex-reduction action's max, so selecting both combines as max(), not sum().
+    _opex_maxes = [a.get("max", 0) for a in catalog.values() if a.get("driver") == "opex_reduction_pct"]
+    if "opex_reduction_pct" in drivers and _opex_maxes:
+        drivers["opex_reduction_pct"] = min(drivers["opex_reduction_pct"], max(_opex_maxes))
+
     base_figs, _ = _project(figs, {}, 1.0)
     proj_figs, cash_released = _project(figs, drivers, capture)
     # Tax realism + baseline consistency: baseline net = the report's actual net;
