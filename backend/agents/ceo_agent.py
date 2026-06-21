@@ -274,6 +274,8 @@ Return ONLY valid JSON. No explanation.
             "quantify it precisely. If the data reveals a different root cause, explain why.\n"
             if memory.primary_concern else ""
         )
+        from services.agent_consistency import consistency_block
+        corrob = consistency_block([f.__dict__ for f in memory.findings])
         prompt = f"""
 You are the Chief Executive AI Consultant reviewing findings from 15 specialist agents
 for {memory.business_name} (industry: {memory.industry}, annual revenue: {cur} {rev:,.0f}).
@@ -284,6 +286,8 @@ FRAUD RISK LEVEL: {memory.fraud_risk_level.upper()}
 12-MONTH REVENUE FORECAST (base case): {cur} {memory.forecast_base_12m:,.0f}
 {concern_block}
 Your task: synthesise all findings into a coherent strategic picture.
+
+{corrob}
 
 ━━━ ALL AGENT FINDINGS ━━━
 {memory.get_all_findings_text()[:6000]}

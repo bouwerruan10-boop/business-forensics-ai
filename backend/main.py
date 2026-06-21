@@ -521,6 +521,17 @@ def report_cashflow(analysis_id: str):
     return result.get("cashflow_13week") or cashflow_from_report(result, None)
 
 
+@app.get("/api/report/{analysis_id}/consistency")
+def report_consistency(analysis_id: str):
+    """Deterministic cross-agent corroboration - which issues multiple independent
+    specialist agents flagged (a confidence signal), and where they diverge."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.agent_consistency import analyze_consistency
+    return result.get("cross_agent_consistency") or analyze_consistency(result.get("all_findings_ranked") or [])
+
+
 @app.get("/api/report/{analysis_id}/bank-signals")
 def report_bank_signals(analysis_id: str):
     """Deterministic bank-statement cash-flow signals (bounced debit orders, overdraft,
@@ -920,6 +931,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["supplier_benchmark"] = run_supplier_benchmark(memory.uploaded_financial_text, _rev, profile, report.get("bank_signals"))
             from services.cashflow_13week import from_report as cashflow_from_report
             report["cashflow_13week"] = cashflow_from_report(report, memory)
+            from services.agent_consistency import analyze_consistency
+            report["cross_agent_consistency"] = analyze_consistency(report.get("all_findings_ranked") or [])
 
             report = finite_safe(report)  # root-cause: strip NaN/inf once -> every consumer + the stored JSON is safe
             report["analysis_id"] = analysis_id  # ensure the report (and audit record) carry their id
@@ -1194,6 +1207,8 @@ def _enrich_demo():
     DEMO_REPORT["distress_score"] = altman_z_em(figs, "D")
     from services.cashflow_13week import project_13week as _proj13
     DEMO_REPORT["cashflow_13week"] = _proj13(figs, vat_registered=True)
+    from services.agent_consistency import analyze_consistency as _consist
+    DEMO_REPORT["cross_agent_consistency"] = _consist(DEMO_REPORT.get("all_findings_ranked") or [])
     DEMO_REPORT["supplier_benchmark"] = run_supplier_benchmark(
         "Bank charges 185,000\nCard machine merchant fees 430,000\nTelephone and data 96,000\n"
         "Insurance 142,000\nFuel 78,000\nAccounting software Pastel 36,000\n",

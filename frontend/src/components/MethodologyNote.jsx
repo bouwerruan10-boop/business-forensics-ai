@@ -102,6 +102,29 @@ export default function MethodologyNote({ report }) {
         </div>
       )}
 
+      {report.cross_agent_consistency?.available && (
+        <div className="mb-4">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
+            Cross-agent corroboration
+            <InfoTip label="Why it matters" text="Issues independently flagged by several specialist agents are the most credible. This is a deterministic cross-check, not an extra AI opinion, and it does not change the Imara Score." />
+          </div>
+          <p className="text-slate-300 text-xs mb-2 leading-relaxed">{report.cross_agent_consistency.summary}</p>
+          <div className="space-y-1.5">
+            {(report.cross_agent_consistency.corroborated || []).slice(0, 5).map((c, i) => (
+              <div key={i} className="flex items-start justify-between gap-3 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-1.5">
+                <span className="text-white text-xs font-medium">{c.topic}</span>
+                <span className="shrink-0 text-[10px] text-slate-400">{c.agent_count} agents · <span className={c.severity === 'critical' ? 'text-red-400' : c.severity === 'high' ? 'text-amber-400' : 'text-slate-300'}>{c.severity}</span></span>
+              </div>
+            ))}
+          </div>
+          {Array.isArray(report.cross_agent_consistency.diverging) && report.cross_agent_consistency.diverging.length > 0 && (
+            <p className="text-amber-300/80 text-[11px] mt-2 leading-relaxed">
+              ⚠ Severity divergence to reconcile: {report.cross_agent_consistency.diverging.map(d => d.topic).join(', ')}.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="text-slate-400 text-xs leading-relaxed">
         <span className="text-slate-300 font-medium">What this is — and isn&apos;t.</span> This report is decision-support, not
         a substitute for a registered auditor, business valuator, or tax practitioner.
