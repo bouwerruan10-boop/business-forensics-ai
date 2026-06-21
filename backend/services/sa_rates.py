@@ -1,0 +1,60 @@
+"""
+sa_rates.py — single dated source of truth for South African statutory + macro rates.
+
+Update the numbers here when SARB moves rates or the Budget changes a threshold;
+every agent that injects sa_rates_block() picks up the change automatically, so no
+rate ever has to be hunted down inside a prompt string again.
+"""
+
+AS_OF = "2026-06-21"
+AS_OF_NOTE = "SARB 28 May 2026 (+25bps) and Budget 2026 (effective 1 April 2026)"
+
+# ── Interest / lending ──
+REPO_RATE = 7.00            # %  SARB repo rate
+PRIME_RATE = 10.50          # %  prime = repo + 3.5% spread
+SARS_INTEREST_RATE = 10.50  # %  interest on outstanding SARS debt (repo + 3.5%)
+
+# ── VAT & turnover-based thresholds (ZAR) ──
+VAT_RATE = 15.0
+VAT_COMPULSORY_THRESHOLD = 2_300_000   # raised from R1,000,000 on 1 April 2026
+VAT_VOLUNTARY_THRESHOLD = 120_000      # raised from R50,000 on 1 April 2026
+TURNOVER_TAX_LIMIT = 2_300_000         # micro-business turnover tax ceiling
+SBC_GROSS_INCOME_CEILING = 20_000_000  # Section 12E Small Business Corporation
+
+# ── B-BBEE turnover bands (generic codes; some sector codes differ) ──
+BBBEE_EME_CEILING = 10_000_000
+BBBEE_QSE_CEILING = 50_000_000
+
+# ── SME debt pricing assumptions ──
+SME_DEBT_MARGIN_LOW = 3.0   # prime + 3%
+SME_DEBT_MARGIN_HIGH = 5.0  # prime + 5%
+STRESS_BPS = 200            # +200bps rate-shock stress test
+
+
+def sme_debt_rate_range():
+    """(low, high) all-in SME debt rate = prime + 3% .. prime + 5%."""
+    return (PRIME_RATE + SME_DEBT_MARGIN_LOW, PRIME_RATE + SME_DEBT_MARGIN_HIGH)
+
+
+def sa_rates_block() -> str:
+    """Prompt-injectable block of current SA rates/thresholds for any agent."""
+    lo, hi = sme_debt_rate_range()
+    return (
+        "CURRENT SA RATES & STATUTORY THRESHOLDS (as of {asof} - {note}). "
+        "Use these exact figures; do NOT substitute remembered values:\n"
+        "- SARB repo rate: {repo:.2f}%  |  Prime lending rate: {prime:.2f}%\n"
+        "- Typical SME debt pricing: prime + {ml:.0f}-{mh:.0f}% = {lo:.2f}-{hi:.2f}%; "
+        "stress-test a +{bps}bps rise\n"
+        "- SARS interest on outstanding debt: {sars:.2f}% p.a.\n"
+        "- VAT: standard rate {vat:.0f}%; COMPULSORY registration above R{vatc:,.0f} "
+        "turnover per 12 months; voluntary from R{vatv:,.0f} (both raised 1 April 2026)\n"
+        "- Turnover-tax (micro) ceiling: R{tt:,.0f}; SBC (Section 12E) gross-income "
+        "ceiling: R{sbc:,.0f}\n"
+        "- B-BBEE: EME below R{eme:,.0f}; QSE R{eme:,.0f}-R{qse:,.0f} turnover"
+    ).format(
+        asof=AS_OF, note=AS_OF_NOTE, repo=REPO_RATE, prime=PRIME_RATE,
+        ml=SME_DEBT_MARGIN_LOW, mh=SME_DEBT_MARGIN_HIGH, lo=lo, hi=hi, bps=STRESS_BPS,
+        sars=SARS_INTEREST_RATE, vat=VAT_RATE, vatc=VAT_COMPULSORY_THRESHOLD,
+        vatv=VAT_VOLUNTARY_THRESHOLD, tt=TURNOVER_TAX_LIMIT, sbc=SBC_GROSS_INCOME_CEILING,
+        eme=BBBEE_EME_CEILING, qse=BBBEE_QSE_CEILING,
+    )

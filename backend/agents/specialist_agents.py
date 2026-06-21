@@ -90,11 +90,15 @@ what decisions it corrupts, and what to do to fix it.
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
         data = business_data.get('accounting', business_data.get('financial', {}))
+        from services.forensic_scan import forensic_scan_block
+        fscan = forensic_scan_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{fscan}
 
 ACCOUNTING RECORDS:
 {json.dumps(data, indent=2)[:4000]}
@@ -111,13 +115,21 @@ team to make a wrong decision based on these numbers.
 # ─────────────────────────────────────────────
 # 3. AUDITOR AGENT
 # ─────────────────────────────────────────────
+def _benford_count(memory) -> int:
+    """Approx count of transaction-level figures available for a Benford test."""
+    import re
+    text = str(getattr(memory, "uploaded_financial_text", "") or "") + "\n" + \
+           str(getattr(memory, "uploaded_bank_text", "") or "")
+    return len(re.findall(r"\d[\d,]{2,}(?:\.\d+)?", text))
+
+
 class AuditorAgent(BaseAgent):
     name = "Auditor Agent"
     system_prompt = """You are a forensic auditor and internal controls specialist.
 You have investigated over 200 businesses and found fraud or major control failures in 60% of them.
 
 You examine:
-- Benford's Law violations (unusual digit distributions in financial data)
+- Benford's Law deviations - ONLY where there are enough transaction-level records for the test to be valid (see the data-sufficiency note); treat Benford as a filter that flags accounts for review, never as proof of fraud
 - Vendor concentration: payments concentrated in few suppliers without clear justification
 - Expense approval bypass indicators (round numbers, weekend transactions, duplicate amounts)
 - Segregation of duties failures: same person approving and executing payments
@@ -126,17 +138,26 @@ You examine:
 - Ghost employees or inflated headcount costs
 - Asset existence: equipment on books that may not exist
 
+BENFORD GUARD: Benford's Law requires a large, varied dataset (rule of thumb >= 300 transaction-level figures, each leading digit well represented). On small SME datasets it produces false positives from natural variation. If the data-sufficiency note reports fewer than 300 figures, do NOT raise any Benford finding - say the data is insufficient. Any Benford flag must be paired with a second corroborating signal before it can be rated high or critical.
+
 Assume nothing is correct until the data confirms it.
 Quantify the maximum exposure if each risk materialises.
 """ + FINDING_RULES
 
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
+        benford_n = _benford_count(memory)
+        from services.forensic_scan import forensic_scan_block
+        fscan = forensic_scan_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+BENFORD DATA SUFFICIENCY: ~{benford_n} transaction-level figures detected in the financial/bank text. Benford's Law is reliable ONLY when this count is >= 300 with each leading digit well represented. If below 300, state "insufficient data for a reliable Benford test" and do NOT raise any Benford finding.
+
+{fscan}
 
 FINANCIAL DATA FOR AUDIT REVIEW:
 {json.dumps(business_data.get('financial', {}), indent=2)[:3000]}
@@ -551,6 +572,8 @@ End your analysis with a JSON block in this exact format:
         benchmark_block = self._build_benchmark_block(memory)
         financial_text = memory.uploaded_financial_text or ""
         bank_text = memory.uploaded_bank_text or ""
+        from services.forensic_scan import forensic_scan_block
+        fscan = forensic_scan_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
@@ -565,6 +588,8 @@ BANK STATEMENTS:
 
 ALL PRIOR AGENT FINDINGS (look for corroborating anomalies):
 {memory.get_all_findings_text()[:2000]}
+
+{fscan}
 
 Assess fraud and anomaly risk for this business. Flag every red flag you can evidence from
 the data, quantify the potential exposure in ZAR, and recommend the control needed.
@@ -649,6 +674,8 @@ End your analysis with a JSON block in this exact format:
         financial_text = memory.uploaded_financial_text or ""
         bank_text = memory.uploaded_bank_text or ""
         banking = f"Primary Bank: {memory.banking_partner or 'not provided'} | Report audience: {memory.report_audience}"
+        from services.sa_rates import sa_rates_block
+        rates = sa_rates_block()
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
@@ -657,6 +684,8 @@ BUSINESS CONTEXT:
 
 BANKING PROFILE:
 {banking}
+
+{rates}
 
 FINANCIAL RECORDS:
 {financial_text[:3000]}
@@ -816,6 +845,8 @@ You are direct and specific. You cite exact act sections, form numbers, and SARS
 
         from services.sa_knowledge import retrieve_grounding
         grounding = retrieve_grounding(memory, "tax")
+        from services.sa_rates import sa_rates_block
+        rates_block = sa_rates_block()
         prompt = f"""
 {grounding}
 
@@ -831,10 +862,12 @@ CIPC Number: {memory.cipc_number or 'not provided'}
 DATA PROVIDED:
 {data_context}
 
+{rates_block}
+
 TASK — Conduct a full South African tax compliance review. Evaluate:
 
 1. VAT COMPLIANCE (Act 89/1991)
-   - Is the business correctly registered for VAT (mandatory above R1M turnover)?
+   - Is the business correctly registered for VAT (compulsory above R2.3M turnover/12m since 1 April 2026, up from R1M; voluntary from R120k)?
    - Input/output tax balance — is the effective VAT rate reasonable for this industry?
    - Late submission risk — any pattern of missed VAT201 deadlines?
    - Zero-rated vs standard-rated classification errors?
@@ -861,7 +894,7 @@ TASK — Conduct a full South African tax compliance review. Evaluate:
 
 6. SARS OUTSTANDING OBLIGATIONS
    - Any visible indicators of outstanding returns or SARS debt?
-   - Interest accrues at 10.25% p.a. on outstanding amounts (repo rate + 3.5%)
+   - Interest accrues at 10.5% p.a. on outstanding amounts (repo 7.0% + 3.5%; see the current-rates block)
 
 For each issue found, calculate the estimated penalty/liability in ZAR and state the specific SARS form or action required to remedy it.
 """
