@@ -242,3 +242,27 @@ intake → analyzing → done
 **Tax (SATaxAgent):** VAT Act 89/1991, Income Tax Act 58/1962 (IT14), EMP201/PAYE/SDL, IRP6 provisional tax, tax clearance certificate, SARS debt management.
 
 **Legal (SALegalAgent):** Companies Act 71/2008, BBBEE Act 53/2003, POPIA Act 4/2013, LRA 66/1995, CPA 68/2008, NCA 34/2005, CIPC compliance, beneficial ownership register.
+
+---
+
+## Coding Disciplines — How To Work In This Repo
+
+These bind every session (they formalise what's already practised here, plus lessons paid for in bugs). The CI ratchet enforces some; the rest are on you.
+
+**The four rules.**
+1. **Think before coding.** State assumptions, surface ambiguity, no silent guesses.
+2. **Simplicity first.** The minimum code that works. No speculative abstractions or future-proofing not asked for.
+3. **Surgical changes.** Touch only what the task requires — no drive-by refactors, renames, or unrequested comments.
+4. **Goal-driven.** Define "done" and a verification *before* starting; verify *before* stopping.
+
+**Standing disciplines (Imara-specific).**
+- **Cleanup is part of "done."** After every feature, audit + prune the mess it added (dead code, duplication, unused components). Verify each candidate with tools (`ruff`, `vulture`, `jscpd`) before deleting — never on the model's say-so. CI runs `ruff --select F401,F811,F841` as a hard gate + `vulture` advisory.
+- **Deterministic-first / anti-hallucination DNA.** Numbers are computed in code; the LLM only narrates. Always verify narration against the computed source (faithfulness + prose verifiers). Do not let an agent invent a figure.
+- **Research before building.** Don't add agents, panels, or features for their own sake. The bottleneck is evidence + distribution, not surface area (see `IMARA_IMPROVEMENT_ROADMAP.md`).
+- **Pressure-test every change.** Adversarially probe new code (malformed/None/hostile/huge/unicode input, injection) and lock the result with a regression test before considering it done.
+- **Don't ship unverified LLM-behaviour changes.** Anything that changes real Anthropic API behaviour can't be judged in the MOCK_MODE sandbox — gate it on a live A/B (`run_live_verify.bat`).
+
+**Paid-in-bugs lessons.**
+- `dict.get(key, default)` does **not** return the default when the key exists with a `None` value — coerce numeric/iterable fields with `or 0` / `or []` (v1.31).
+- Edit/Write tools silently **truncate** large files on the Windows mount — edit large `.py`/`.md` files with bash heredoc or python string-replace, then `ast.parse` / line-count to verify (Critical Constraint #1).
+
