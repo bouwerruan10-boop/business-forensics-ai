@@ -58,3 +58,5 @@ BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "7"))  # rotation: keep N most recent
 # Opt-in. When enabled, analyses older than RETENTION_DAYS are auto-deleted daily.
 RETENTION_ENABLED = os.getenv("RETENTION_ENABLED", "false").lower() in ("true", "1", "yes")
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "365"))
+# Opt-in backend enforcement: when on, /api/analyze rejects requests without consent.
+REQUIRE_CONSENT = os.getenv("REQUIRE_CONSENT", "false").lower() in ("true", "1", "yes")

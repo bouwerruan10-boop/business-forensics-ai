@@ -366,6 +366,11 @@ async def analyze(
     _consented = str(consent).lower() in ("true", "1", "yes", "on")
     log.info("consent_recorded", analysis_id=analysis_id,
              consented=_consented, consent_at=consent_at or "")
+    import config as _cfg
+    if getattr(_cfg, "REQUIRE_CONSENT", False) and not _consented:
+        analysis_status.pop(analysis_id, None)
+        raise HTTPException(status_code=400,
+                            detail="Consent is required: confirm you have the right to upload this data and consent to processing.")
 
     # Read file bytes immediately -- can't read in background task
     file_data = []
