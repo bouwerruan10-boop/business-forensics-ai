@@ -31,6 +31,21 @@ PRICE_VOLUME_ELASTICITY = -0.5
 # SA company income tax — applied to incremental operating profit so 'net' is realistic.
 TAX_RATE = 0.27
 
+# Build 2: realistic default = close this fraction of the benchmark gap (slider max stays the full gap).
+_CLOSE_FRACTIONS = {"gross_margin": 0.35, "opex": 0.5, "debtor_days": 0.6, "inventory_days": 0.5}
+
+
+def _sim_assumptions(extra=None):
+    """Surface the model assumptions so they are visible, not hidden hard-coded values."""
+    a = {"realisation_by_scenario": {"optimistic": "100%", "expected": "60%", "pessimistic": "30%"},
+         "price_volume_elasticity": PRICE_VOLUME_ELASTICITY,
+         "company_tax_rate": TAX_RATE,
+         "default_target": "each action defaults to closing a realistic share of the benchmark gap; the slider reaches the full gap (the ceiling)",
+         "note": "Deterministic driver-based model. Indicative, not a guarantee; not a change to the Imara Score."}
+    if extra:
+        a.update(extra)
+    return a
+
 
 def _num(d, k, default=0.0):
     v = (d or {}).get(k)
@@ -110,7 +125,9 @@ def derive_actions(report: dict) -> list:
                 "label": "Raise prices", "max": 15.0, "unit": "%", "default": 5.0,
                 "rationale": "Price rises lift margin but soften volume (elasticity modelled)."})
     for a in out:
-        a.setdefault("default", a["max"])
+        if "default" not in a:
+            _d = _CLOSE_FRACTIONS.get(a["id"], 0.4) * a["max"]
+            a["default"] = round(_d) if a.get("unit") == "days" else round(_d, 1)
         a["currency"] = cur
     return out
 
@@ -279,6 +296,7 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
         "baseline": baseline, "projected": projected,
         "cash_released": round(cash_released),
         "applied_actions": applied,
+        "assumptions": _sim_assumptions(),
         "net_profit_delta": projected["net_profit"] - baseline["net_profit"],
         "imara_score_delta": projected["imara_score"] - (baseline["imara_score"] or 0),
         "disclaimer": ("Indicative model: deterministic projection from your figures under a {} "
@@ -334,7 +352,11 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
 
     net_deltas = []
     scores = []
+    _E_MODE = 0.72
     for _ in range(max(1, n)):
+        # Build 1: ONE shared execution-conditions factor per run correlates how fully actions
+        # land. Independent per-action sampling understates the joint downside (a known MC pitfall).
+        execution = rng.triangular(0.4, 1.0, _E_MODE)
         drivers = {}
         for s in sel:
             a = catalog[s["id"]]
@@ -342,9 +364,11 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
                 intensity = max(0.0, min(1.0, float(s.get("intensity", 1.0))))
             except (TypeError, ValueError):
                 intensity = 1.0
-            cap = rng.triangular(0.2, 1.05, 0.6)  # how fully this action lands
+            idio = rng.triangular(0.8, 1.15, 1.0)            # tight per-action idiosyncratic noise
+            cap = max(0.0, min(1.1, execution * idio))       # correlated realisation
             drivers[a["driver"]] = drivers.get(a["driver"], 0.0) + float(a.get("default", a.get("max", 0))) * intensity * cap
-        drivers["revenue_growth_pct"] = drivers.get("revenue_growth_pct", 0.0) + rng.gauss(0.0, 4.0)  # market noise (pp)
+        # Market noise tied to the SAME conditions: good conditions lift growth, bad ones contract it.
+        drivers["revenue_growth_pct"] = drivers.get("revenue_growth_pct", 0.0) + rng.gauss((execution - _E_MODE) * 12.0, 3.0)
         pf, _ = _project(figs, drivers, 1.0)
         delta_op = _num(pf, "operating_profit") - base_operating
         net_deltas.append((delta_op * (1 - TAX_RATE) if delta_op > 0 else delta_op))
@@ -366,6 +390,10 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
         "base_score": round(base_score), "next_band_threshold": nb,
         "prob_reach_next_band": round(prob, 3),
         "net_profit_delta": pcts(net_deltas), "imara_score": pcts(scores),
+        "assumptions": _sim_assumptions({"monte_carlo": {"iterations": n, "seed": seed,
+            "execution_factor": "shared triangular(0.4, 1.0, %.2f) correlates actions within each run" % _E_MODE,
+            "per_action_noise": "triangular(0.8, 1.15, 1.0)",
+            "models": "execution variance only — not external shocks (use the macro stress test for those)"}}),
         "disclaimer": ("Probabilistic estimate over {} simulations sampling how fully each action "
                        "lands plus market noise. Indicative, not a guarantee.".format(n)),
     }

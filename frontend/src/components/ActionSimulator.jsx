@@ -95,7 +95,7 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
     <div>
       <p className="text-slate-400 text-sm mb-4 flex items-center gap-1.5">
         Pick the actions you could take and see the projected effect — and how likely it is.
-        <InfoTip label="Action Simulator" text="A deterministic projection from your own figures. Each action adjusts a driver (margin, overheads, collections, growth); we recompute the statements, ratios and Imara Score. Incremental profit is taxed; the Likelihood is a 1,000-run Monte Carlo sampling how fully each action lands plus market noise. Indicative estimates, not guarantees." />
+        <InfoTip label="Action Simulator" text="A deterministic projection from your own figures. Each action adjusts a driver (margin, overheads, collections, growth); we recompute the statements, ratios and Imara Score. Incremental profit is taxed; the Likelihood is a 1,000-run Monte Carlo where a shared execution-conditions factor correlates how fully the actions land together (so the downside isn't understated). It models execution variance, not external shocks. Indicative estimates, not guarantees." />
       </p>
 
       {/* Biggest levers (tornado / sensitivity) */}
@@ -209,6 +209,15 @@ export default function ActionSimulator({ analysisId, currency = 'ZAR' }) {
               <MetricRow label="Debtor days" from={b.debtor_days} to={pj.debtor_days} fmt={v => `${Math.round(v)}d`} goodUp={false} />
               <MetricRow label="Fundamentals score" from={b.fundamentals_score} to={pj.fundamentals_score} fmt={v => `${Math.round(v)}`} />
               <p className="text-slate-600 text-[11px] mt-3 leading-relaxed italic">{result.disclaimer}</p>
+              {result.assumptions && (
+                <details className="mt-2">
+                  <summary className="text-slate-500 text-[11px] cursor-pointer hover:text-slate-300">Model assumptions</summary>
+                  <div className="text-slate-500 text-[11px] mt-1 leading-relaxed">
+                    Realisation {result.assumptions.realisation_by_scenario?.expected} (expected) · price–volume elasticity {result.assumptions.price_volume_elasticity} · company tax {Math.round((result.assumptions.company_tax_rate || 0) * 100)}%. {result.assumptions.default_target}.
+                    {mc?.assumptions?.monte_carlo && <> {' '}Monte&nbsp;Carlo: {mc.assumptions.monte_carlo.execution_factor}; it models {mc.assumptions.monte_carlo.models}.</>}
+                  </div>
+                </details>
+              )}
             </>
           ) : (
             <div className="text-slate-500 text-sm text-center py-12">{loading ? 'Modelling…' : 'Select one or more actions to see the projected outcome.'}</div>
