@@ -9,6 +9,11 @@ MAX_TOKENS = int(os.getenv("MAX_TOKENS", "4096"))
 # Cheaper/faster model for mechanical JSON extraction (the 2nd call per agent).
 PARSE_MODEL = os.getenv("PARSE_MODEL", "claude-haiku-4-5-20251001")
 
+# Ordered fallback models tried if the primary MODEL is unavailable/deprecated
+# (provider-resilience). Default: degrade to the known-available parse model so a
+# model retirement degrades quality instead of taking the pipeline down.
+MODEL_FALLBACKS = [m.strip() for m in os.getenv("MODEL_FALLBACKS", PARSE_MODEL).split(",") if m.strip()]
+
 # Set MOCK_MODE=true in .env to run without an API key (returns demo data)
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() in ("true", "1", "yes")
 
@@ -28,3 +33,4 @@ MULTI_TENANT = os.getenv("MULTI_TENANT", "false").lower() in ("true", "1", "yes"
 PUBLIC_API = os.getenv("PUBLIC_API", "false").lower() in ("true", "1", "yes")
 DEFAULT_OWNER = os.getenv("DEFAULT_OWNER", "operator")
 API_VERSION = "v1"
+IMARA_ENGINE_VERSION = os.getenv("IMARA_ENGINE_VERSION", "2.1.0")  # stamped into the decision audit log

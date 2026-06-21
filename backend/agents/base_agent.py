@@ -8,7 +8,7 @@ import httpx
 import json
 import os
 from memory.shared_memory import SharedMemory, AgentFinding
-from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS, MOCK_MODE, PARSE_MODEL
+from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS, MOCK_MODE, PARSE_MODEL, MODEL_FALLBACKS
 from services.benchmark_service import format_benchmark_context
 
 # Build an httpx client that works in any environment:
@@ -53,6 +53,20 @@ def _is_transient(exc) -> bool:
     return code in _TRANSIENT_STATUS
 
 
+def _is_model_unavailable(exc) -> bool:
+    """Classify an error as 'this model can't be used' (deprecated/retired/unknown)
+    so we fall back to the next model in the chain rather than failing the run."""
+    if exc is None:
+        return False
+    if getattr(exc, "status_code", None) == 404:
+        return True
+    s = str(exc).lower()
+    if "model" in s and any(k in s for k in ("not found", "does not exist", "deprecat",
+                                             "not_found", "unknown model", "no longer available", "invalid model")):
+        return True
+    return "notfound" in type(exc).__name__.lower()
+
+
 class BaseAgent:
     name: str = "Base Agent"
     role: str = ""
@@ -60,31 +74,49 @@ class BaseAgent:
 
     def _call_claude(self, user_message: str, system_override: str = "", model_override: str = "") -> str:
         system = system_override or self.system_prompt
-        model = model_override or MODEL
+        primary = model_override or MODEL
+        # Provider-resilience: try the chosen model, then ordered fallbacks if it is
+        # unavailable/deprecated (or transient-exhausted), so a model retirement degrades
+        # gracefully instead of taking the whole pipeline down.
+        candidates = [primary] + [m for m in MODEL_FALLBACKS if m and m != primary]
         import time as _time
         _t0 = _time.perf_counter()
-        # Error-classified retries: back off on TRANSIENT errors (rate limit, overload,
-        # timeout, 5xx) and re-try; raise non-transient errors (auth, bad request) at once.
-        _attempts = 3
-        for _attempt in range(_attempts):
-            try:
-                response = client.messages.create(
-                    model=model,
-                    max_tokens=MAX_TOKENS,
-                    system=system,
-                    messages=[{"role": "user", "content": user_message}]
-                )
+        response = None
+        used_model = primary
+        last_exc = None
+        for model in candidates:
+            _attempts = 3
+            for _attempt in range(_attempts):
+                try:
+                    response = client.messages.create(
+                        model=model,
+                        max_tokens=MAX_TOKENS,
+                        system=system,
+                        messages=[{"role": "user", "content": user_message}]
+                    )
+                    used_model = model
+                    break
+                except Exception as _exc:
+                    last_exc = _exc
+                    if _is_transient(_exc) and _attempt < _attempts - 1:
+                        import random as _r
+                        _time.sleep((2 ** _attempt) + _r.random())
+                        continue
+                    break
+            if response is not None:
                 break
-            except Exception as _exc:
-                if _is_transient(_exc) and _attempt < _attempts - 1:
-                    import random as _r
-                    _time.sleep((2 ** _attempt) + _r.random())
-                    continue
-                raise
+            # This model failed: fall back to the next only if it is unavailable/deprecated
+            # or a transient that exhausted retries; raise auth/400-type errors immediately.
+            if not (_is_model_unavailable(last_exc) or _is_transient(last_exc)):
+                raise last_exc
+            if model != candidates[-1]:
+                print("[model] '{}' unavailable ({}); falling back to next model".format(model, last_exc))
+        if response is None:
+            raise last_exc
         try:  # observability: attribute token usage + cost to this analysis (never fatal)
             from services.tracing import record_call
             _u = getattr(response, "usage", None)
-            record_call(self.name, model,
+            record_call(self.name, used_model,
                         getattr(_u, "input_tokens", 0) or 0,
                         getattr(_u, "output_tokens", 0) or 0,
                         int((_time.perf_counter() - _t0) * 1000))

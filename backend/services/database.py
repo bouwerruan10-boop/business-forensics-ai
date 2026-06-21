@@ -118,6 +118,17 @@ def init_db():
                     recorded_at  TEXT NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS decision_audit (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    analysis_id  TEXT NOT NULL,
+                    created_at   TEXT NOT NULL,
+                    record_json  TEXT NOT NULL,
+                    record_hash  TEXT NOT NULL,
+                    prev_hash    TEXT
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_analysis ON decision_audit (analysis_id)")
             _add_owner_column(conn, "analyses")
             _add_owner_column(conn, "shares")
             conn.commit()
@@ -423,3 +434,71 @@ def outcomes_with_scores():
         if sc is not None:
             out.append({"analysis_id": r["aid"], "imara_score": sc, "label": int(r["label"])})
     return out
+
+
+# ── Decision audit log (append-only, hash-chained — governance/AI-Act evidence) ──
+def _sha256(text: str) -> str:
+    import hashlib
+    return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+
+
+def append_audit(record: dict) -> dict:
+    """Append a hash-chained decision record. Append-only (never updated/deleted).
+    Returns {record_hash, prev_hash, created_at}."""
+    import json as _json
+    now = _utcnow()
+    body = _json.dumps(record, sort_keys=True, default=str)
+    with _lock:
+        conn = _get_conn()
+        try:
+            prev = conn.execute("SELECT record_hash FROM decision_audit ORDER BY id DESC LIMIT 1").fetchone()
+            prev_hash = prev["record_hash"] if prev else None
+            record_hash = _sha256((prev_hash or "") + "|" + body)
+            conn.execute(
+                "INSERT INTO decision_audit (analysis_id, created_at, record_json, record_hash, prev_hash) VALUES (?,?,?,?,?)",
+                (record.get("analysis_id", ""), now, body, record_hash, prev_hash))
+            conn.commit()
+            return {"record_hash": record_hash, "prev_hash": prev_hash, "created_at": now}
+        finally:
+            conn.close()
+
+
+def _audit_rows(where="", params=()):
+    import json as _json
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute("SELECT * FROM decision_audit " + where, params).fetchall()
+        finally:
+            conn.close()
+    out = []
+    for r in rows:
+        d = _json.loads(r["record_json"])
+        d["record_hash"] = r["record_hash"]; d["prev_hash"] = r["prev_hash"]; d["created_at"] = r["created_at"]
+        out.append(d)
+    return out
+
+
+def get_audit(analysis_id: str) -> list:
+    return _audit_rows("WHERE analysis_id=? ORDER BY id", (analysis_id,))
+
+
+def list_audit(limit: int = 100) -> list:
+    return _audit_rows("ORDER BY id DESC LIMIT ?", (int(limit),))
+
+
+def verify_audit_chain() -> dict:
+    """Recompute the hash chain to confirm the audit log has not been tampered with."""
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute("SELECT record_json, record_hash, prev_hash FROM decision_audit ORDER BY id").fetchall()
+        finally:
+            conn.close()
+    prev = None
+    for i, r in enumerate(rows):
+        expect = _sha256((prev or "") + "|" + r["record_json"])
+        if r["prev_hash"] != prev or r["record_hash"] != expect:
+            return {"intact": False, "broken_at_index": i, "records": len(rows)}
+        prev = r["record_hash"]
+    return {"intact": True, "records": len(rows)}

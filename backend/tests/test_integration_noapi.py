@@ -161,6 +161,9 @@ def test_full_pipeline_no_api(client):
     assert client.get(f"/api/report/demo-001/lender-view").json().get("decline_risk") in ("low", "medium", "high")
     brp = client.get("/api/report/demo-001/bank-ready-pack")
     assert brp.status_code == 200 and brp.content[:4] == b"%PDF"
+    aud = client.get(f"/api/report/{aid}/audit").json()
+    assert aud.get("available") and aud["records"][0].get("record_hash")
+    assert client.get("/api/admin/audit").json().get("chain", {}).get("intact") is True
     mcd = client.get("/api/v1/model-card")
     assert mcd.status_code == 200 and mcd.json()["method"]["weight_derivation"]["consistent"] is True
     assert client.get(f"/api/report/{aid}/supplier-savings").status_code == 200

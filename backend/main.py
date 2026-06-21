@@ -529,6 +529,35 @@ def report_lender_view(analysis_id: str):
     return result.get("lender_view") or {"available": False, "reason": "Not computed for this analysis."}
 
 
+@app.get("/api/report/{analysis_id}/audit")
+def report_audit(analysis_id: str):
+    """The decision audit record(s) for this analysis: how the score was produced —
+    input/figures hashes, model + engine versions, timestamp, tamper-evident hash.
+    Governance evidence (EU AI Act / SA COFI direction); raw documents are never stored."""
+    from services.database import get_audit
+    try:
+        rows = get_audit(analysis_id)
+    except Exception:
+        rows = []
+    if rows:
+        return {"available": True, "records": rows}
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    a = result.get("audit")
+    return {"available": bool(a), "records": ([a] if a else [])}
+
+
+@app.get("/api/admin/audit")
+def admin_audit(limit: int = 100, _admin: None = Depends(verify_admin_key)):
+    """Admin: recent decision audit records + a tamper-evidence check of the hash chain."""
+    from services.database import list_audit, verify_audit_chain
+    try:
+        return {"chain": verify_audit_chain(), "records": list_audit(limit)}
+    except Exception as _e:
+        return {"chain": {"intact": None, "error": str(_e)}, "records": []}
+
+
 @app.get("/api/report/{analysis_id}/bank-ready-pack")
 def report_bank_ready_pack(analysis_id: str):
     """Bank-Ready Pack — a deterministic, lender-facing PDF bundling normalised earnings
@@ -851,6 +880,12 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             _rev = report.get("annual_revenue") or (report.get("financial_figures") or {}).get("revenue") or 0
             report["supplier_benchmark"] = run_supplier_benchmark(memory.uploaded_financial_text, _rev, profile, report.get("bank_signals"))
 
+            report["analysis_id"] = analysis_id  # ensure the report (and audit record) carry their id
+            from services.audit_log import record_decision
+            try:
+                report["audit"] = record_decision(report, memory)  # hash-chained governance record
+            except Exception as _ae:
+                print("[audit] non-fatal: {}".format(_ae))
             analyses[analysis_id] = report
             save_report(analysis_id, report)
             analysis_status[analysis_id]["status"] = "complete"
@@ -1134,6 +1169,12 @@ def _enrich_demo():
     DEMO_REPORT["normalization"] = normalize_earnings(figs, _demo_fin)
     DEMO_REPORT["lender_view"] = run_lender_view(figs, DEMO_REPORT["bank_signals"], DEMO_REPORT["normalization"], 24_500_000)
     DEMO_REPORT["decision_support"] = decision_support_notice()
+    from services.audit_log import build_audit_record
+    _arec = build_audit_record(DEMO_REPORT, "demo-inputs")
+    DEMO_REPORT["audit"] = {"record_hash": "demo-" + _arec["figures_hash"][:24], "prev_hash": None,
+                            "generated_at": _arec["generated_at"], "engine_version": _arec["engine_version"],
+                            "models": _arec["models"], "figures_hash": _arec["figures_hash"],
+                            "inputs_hash": _arec["inputs_hash"]}
     DEMO_REPORT["macro_performed"] = True
     DEMO_REPORT["macro_summary"] = ("Retail margins are exposed to inflation on the cost base and "
         "rand-driven import costs; interest-rate sensitivity is moderate on the existing debt.")
