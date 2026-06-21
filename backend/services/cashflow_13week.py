@@ -11,7 +11,6 @@ loan instalments and net VAT remittances. Every assumption is returned in the
 output and the agent is told to present it as indicative. All arithmetic; no LLM.
 Nothing here changes the Imara Score.
 """
-import math
 
 from services.sa_rates import PRIME_RATE, SME_DEBT_MARGIN_LOW, SME_DEBT_MARGIN_HIGH
 from services.derived_metrics import annual_debt_service, _fnum

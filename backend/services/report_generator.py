@@ -7,14 +7,14 @@ import io
 from datetime import date
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.units import cm, mm
+from reportlab.lib.units import cm
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     HRFlowable, PageBreak, KeepTogether, Image
 )
-from services.charts import score_bar_chart, severity_donut, roadmap_timeline
+from services.charts import score_bar_chart, severity_donut
 
 # ── Palette ──────────────────────────────────────────────────────
 NAVY      = colors.HexColor("#0D1B2A")
@@ -160,7 +160,6 @@ def _footer(canvas, doc):
     if page_num == 1:
         canvas.restoreState()
         return
-    biz = doc.title or "Imara"
     canvas.setFont("Helvetica", 7)
     canvas.setFillColor(MID_GRAY)
     canvas.drawString(MARGIN, 0.9 * cm, "CONFIDENTIAL — For management use only")
@@ -185,7 +184,7 @@ def _cover_page(story, report):
     health  = scores.get("business_health", 0)
     findings_total = report.get("total_findings", 0)
     critical = report.get("critical_findings", 0)
-    high     = report.get("high_findings", 0)
+    report.get("high_findings", 0)
 
     # ── Top header band ──
     story.append(Spacer(1, 0.6 * cm))
@@ -854,7 +853,7 @@ def _cover_page_investor(story, report):
     biz      = report.get("business_name", "Business")
     industry = report.get("industry", "General Business")
     cur      = report.get("currency", "ZAR")
-    rev      = report.get("annual_revenue", 0)
+    report.get("annual_revenue", 0)
     country  = report.get("country", "")
     today    = date.today().strftime("%d %B %Y")
     val_low  = report.get("valuation_low", 0)
@@ -893,7 +892,6 @@ def _cover_page_investor(story, report):
     val_range = (f"{cur} {val_low:,.0f} – {cur} {val_high:,.0f}" if val_low else "—")
     val_mid_str = f"{cur} {val_mid:,.0f}" if val_mid else "—"
     mult_str = f"{multiple:.1f}×" if multiple else "—"
-    rev_str  = f"{cur} {rev:,.0f}" if rev else "—"
 
     metric_data = [
         ["VALUATION RANGE", "MID-POINT", "EBITDA MULTIPLE", "HEALTH SCORE"],
@@ -1257,7 +1255,7 @@ def _traffic_light_section(story, report):
 def _credit_readiness_section(story, report):
     _section_header(story, "CREDIT READINESS ASSESSMENT")
 
-    cur          = report.get("currency", "ZAR")
+    report.get("currency", "ZAR")
     credit_score = report.get("credit_score", 0)
     credit_grade = report.get("credit_grade", "—")
     barriers     = report.get("credit_barriers", [])

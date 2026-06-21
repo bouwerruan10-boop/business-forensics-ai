@@ -29,6 +29,13 @@ jobs:
           MOCK_MODE: "true"
           ANTHROPIC_API_KEY: "ci-dummy-key"
         run: python -c "from main import app; assert len(app.routes) > 5; print('app OK -', len(app.routes), 'routes')"
+      - name: Cleanup ratchet — no unused imports/vars or dead code
+        working-directory: backend
+        run: |
+          pip install ruff vulture
+          ruff check . --select F401,F811,F841   # HARD gate: unused imports / redefs / unused vars
+          echo "--- vulture (advisory dead-code scan; candidates to verify, not a gate) ---"
+          vulture . --min-confidence 80 --exclude tests,evals,__pycache__ || true
       - name: Run regression tests (no API key)
         working-directory: backend
         env:

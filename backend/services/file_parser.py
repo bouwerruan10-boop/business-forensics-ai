@@ -6,7 +6,6 @@ Returns a structured dict that agents can query.
 """
 import io
 import re
-import json
 import pandas as pd
 import pdfplumber
 from pathlib import Path

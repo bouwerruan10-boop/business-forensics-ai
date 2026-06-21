@@ -18,7 +18,7 @@ from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, KeepTogether,
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable,
 )
 
 NAVY = colors.HexColor("#0b1f3a")

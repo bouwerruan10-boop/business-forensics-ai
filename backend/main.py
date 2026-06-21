@@ -5,7 +5,6 @@ Endpoints:
   GET  /api/status/{id}     -- poll analysis progress
   GET  /api/report/{id}     -- get full JSON report
   GET  /api/report/{id}/pdf -- download premium PDF report
-  POST /api/simulate        -- what-if digital twin simulation
   GET  /api/admin/analyses  -- admin: list all analyses
   GET  /api/health          -- health check
 
@@ -28,7 +27,6 @@ from slowapi.errors import RateLimitExceeded
 from services.file_parser import parse_file, merge_parsed_data
 from services.report_generator import generate_pdf_report
 from services.html_report import generate_html_report
-from services.benchmark_service import get_benchmarks, detect_industry
 from services.database import (
     init_db, create_analysis, save_report, save_error,
     get_report, list_analyses, count_analyses, delete_analysis,
@@ -152,12 +150,6 @@ analysis_status: dict = {}
 
 
 # -- Pydantic models -----------------------------------------------
-
-class SimulateRequest(BaseModel):
-    analysis_id: str
-    variable: str = "revenue"   # revenue | labor_cost | ... (what-if lever; restored - handler reads req.variable)
-    scenario: str = ""
-    change_percent: float = 0.0
 
 class ActionSimRequest(BaseModel):
     analysis_id: str
@@ -693,74 +685,6 @@ def health_v1():
     return {"status": "ok", "api_version": API_VERSION}
 
 
-@app.post("/api/simulate")
-def simulate(req: SimulateRequest):
-    """
-    Run a what-if scenario using the digital twin parameters from an analysis.
-    Uses the business actual revenue and benchmark cost ratios for the industry.
-    """
-    result = analyses.get(req.analysis_id) or get_report(req.analysis_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-
-    twin = result.get("digital_twin_parameters", {})
-    base_revenue = twin.get("base_revenue", 0) or result.get("annual_revenue", 0)
-    currency = result.get("currency", "ZAR")
-    industry_key = result.get("industry_key", "general")
-    bm = get_benchmarks(industry_key)
-    labour_ratio = bm.get("cost_ratios", {}).get("labour_pct_revenue", 0.30)
-    fuel_ratio = bm.get("cost_ratios", {}).get("fuel_pct_revenue", 0.08)
-    op_margin = bm.get("margins", {}).get("operating_margin", 0.12)
-
-    change = req.change_percent / 100
-    c = currency
-
-    if req.variable == "revenue":
-        new_rev = base_revenue * (1 + change)
-        profit_impact = (new_rev - base_revenue) * op_margin
-        return {
-            "scenario": "Revenue {:+.1f}%".format(req.change_percent),
-            "change": "{:+.1f}%".format(req.change_percent),
-            "projected_revenue": new_rev,
-            "revenue_delta": new_rev - base_revenue,
-            "estimated_profit_impact": profit_impact,
-            "currency": c,
-            "note": "Profit impact estimated at {:.1f}% operating margin (industry benchmark)".format(op_margin * 100),
-        }
-    elif req.variable == "labor_cost":
-        labour_base = base_revenue * labour_ratio
-        saving = labour_base * abs(change)
-        key = "annual_saving" if change < 0 else "annual_cost"
-        return {
-            "scenario": "Labour cost {:+.1f}%".format(req.change_percent),
-            "change": "{:+.1f}%".format(req.change_percent),
-            "estimated_labour_base": labour_base,
-            key: saving,
-            "profit_impact": saving if change < 0 else -saving,
-            "currency": c,
-            "note": "Labour estimated at {:.0f}% of revenue (industry benchmark)".format(labour_ratio * 100),
-        }
-    elif req.variable == "fuel_cost":
-        fuel_base = base_revenue * fuel_ratio
-        fuel_impact = fuel_base * change
-        return {
-            "scenario": "Fuel cost {:+.1f}%".format(req.change_percent),
-            "change": "{:+.1f}%".format(req.change_percent),
-            "estimated_fuel_base": fuel_base,
-            "fuel_cost_change": fuel_impact,
-            "profit_impact": -fuel_impact,
-            "currency": c,
-            "note": "Fuel estimated at {:.0f}% of revenue (industry benchmark)".format(fuel_ratio * 100),
-        }
-    else:
-        return {
-            "scenario": req.scenario,
-            "variable": req.variable,
-            "change": "{:+.1f}%".format(req.change_percent),
-            "note": "Custom scenario -- provide more specific financial data for detailed modelling",
-        }
-
-
 # -- Admin endpoints -----------------------------------------------
 
 @app.get("/api/admin/analyses")
@@ -934,7 +858,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark
             _rev = report.get("annual_revenue") or (report.get("financial_figures") or {}).get("revenue") or 0
-            report["supplier_benchmark"] = run_supplier_benchmark(memory.uploaded_financial_text, _rev, profile, report.get("bank_signals"))
+            report["supplier_benchmark"] = run_supplier_benchmark(memory.uploaded_financial_text, _rev, profile)
             from services.cashflow_13week import from_report as cashflow_from_report
             report["cashflow_13week"] = cashflow_from_report(report, memory)
             from services.agent_consistency import analyze_consistency

@@ -4,7 +4,6 @@ Self-contained: all CSS, JS, and SVG charts are inlined.
 No external dependencies — works offline, can be emailed.
 """
 from datetime import date
-import json
 import html as _html_mod
 
 

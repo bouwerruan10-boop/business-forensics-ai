@@ -18,7 +18,6 @@ Robust, format-agnostic signals (the ones that survive messy text):
 """
 
 import re
-import statistics
 
 # ── patterns ──────────────────────────────────────────────────────────────
 _DATE = re.compile(

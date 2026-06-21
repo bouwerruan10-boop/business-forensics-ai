@@ -122,7 +122,7 @@ def score_bar_chart(scores: dict, width: float = 6.0, height: float = 2.8) -> by
     ax.set_facecolor(DARK_CARD)
 
     y_pos = range(len(labels))
-    bars = ax.barh(list(y_pos), values, color=colors, height=0.55,
+    ax.barh(list(y_pos), values, color=colors, height=0.55,
                    zorder=3, linewidth=0)
 
     # Background bars (full width)
@@ -187,7 +187,7 @@ def severity_donut(findings: list, width: float = 4.0) -> bytes:
         at.set_fontsize(9)
         at.set_fontweight("bold")
 
-    legend = ax.legend(
+    ax.legend(
         wedges, [f"{l} ({v})" for l, v in zip(labels, values)],
         loc="lower center", bbox_to_anchor=(0.5, -0.12),
         ncol=2, fontsize=8, frameon=False,

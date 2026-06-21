@@ -6,14 +6,13 @@ Narrative arc: Situation → Complication → Resolution (McKinsey SCR)
 Findings ranked by quantified financial impact, not by agent order.
 """
 import json
-import re
 import time
 from agents.base_agent import BaseAgent
 from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent
 from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
 from agents.economics_agent import EconomicsAgent
 from memory.shared_memory import SharedMemory, AgentFinding
-from config import MODEL, MAX_TOKENS, PARSE_MODEL
+from config import PARSE_MODEL
 
 
 class CEOAgent(BaseAgent):
@@ -351,7 +350,7 @@ Return ONLY valid JSON.
             return {"critical": 15, "high": 8, "medium": 3, "low": 1}.get(f.severity, 3)
 
         total_penalty = sum(_sev_weight(f) for f in findings)
-        base = max(15, 100 - total_penalty)
+        max(15, 100 - total_penalty)
 
         financial_agents = {"Financial Forensics Agent", "Accounting Agent", "Procurement Agent"}
         ops_agents = {"Operations Agent", "Logistics Agent", "Human Resources Agent", "Sales Agent"}
@@ -503,7 +502,6 @@ Return ONLY valid JSON.
         # Generate narrative sections
         executive_summary = self._generate_executive_summary(memory, synthesis)
         roadmap = self._generate_roadmap(memory, synthesis)
-        digital_twin = self._generate_digital_twin(memory)
 
         # Pull synthesis sections
         top_issues = synthesis.get("top_priority_issues", [])
@@ -567,7 +565,6 @@ Return ONLY valid JSON.
 
             # Roadmap and twin
             "implementation_roadmap": roadmap,
-            "digital_twin_parameters": digital_twin,
 
             # Business structure
             "revenue_streams": memory.revenue_streams,
@@ -750,22 +747,6 @@ Rules:
             return roadmap
         except Exception:
             return []
-
-    def _generate_digital_twin(self, memory: SharedMemory) -> dict:
-        """
-        Extract key financial parameters for the What-If digital twin simulator.
-        Returns a simple dict consumed by the /api/simulate endpoint.
-        """
-        rev = memory.annual_revenue
-        return {
-            "base_revenue": rev,
-            "headcount": memory.headcount,
-            "currency": memory.currency,
-            "industry_key": memory.industry_key,
-            "credit_score": memory.credit_score,
-            "valuation_mid": memory.valuation_mid,
-            "forecast_base_12m": memory.forecast_base_12m,
-        }
 
 
 def _strip_json(text: str) -> str:

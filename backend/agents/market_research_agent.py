@@ -14,8 +14,6 @@ Graceful fallback: if SERPER_API_KEY is absent, Claude's knowledge fills the gap
 """
 
 import json
-import httpx
-import os
 from agents.base_agent import BaseAgent, _http_client
 from memory.shared_memory import SharedMemory, AgentFinding
 from config import MOCK_MODE, SERPER_API_KEY

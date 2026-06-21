@@ -652,7 +652,7 @@ def test_grade_sa_citation_detects_grounded_citations():
 
 
 def test_llm_judge_is_injectable_and_aggregates():
-    from evals.grader import grade_findings_with_judge, build_judge_prompt
+    from evals.grader import grade_findings_with_judge
     # stub judge returns fixed JSON — tests aggregation without an API
     def judge(prompt):
         assert "specificity" in prompt and "Return ONLY JSON" in prompt
@@ -851,7 +851,7 @@ def test_optimizer_objectives_switch():
 def test_golden_set_expanded_and_deterministic_baseline():
     """The deterministic engine must match independent ground-truth ratios on
     every golden case (CI gate; catches extraction/ratio regressions)."""
-    from evals.grader import load_cases, grade_deterministic
+    from evals.grader import load_cases
     cases = load_cases()
     assert len(cases) >= 12
     for c in cases:
@@ -1306,7 +1306,7 @@ def test_zscore_proxy_backtest():
 
 
 def test_score_calibration():
-    from services.score_calibration import calibrate, calibrated_pd
+    from services.score_calibration import calibrate
     c = calibrate(_synth_pairs(n=160))
     assert c["calibrated"] and c["brier"] < 0.25
     pd20, pd80 = c["example_pd"]["20"], c["example_pd"]["80"]

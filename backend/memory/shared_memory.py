@@ -4,7 +4,6 @@ Every specialist agent reads from and writes to this object.
 """
 
 from dataclasses import dataclass, field
-import json
 
 
 @dataclass

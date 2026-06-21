@@ -113,7 +113,7 @@ def test_lender_view_handles_empty_inputs():
 
 def test_nonfinite_figures_stay_json_safe():
     """NaN/inf figures must not leak into outputs (would break JSON / the frontend)."""
-    import json, math
+    import json
     for figs in ({"ebitda": float("nan")}, {"ebitda": float("inf")}, {"operating_profit": "inf"}):
         nm = normalize_earnings(figs, "Donations 50 000\n")
         lv = run_lender_view(figs, {"available": False}, nm, 1_000_000)

@@ -13,7 +13,7 @@ from services.expense_lines import extract_expense_lines
 from services.supplier_catalog import category_reference
 
 
-def run_supplier_benchmark(financial_text: str, revenue, profile=None, bank_signals=None) -> dict:
+def run_supplier_benchmark(financial_text: str, revenue, profile=None) -> dict:
     profile = profile or {}
     lines = extract_expense_lines(financial_text or "")
     if not lines:

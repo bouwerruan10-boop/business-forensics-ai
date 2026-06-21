@@ -91,7 +91,7 @@ def test_audit_record_never_stores_raw_documents():
 
 def test_audit_record_json_safe_with_nonfinite():
     """A report with NaN/inf score/figures must still yield a strict-JSON-safe audit record."""
-    import json, math
+    import json
     from services.audit_log import build_audit_record
     for rep in ({"imara_score": float("nan"), "imara_completeness": float("inf"),
                  "financial_figures": {"revenue": float("inf")}},

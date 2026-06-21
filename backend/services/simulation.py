@@ -348,7 +348,7 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
 
     base_figs, _ = _project(figs, {}, 1.0)
     base_operating = _num(base_figs, "operating_profit")
-    actual_net = _num(figs, "net_profit") or _num(base_figs, "net_profit")
+    _num(figs, "net_profit") or _num(base_figs, "net_profit")
     base_fund = float(report.get("financial_fundamentals_score")
                       or (fundamentals_score(compute_ratios(base_figs, industry, rev), industry).get("score") or 0))
     canonical = report.get("imara_score")

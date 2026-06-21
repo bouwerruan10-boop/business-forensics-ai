@@ -1,10 +1,8 @@
 """Tests for the deterministic derived-metrics (DSCR / EBITDA bridge / procurement WC / PIS)."""
-import math
 from services.derived_metrics import (
     annual_debt_service, ebitda_bridge_block, dscr_block, procurement_wc_block, pis_block,
 )
 from memory.shared_memory import SharedMemory
-from agents import specialist_agents as SA
 
 
 def _mem():

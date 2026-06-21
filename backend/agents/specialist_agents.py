@@ -1160,7 +1160,6 @@ State the uncertainty range and the most critical assumption to monitor.
 
     def analyze(self, business_data: dict, memory) -> list:
         benchmark_block = self._build_benchmark_block(memory)
-        cur = memory.currency
         from services.cashflow_13week import cashflow_summary_block
         cf = cashflow_summary_block(memory)
         prompt = f"""

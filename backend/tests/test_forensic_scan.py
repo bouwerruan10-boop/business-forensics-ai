@@ -1,6 +1,6 @@
 """Tests for the deterministic forensic scanner + its injection into the 3 agents."""
 from services.forensic_scan import (
-    find_duplicate_amounts, round_number_ratio, forensic_scan, forensic_scan_block,
+    find_duplicate_amounts, round_number_ratio, forensic_scan_block,
 )
 from memory.shared_memory import SharedMemory
 from agents import specialist_agents as SA

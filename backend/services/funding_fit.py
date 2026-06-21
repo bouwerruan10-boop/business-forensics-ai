@@ -57,7 +57,7 @@ def recommend_funding(report: dict) -> dict:
     lv = g("lender_view") if isinstance(g("lender_view"), dict) else {}
     norm = g("normalization") if isinstance(g("normalization"), dict) else {}
     sb = g("supplier_benchmark") if isinstance(g("supplier_benchmark"), dict) else {}
-    ratios = g("financial_ratios") if isinstance(g("financial_ratios"), dict) else {}
+    g("financial_ratios") if isinstance(g("financial_ratios"), dict) else {}
 
     revenue = _num(figs.get("revenue")) or _num(g("annual_revenue")) or 0.0
     months = _trading_months(report)
@@ -66,7 +66,6 @@ def recommend_funding(report: dict) -> dict:
 
     # ── eligibility floors ────────────────────────────────────────────────
     turnover_ok = revenue >= _TURNOVER_FLOOR
-    trading_ok = (months is None) or (months >= _TRADING_FLOOR_MONTHS)
     floor_met = turnover_ok and (months is not None and months >= _TRADING_FLOOR_MONTHS) and cipc
     elig = {
         "turnover_ok": turnover_ok, "trading_ok": bool(months is not None and months >= _TRADING_FLOOR_MONTHS),

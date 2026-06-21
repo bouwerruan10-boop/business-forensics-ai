@@ -71,7 +71,7 @@ def firm_macro_sensitivity(report: dict) -> dict:
     opex = max(0.0, gp - op) if (gp or op) else _num(figs, "opex")
     cogs = _num(figs, "cogs") or max(0.0, rev - gp)
     debt = _num(figs, "total_debt")
-    interest = _num(figs, "interest")
+    _num(figs, "interest")
 
     # Interest rate: +100bps on the floating share of debt -> extra annual interest.
     floating = debt * FLOATING_DEBT_SHARE
