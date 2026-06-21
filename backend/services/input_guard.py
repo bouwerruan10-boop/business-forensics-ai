@@ -12,12 +12,14 @@ untouched. Pure regex - no LLM, so it cannot itself be injected. Counts are
 de-duplicated to DISTINCT planted instructions / PII values across all surfaces.
 """
 import re
+import unicodedata
 
 _INJECTION_SRC = [
-    (r"ignore\s+(?:all\s+|any\s+)?(?:the\s+)?(?:previous|prior|above|preceding|earlier|foregoing)\s+"
+    (r"ignore[\s,]+(?:all\s+(?:of\s+)?|any\s+)?(?:the\s+)?(?:previous|prior|above|preceding|earlier|foregoing)\s+"
      r"(?:instructions?|prompts?|messages?|context|rules?|text|content)", "ignore-previous"),
     (r"disregard\s+(?:all\s+|the\s+)?(?:previous|prior|above|system|earlier)?\s*"
      r"(?:instructions?|rules?|guidelines?|prompts?)", "disregard"),
+    (r"disregard\s+(?:everything|anything|all)\b", "disregard"),
     (r"forget\s+(?:everything|all\s+(?:previous|prior)|your\s+(?:instructions?|rules?|prompt))", "forget"),
     (r"you\s+are\s+now\s+(?:a|an|the)\b", "role-override"),
     (r"from\s+now\s+on,?\s+you\b", "role-override"),
@@ -33,7 +35,7 @@ _INJECTION_SRC = [
     (r"(?:reveal|print|output|show|repeat|disclose)\s+(?:your\s+)?(?:system\s+)?(?:prompt|instructions?)", "exfil-prompt"),
     (r"(?:set|change|make|force)\s+(?:the\s+)?(?:vat|tax|score|rating|risk|prime|threshold|grade|valuation)\b"
      r"[^.\n]{0,40}\b(?:to|as|=)\b", "set-value"),
-    (r"(?:mark|rate|classify|report|treat)\s+(?:this\s+)?(?:business|company|firm|client)?\s*"
+    (r"(?:mark|rate|classify|report|treat)\s+(?:this\s+|the\s+)?(?:business|company|firm|client)?\s*"
      r"(?:as\s+)?(?:compliant|low[\s-]risk|healthy|approved|investment[\s-]grade|fully\s+compliant|no\s+risk)", "force-rating"),
     (r"(?:give|assign|award)\s+(?:this\s+|it\s+)?(?:a\s+)?(?:score|rating|grade)\s+of\b", "force-score"),
     (r"(?:ignore|skip|omit|hide|suppress)\s+(?:the\s+|all\s+)?(?:findings?|issues?|problems?|risks?|red\s+flags?)", "suppress-findings"),
@@ -41,7 +43,7 @@ _INJECTION_SRC = [
 ]
 _INJECTION = [(re.compile(p, re.I | re.M), tag) for p, tag in _INJECTION_SRC]
 
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_EMAIL = re.compile(r"\b[\w.+-]{1,64}@[\w-]{1,255}\.[\w.-]{1,64}\b")  # bounded -> no ReDoS on long word-runs
 _CARD = re.compile(r"\b\d{16}\b")
 _SA_ID = re.compile(r"\b\d{13}\b")
 _PII = [(_EMAIL, "email"), (_CARD, "card"), (_SA_ID, "sa_id")]
@@ -59,6 +61,9 @@ def scan_text(text):
     """
     if not isinstance(text, str) or not text:
         return (text if isinstance(text, str) else ""), {"injections": [], "pii_values": {}}
+    # normalise unicode (folds full-width/compatibility forms) + strip zero-width chars
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(r"[\u200b\u200c\u200d\ufeff]", "", text)
     injections = []
     clean = text
     for rx, tag in _INJECTION:
