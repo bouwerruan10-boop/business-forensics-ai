@@ -198,11 +198,15 @@ Every finding must state: current rate, benchmark rate, gap, and annual cost of 
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
         data = business_data.get('operations', business_data.get('general', {}))
+        from services.applicability import applicability_note
+        appnote = applicability_note(memory, "operations")
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{appnote}
 
 OPERATIONS DATA:
 {json.dumps(data, indent=2)[:4000]}
@@ -242,11 +246,15 @@ For every logistics finding:
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
         data = business_data.get('logistics', business_data.get('general', {}))
+        from services.applicability import applicability_note
+        appnote = applicability_note(memory, "logistics")
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{appnote}
 
 LOGISTICS AND FLEET DATA:
 {json.dumps(data, indent=2)[:4000]}
@@ -286,11 +294,15 @@ in additional annual revenue.
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
         data = business_data.get('sales', business_data.get('general', {}))
+        from services.applicability import applicability_note
+        appnote = applicability_note(memory, "sales")
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{appnote}
 
 SALES DATA:
 {json.dumps(data, indent=2)[:4000]}
@@ -332,11 +344,15 @@ For each marketing finding:
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         benchmark_block = self._build_benchmark_block(memory)
         data = business_data.get('marketing', business_data.get('general', {}))
+        from services.applicability import applicability_note
+        appnote = applicability_note(memory, "marketing")
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{appnote}
 
 MARKETING DATA:
 {json.dumps(data, indent=2)[:4000]}
