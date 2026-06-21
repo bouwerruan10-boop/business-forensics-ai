@@ -44,6 +44,8 @@ from services.score_contract import score_contract, usage_summary
 # -- Rate limiter setup -------------------------------------------
 # Configurable via RATE_LIMIT env var, default: 3 per hour
 RATE_LIMIT = os.getenv("RATE_LIMIT", "3/hour")
+# Ask Imara is an open LLM endpoint (cost/abuse vector) -> its own per-IP limit.
+ASK_RATE_LIMIT = os.getenv("ASK_RATE_LIMIT", "20/hour")
 limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT])
 
 # -- Optional API key gate ----------------------------------------
@@ -453,10 +455,14 @@ def report_reasons(analysis_id: str):
 
 
 @app.post("/api/report/{analysis_id}/ask")
-def report_ask(analysis_id: str, body: AskRequest):
+@limiter.limit(ASK_RATE_LIMIT)
+def report_ask(request: Request, analysis_id: str, body: AskRequest,
+               _api_key: None = Depends(verify_api_key)):
     """Ask Imara: a grounded Q&A over an already-produced analysis. Explains the
     deterministic facts in the report; never invents numbers; defers what-ifs to
-    the Action Simulator. Cheap (Haiku) and decision-support only."""
+    the Action Simulator. Cheap (Haiku) and decision-support only.
+    Per-IP rate-limited (ASK_RATE_LIMIT, default 20/hour) and behind the optional
+    API-key gate (active only when API_SECRET_KEY is set) - it is an open LLM endpoint."""
     result = analyses.get(analysis_id) or get_report(analysis_id)
     if not result:
         raise HTTPException(status_code=404, detail="Analysis not found")
