@@ -54,7 +54,8 @@ def _num(d, k, default=0.0):
 
 def _baseline_figs(report: dict) -> dict:
     """Normalise the stored figures into a complete set the model can work with."""
-    figs = dict(report.get("financial_figures") or {})
+    _ff = report.get("financial_figures")
+    figs = dict(_ff) if isinstance(_ff, dict) else {}
     rev = _num(figs, "revenue") or float(report.get("annual_revenue") or 0)
     figs["revenue"] = rev
     if "gross_profit" not in figs and "cogs" in figs:
@@ -70,7 +71,8 @@ def _baseline_figs(report: dict) -> dict:
 def derive_actions(report: dict) -> list:
     """Candidate actions from the firm's own ratios vs their sector benchmark.
     Each action is grounded in real numbers (the gap IS the maximum magnitude)."""
-    ratios = report.get("financial_ratios") or {}
+    _r = report.get("financial_ratios")
+    ratios = _r if isinstance(_r, dict) else {}
     figs = _baseline_figs(report)
     rev = _num(figs, "revenue")
     opex = _num(figs, "opex")
@@ -110,7 +112,8 @@ def derive_actions(report: dict) -> list:
                 "label": "Grow revenue (win more volume)", "max": 25.0, "unit": "%", "default": 10.0,
                 "rationale": "Model winning more business at current margins."})
     # Supplier benchmarking: a grounded opex-reduction lever from the supplier-savings engine.
-    sb = report.get("supplier_benchmark") or {}
+    sb = report.get("supplier_benchmark")
+    sb = sb if isinstance(sb, dict) else {}
     if sb.get("available") and opex > 0:
         _shi = float(sb.get("total_est_saving_high") or 0)
         _slo = float(sb.get("total_est_saving_low") or 0)
@@ -229,6 +232,8 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
 
     drivers = {}; applied = []
     for sel in (selected or []):
+        if not isinstance(sel, dict):
+            continue
         a = catalog.get(sel.get("id"))
         if not a:
             continue
@@ -339,7 +344,7 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
     industry = report.get("industry_key") or "general"
     rev = _num(figs, "revenue")
     catalog = {a["id"]: a for a in derive_actions(report)}
-    sel = [s for s in (selected or []) if catalog.get(s.get("id"))]
+    sel = [s for s in (selected or []) if isinstance(s, dict) and catalog.get(s.get("id"))]
 
     base_figs, _ = _project(figs, {}, 1.0)
     base_operating = _num(base_figs, "operating_profit")
