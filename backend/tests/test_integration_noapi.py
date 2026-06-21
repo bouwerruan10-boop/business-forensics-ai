@@ -154,6 +154,11 @@ def test_full_pipeline_no_api(client):
     # Research-cycle builds: distress anchor, bank signals, model card
     assert client.get(f"/api/report/{aid}/distress").status_code == 200
     assert client.get(f"/api/report/{aid}/bank-signals").status_code == 200
+    # research-driven "Lender's-Eye View" builds wired through to the API
+    lv = client.get(f"/api/report/{aid}/lender-view").json()
+    assert lv.get("available") and lv.get("decline_risk") in ("low", "medium", "high")
+    assert client.get(f"/api/report/{aid}/normalization").status_code == 200
+    assert client.get(f"/api/report/demo-001/lender-view").json().get("decline_risk") in ("low", "medium", "high")
     mcd = client.get("/api/v1/model-card")
     assert mcd.status_code == 200 and mcd.json()["method"]["weight_derivation"]["consistent"] is True
     assert client.get(f"/api/report/{aid}/supplier-savings").status_code == 200

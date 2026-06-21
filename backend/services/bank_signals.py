@@ -95,10 +95,12 @@ def analyze_bank_statement(text: str) -> dict:
     classified = 0
     largest_in = largest_out = 0.0
     balances = []
+    month_inflow = {}
     for ln in txn_lines:
         amts = [v for v in (_to_float(t) for t in _AMOUNT.findall(ln)) if v is not None and abs(v) >= 1]
         if not amts:
             continue
+        _mk = _month_key(ln)
         # Heuristic: the last number on a statement row is usually the running balance.
         if len(amts) >= 2:
             balances.append(amts[-1])
@@ -110,6 +112,7 @@ def analyze_bank_statement(text: str) -> dict:
         if is_credit and not is_debit:
             inflow += abs(txn_amt); classified += 1
             largest_in = max(largest_in, abs(txn_amt))
+            if _mk: month_inflow[_mk] = month_inflow.get(_mk, 0.0) + abs(txn_amt)
         elif is_debit and not is_credit:
             outflow += abs(txn_amt); classified += 1
             largest_out = max(largest_out, abs(txn_amt))
@@ -119,9 +122,20 @@ def analyze_bank_statement(text: str) -> dict:
         elif txn_amt > 0:
             inflow += abs(txn_amt); classified += 1
             largest_in = max(largest_in, abs(txn_amt))
+            if _mk: month_inflow[_mk] = month_inflow.get(_mk, 0.0) + abs(txn_amt)
 
     negative_balance_rows = sum(1 for b in balances if b < 0)
     min_balance = min(balances) if balances else None
+    _plaus_bal = [b for b in balances if abs(b) < 1e10]  # drop merge/parse artefacts
+    avg_balance = round(sum(_plaus_bal) / len(_plaus_bal), 2) if _plaus_bal else None
+    _dep = [v for v in month_inflow.values() if 0 < v < 1e10]
+    deposit_consistency = None
+    if len(_dep) >= 2:
+        import statistics
+        _mean = sum(_dep) / len(_dep)
+        if _mean > 0:
+            _cv = statistics.pstdev(_dep) / _mean
+            deposit_consistency = ('consistent' if _cv < 0.35 else 'variable' if _cv < 0.6 else 'erratic')
     flow_confident = classified >= max(3, int(0.4 * len(txn_lines)))
     net_flow = (inflow - outflow) if flow_confident else None
 
@@ -170,6 +184,8 @@ def analyze_bank_statement(text: str) -> dict:
         "overdraft_signals": overdraft_hits,
         "negative_balance_rows": negative_balance_rows,
         "min_balance": (round(min_balance, 2) if min_balance is not None else None),
+        "avg_balance": avg_balance,
+        "deposit_consistency": deposit_consistency,
         "inflow": round(inflow, 2) if flow_confident else None,
         "outflow": round(outflow, 2) if flow_confident else None,
         "net_flow": round(net_flow, 2) if net_flow is not None else None,

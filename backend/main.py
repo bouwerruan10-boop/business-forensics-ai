@@ -508,6 +508,27 @@ def report_bank_signals(analysis_id: str):
     return result.get("bank_signals") or {"available": False, "reason": "Not computed for this analysis."}
 
 
+@app.get("/api/report/{analysis_id}/normalization")
+def report_normalization(analysis_id: str):
+    """Indicative Adjusted EBITDA / owner add-backs + SA loan-account flag — the
+    tax-books vs deal/loan-books view. Decision-support, not an Imara Score input."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return result.get("normalization") or {"available": False, "reason": "Not computed for this analysis."}
+
+
+@app.get("/api/report/{analysis_id}/lender-view")
+def report_lender_view(analysis_id: str):
+    """The lender's-eye view: bank-vs-financials reconciliation, cash-flow conduct,
+    indicative borrowing capacity and a decline-risk readout with fixes. Deterministic
+    decision-support — NOT a credit decision and NOT an Imara Score input."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return result.get("lender_view") or {"available": False, "reason": "Not computed for this analysis."}
+
+
 @app.get("/api/report/{analysis_id}/supplier-savings")
 def report_supplier_savings(analysis_id: str, live: bool = False):
     """Supplier benchmarking — per-line-item spend-vs-benchmark + lower-cost-supplier
@@ -804,6 +825,10 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["distress_score"] = altman_z_em(report.get("financial_figures") or {}, report.get("imara_band", ""))
             from services.bank_signals import analyze_bank_statement
             report["bank_signals"] = analyze_bank_statement(memory.uploaded_bank_text)
+            from services.normalization import normalize_earnings
+            report["normalization"] = normalize_earnings(report.get("financial_figures") or {}, memory.uploaded_financial_text, getattr(memory, "uploaded_legal_text", ""))
+            from services.lender_view import run_lender_view
+            report["lender_view"] = run_lender_view(report.get("financial_figures") or {}, report.get("bank_signals") or {}, report.get("normalization") or {}, report.get("annual_revenue") or 0)
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark
@@ -1034,6 +1059,8 @@ def _enrich_demo():
     from services.supplier_benchmark import run_supplier_benchmark
     from services.bank_signals import analyze_bank_statement
     from services.governance import decision_support_notice
+    from services.normalization import normalize_earnings
+    from services.lender_view import run_lender_view
 
     figs = {
         "revenue": 24_500_000, "cogs": 20_090_000, "gross_profit": 4_410_000,
@@ -1070,13 +1097,18 @@ def _enrich_demo():
         24_500_000, {"banking_partner": "Standard Bank"})
     DEMO_REPORT["bank_signals"] = analyze_bank_statement(
         "Date Description Amount Balance\n"
-        "2026-01-03 Card settlement credit 820,000 410,000\n"
-        "2026-01-08 Debit order supplier RETURNED unpaid R/D -95,000 315,000\n"
-        "2026-01-22 Rent debit -180,000 -45,000\n"
-        "2026-02-05 Card settlement credit 760,000 690,000\n"
-        "2026-02-19 Debit order insurance insufficient funds reversal -42,000 -12,000\n"
-        "2026-03-02 Card settlement credit 690,000 615,000\n"
-        "2026-03-10 Overdraft interest charge -22,000 588,000\n")
+        "2026-01-03 Card settlement credit received 2,050,000.00 1,410,000.00\n"
+        "2026-01-08 Debit order supplier RETURNED unpaid R/D 95,000.00 1,315,000.00\n"
+        "2026-01-22 Rent debit payment 180,000.00 -45,000.00\n"
+        "2026-02-05 Card settlement credit received 1,980,000.00 1,690,000.00\n"
+        "2026-02-19 Debit order insurance insufficient funds reversal 42,000.00 -12,000.00\n"
+        "2026-03-02 Card settlement credit received 2,060,000.00 1,615,000.00\n"
+        "2026-03-10 Overdraft interest charge 22,000.00 588,000.00\n")
+    _demo_fin = ("Revenue 24 500 000\nOperating profit 735 000\nDepreciation 610 000\n"
+                 "Directors remuneration 1 080 000\nMotor vehicle expenses 240 000\n"
+                 "Entertainment 110 000\nDonations 60 000\nRestructuring costs 180 000\nDrawings 300 000\n")
+    DEMO_REPORT["normalization"] = normalize_earnings(figs, _demo_fin)
+    DEMO_REPORT["lender_view"] = run_lender_view(figs, DEMO_REPORT["bank_signals"], DEMO_REPORT["normalization"], 24_500_000)
     DEMO_REPORT["decision_support"] = decision_support_notice()
     DEMO_REPORT["macro_performed"] = True
     DEMO_REPORT["macro_summary"] = ("Retail margins are exposed to inflation on the cost base and "
