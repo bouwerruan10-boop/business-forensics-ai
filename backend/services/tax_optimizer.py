@@ -17,6 +17,10 @@ separately so the figure is never overstated.
 import math
 from services import sa_rates
 
+_DISCLAIMER = ("Legal tax planning only - compliance-positive and GAAR-respecting, NOT avoidance/evasion. "
+               "These are reliefs you may QUALIFY for; eligibility and current rates must be confirmed with a "
+               "registered SA tax practitioner. This is not tax advice.")
+
 
 def _fnum(v):
     if isinstance(v, bool):
@@ -24,7 +28,11 @@ def _fnum(v):
     if isinstance(v, (int, float)):
         return float(v) if math.isfinite(v) else None
     try:
-        x = float(str(v).strip().replace(" ", "").replace(",", "").replace("R", "").replace("ZAR", "").strip("()"))
+        raw = str(v).strip()
+        neg = raw.startswith("(") and raw.endswith(")")   # accounting negative, e.g. (50,000)
+        x = float(raw.replace(" ", "").replace(",", "").replace("R", "").replace("ZAR", "").strip("()"))
+        if neg:
+            x = -abs(x)
         return x if math.isfinite(x) else None
     except (ValueError, TypeError):
         return None
@@ -57,7 +65,17 @@ def _r(x):
 
 def analyze_tax_optimization(memory) -> dict:
     """Deterministic legal tax-optimisation scan. Returns opportunities + a saving
-    range (quantified items only). Pure; no LLM; safe when figures are missing."""
+    range (quantified items only). Pure; no LLM; safe when figures are missing.
+    Gated to SA taxpayers - these are South African statutory reliefs only."""
+    currency = getattr(memory, "currency", "ZAR") or "ZAR"
+    country = (getattr(memory, "country", "") or "").lower()
+    is_sa = ("south afric" in country) or (currency.upper() == "ZAR") or country in ("za", "rsa", "sa")
+    if not is_sa:
+        return {"available": False, "as_of": sa_rates.AS_OF, "sbc_tax_year": sa_rates.SBC_TAX_YEAR,
+                "currency": currency, "opportunities": [], "quantified_count": 0,
+                "total_saving_low": 0, "total_saving_high": 0,
+                "summary": "SA tax-optimisation reliefs apply to South African taxpayers only.",
+                "disclaimer": _DISCLAIMER}
     figs = _figs(memory)
     turnover = _fnum(getattr(memory, "annual_revenue", 0)) or figs.get("revenue") or 0.0
     taxable = figs.get("net_profit")
@@ -68,7 +86,6 @@ def analyze_tax_optimization(memory) -> dict:
     headcount = int(_fnum(getattr(memory, "headcount", 0)) or 0)
     entity_type = getattr(memory, "entity_type", "") or ""
     kind = _entity_kind(entity_type)
-    currency = getattr(memory, "currency", "ZAR") or "ZAR"
 
     opps = []
     q_low = q_high = 0.0
@@ -112,14 +129,14 @@ def analyze_tax_optimization(memory) -> dict:
 
     # 2) Employment Tax Incentive (flag; can't quantify without employee ages/wages)
     if headcount >= 1:
-        ceiling = round(headcount * sa_rates.ETI_MAX_MONTHLY_Y1 * 12)
+        per_emp = sa_rates.ETI_MAX_MONTHLY_Y1 * 12
         opps.append({
             "name": "Employment Tax Incentive (ETI)",
             "eligible": "possibly", "quantified": False,
-            "est_saving_low": 0, "est_saving_high": ceiling,
-            "basis": "You report {} employee(s). Each qualifying young worker (18-29) earning <R7,500/mo can attract up to R2,500/mo (~R30,000/yr) in year 1, R1,250/mo in year 2. The {} figure is the theoretical ceiling if EVERY employee qualified - realistically a fraction do.".format(headcount, _r(ceiling)),
+            "est_saving_low": 0, "est_saving_high": 0,
+            "basis": "You report {} employee(s). Each qualifying young worker (18-29) earning <R7,500/mo can attract up to R2,500/mo (~{}/yr) in year 1, R1,250/mo in year 2 - a PER-EMPLOYEE benefit claimed for however many of your staff actually qualify (not an aggregate).".format(headcount, _r(per_emp)),
             "action": "Check how many staff are 18-29 earning <R7,500/mo and claim ETI via EMP201.",
-            "caveat": "Depends on employee ages, wages, hours and minimum-wage compliance; not summed into the headline saving.",
+            "caveat": "Depends on employee ages, wages, hours and minimum-wage compliance; quantify per qualifying employee with your practitioner.",
         })
         # SDL note
         opps.append({
@@ -170,9 +187,7 @@ def analyze_tax_optimization(memory) -> dict:
         "total_saving_low": round(q_low),
         "total_saving_high": round(q_high),
         "summary": summary,
-        "disclaimer": ("Legal tax planning only - compliance-positive and GAAR-respecting, NOT avoidance/evasion. "
-                       "These are reliefs you may QUALIFY for; eligibility and current rates must be confirmed with a "
-                       "registered SA tax practitioner. This is not tax advice."),
+        "disclaimer": _DISCLAIMER,
     }
 
 

@@ -56,11 +56,13 @@ def test_no_employees_no_eti():
     assert "Employment Tax Incentive (ETI)" not in _by_name(r)
 
 
-def test_eti_ceiling_never_enters_headline_total():
+def test_eti_is_per_employee_not_aggregated():
+    # ETI must NOT show a headcount-multiplied aggregate (avoids absurd "up to R3bn")
     r = analyze_tax_optimization(_mk(headcount=20, figs={"net_profit": 400_000}))
     eti = _by_name(r)["Employment Tax Incentive (ETI)"]
-    assert eti["quantified"] is False and eti["est_saving_high"] == 20 * 2500 * 12
-    assert r["total_saving_high"] == 81802   # ETI ceiling NOT added
+    assert eti["quantified"] is False and eti["est_saving_high"] == 0
+    assert "per-employee" in eti["basis"].lower()
+    assert r["total_saving_high"] == 81802   # only SBC in the headline
 
 
 def test_unknown_entity_is_possibly_eligible():
@@ -108,3 +110,25 @@ def test_only_named_statutory_reliefs_surface():
                "Employment Tax Incentive (ETI)", "Skills Development Levy position",
                "Turnover-tax option (micro business)", "Further reliefs to review"}
     assert all(o["name"] in allowed for o in r["opportunities"])
+
+
+def test_non_sa_business_is_gated_out():
+    """SA statutory reliefs must NOT surface for a non-SA taxpayer."""
+    m = _mk()
+    m.currency = "USD"; m.country = "United States"
+    r = analyze_tax_optimization(m)
+    assert r["available"] is False and r["opportunities"] == []
+
+
+def test_sa_context_via_country_even_if_currency_blank():
+    m = _mk()
+    m.currency = ""; m.country = "South Africa"
+    r = analyze_tax_optimization(m)
+    assert r["available"] is True
+
+
+def test_accounting_negative_loss_is_not_a_saving():
+    # a loss written in accounting parens must not be read as a profit
+    r = analyze_tax_optimization(_mk(figs={"net_profit": "(50,000)"}))
+    sbc = _by_name(r)["Small Business Corporation rates (Section 12E)"]
+    assert sbc["quantified"] is False and r["total_saving_high"] == 0
