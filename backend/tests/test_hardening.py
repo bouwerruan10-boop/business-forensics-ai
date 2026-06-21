@@ -1357,3 +1357,13 @@ def test_ask_imara_grounded():
         r = c.post("/api/report/demo-001/ask", json={"analysis_id": "demo-001", "question": "What should I fix first?"})
         assert r.status_code == 200 and r.json()["answer"]
         assert c.post("/api/report/nope-9/ask", json={"analysis_id": "nope-9", "question": "x"}).status_code == 404
+
+
+def test_ask_context_handles_malformed_report():
+    """Ask Imara's context builder must never crash on a wrong-typed report field
+    (it feeds the user-facing /ask endpoint)."""
+    from services.ask import build_context
+    for rep in [{"imara_components": "notalist"}, {"financial_ratios": [1, 2]},
+                {"all_findings_ranked": "x"}, {"imara_components": 7, "financial_ratios": "y",
+                "all_findings_ranked": 99, "annual_revenue": {}}]:
+        assert isinstance(build_context(rep), str)

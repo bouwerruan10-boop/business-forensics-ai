@@ -42,11 +42,16 @@ def build_context(report: dict) -> str:
         L.append("Imara Score: {}/100 (Band {} - {}); confidence {}.".format(
             r.get("imara_score"), r.get("imara_band", "?"), r.get("imara_label", "?"),
             r.get("imara_confidence", "?")))
-    comps = r.get("imara_components") or []
+    comps = r.get("imara_components")
+    if not isinstance(comps, list):
+        comps = []
+    comps = [c for c in comps if isinstance(c, dict)]
     if comps:
         L.append("Score components (value/100, weight): " + "; ".join(
             "{} {} (w {:.0%})".format(c.get("label"), c.get("value"), c.get("weight", 0)) for c in comps))
-    ratios = r.get("financial_ratios") or {}
+    ratios = r.get("financial_ratios")
+    if not isinstance(ratios, dict):
+        ratios = {}
     if ratios:
         rl = []
         for k, m in ratios.items():
@@ -58,7 +63,10 @@ def build_context(report: dict) -> str:
     for key in ("situation", "complication", "resolution"):
         if r.get(key):
             L.append(key.capitalize() + ": " + str(r[key]))
-    findings = r.get("all_findings_ranked") or []
+    findings = r.get("all_findings_ranked")
+    if not isinstance(findings, list):
+        findings = []
+    findings = [f for f in findings if isinstance(f, dict)]
     if findings:
         L.append("Top findings:")
         for f in findings[:6]:
