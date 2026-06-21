@@ -47,3 +47,19 @@ def test_pack_handles_nonfinite_and_string_figures():
     rep["normalization"]["reported_ebitda"] = float("nan")
     b = generate_bank_ready_pack(rep)   # must not crash
     assert b[:4] == b"%PDF"
+
+
+def test_pack_survives_wrong_typed_sections():
+    """Report subsections may be the wrong type (string/list/int) — must still yield a valid PDF."""
+    for sub in ("financial_figures", "normalization", "lender_view", "bank_signals", "financial_ratios"):
+        for val in ("garbage", ["a", "b"], 123, True):
+            b = generate_bank_ready_pack({sub: val, "business_name": "X"})
+            assert b[:4] == b"%PDF"
+    # non-string business_name and nested wrong types
+    assert generate_bank_ready_pack({"business_name": 12345, "annual_revenue": float("inf")})[:4] == b"%PDF"
+    assert generate_bank_ready_pack({"normalization": {"available": True, "reported_ebitda": 1e6,
+        "adjusted_ebitda_low": 1e6, "adjusted_ebitda_high": 2e6, "add_backs": "nope",
+        "loan_account_flag": "nope"}})[:4] == b"%PDF"
+    assert generate_bank_ready_pack({"lender_view": {"available": True, "decline_risk": "high",
+        "verdict": "v", "reasons": "nope", "reconciliation": "nope",
+        "cash_flow_metrics": "nope", "borrowing_capacity": "nope"}})[:4] == b"%PDF"

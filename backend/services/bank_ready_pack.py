@@ -75,6 +75,16 @@ def _money(n, cur="ZAR"):
     return "%s %s%s" % (cur, "-" if n < 0 else "", "{:,.0f}".format(abs(n)))
 
 
+def _d(x):
+    """Coerce to dict (defensive — report subsections may be wrong-typed)."""
+    return x if isinstance(x, dict) else {}
+
+
+def _l(x):
+    """Coerce to a list of dicts (drops non-dict items)."""
+    return [i for i in x if isinstance(i, dict)] if isinstance(x, list) else []
+
+
 def _table(rows, col_widths, header=True, st=None):
     rows = [[c if hasattr(c, "wrap") else _para(str(c), _CELL) for c in row] for row in rows]
     t = Table(rows, colWidths=col_widths, hAlign="LEFT")
@@ -99,11 +109,11 @@ def generate_bank_ready_pack(report: dict) -> bytes:
     report = report or {}
     g = report.get
     cur = g("currency", "ZAR") or "ZAR"
-    figs = g("financial_figures") or {}
-    norm = g("normalization") or {}
-    lv = g("lender_view") or {}
-    bank = g("bank_signals") or {}
-    ratios = g("financial_ratios") or {}
+    figs = _d(g("financial_figures"))
+    norm = _d(g("normalization"))
+    lv = _d(g("lender_view"))
+    bank = _d(g("bank_signals"))
+    ratios = _d(g("financial_ratios"))
     S = _styles()
     M = lambda n: _money(n, cur)
 
@@ -114,7 +124,7 @@ def generate_bank_ready_pack(report: dict) -> bytes:
     story = []
 
     # ── Header band ──
-    name = g("business_name") or "Your Business"
+    name = str(g("business_name") or "Your Business")
     head = Table([[_para("Bank-Ready Pack", S["title"])],
                   [_para(name + " &nbsp;·&nbsp; an application-readiness summary prepared by Imara", S["sub"])],
                   [_para("Decision-support to help you get finance-ready — not a credit decision, not financial advice.", S["sub"])]],
@@ -170,7 +180,7 @@ def generate_bank_ready_pack(report: dict) -> bytes:
                 [_para("<b>Adjusted EBITDA (indicative range)</b>", S["cell"]),
                  _para("<b>" + M(norm.get("adjusted_ebitda_low")) + " – " + M(norm.get("adjusted_ebitda_high")) + "</b>", S["cell"])]]
         story += [_table(rows, [120 * mm, 58 * mm])]
-        adds = norm.get("add_backs") or []
+        adds = _l(norm.get("add_backs"))
         if adds:
             ab = [[_para("Add-back", S["cellb"]), _para("Amount", S["cellb"]), _para("Basis", S["cellb"])]]
             for a in adds:
@@ -181,7 +191,7 @@ def generate_bank_ready_pack(report: dict) -> bytes:
                 "On the basis above, the company-paid owner/personal and one-off costs are added back to reflect the "
                 "business's true earning power. The owner-personal portion should be confirmed by the owner/accountant "
                 "for the bank's file.", S["small"])]
-        lf = norm.get("loan_account_flag") or {}
+        lf = _d(norm.get("loan_account_flag"))
         if lf.get("flagged"):
             story += [Spacer(1, 4), _para("<b>Note:</b> " + str(lf.get("detail", "")) + " <b>Action:</b> " + str(lf.get("fix", "")), S["small"])]
     else:
@@ -189,8 +199,8 @@ def generate_bank_ready_pack(report: dict) -> bytes:
 
     # ── Section B: Bank conduct + reconciliation ──
     story += [_para("2. Cash-flow &amp; bank-conduct evidence", S["h"])]
-    if bank.get("available") or lv.get("cash_flow_metrics", {}).get("available"):
-        m = lv.get("cash_flow_metrics") or {}
+    m = _d(lv.get("cash_flow_metrics"))
+    if bank.get("available") or m.get("available"):
         rows = [[_para("Signal", S["cellb"]), _para("Value", S["cellb"])],
                 ["Months of statement history", m.get("period_months") or bank.get("period_months") or "—"],
                 ["Average balance", M(m.get("average_daily_balance") or bank.get("avg_balance"))],
@@ -199,7 +209,7 @@ def generate_bank_ready_pack(report: dict) -> bytes:
                 ["Returned / bounced debit orders", m.get("returned_debit_orders") if m.get("returned_debit_orders") is not None else bank.get("returned_debit_orders", "—")],
                 ["Lowest balance in period", M(m.get("min_balance") if m.get("min_balance") is not None else bank.get("min_balance"))]]
         story += [_table(rows, [120 * mm, 58 * mm])]
-        rec = lv.get("reconciliation") or {}
+        rec = _d(lv.get("reconciliation"))
         if rec.get("available"):
             story += [Spacer(1, 5), _para("Bank deposits vs declared revenue", S["body"]),
                       _table([[_para("Declared revenue", S["cellb"]), _para("Annualised deposits", S["cellb"]), _para("Gap", S["cellb"])],
@@ -212,11 +222,11 @@ def generate_bank_ready_pack(report: dict) -> bytes:
                         "attach business bank statements to strengthen the application.", S["small"])]
 
     # ── Section C: Affordability ──
-    bc = lv.get("borrowing_capacity") or {}
+    bc = _d(lv.get("borrowing_capacity"))
     if bc.get("working_capital_facility") or bc.get("term_loan"):
         story += [_para("3. Indicative affordability / debt-service capacity", S["h"])]
-        wc = bc.get("working_capital_facility") or {}
-        tl = bc.get("term_loan") or {}
+        wc = _d(bc.get("working_capital_facility"))
+        tl = _d(bc.get("term_loan"))
         rows = [[_para("Facility", S["cellb"]), _para("Indicative range", S["cellb"]), _para("Basis", S["cellb"])]]
         if wc:
             rows.append(["Working-capital facility", M(wc.get("low")) + " – " + M(wc.get("high")), wc.get("basis", "")])
@@ -243,7 +253,7 @@ def generate_bank_ready_pack(report: dict) -> bytes:
             story += [_table(rr, [60 * mm, 38 * mm, 44 * mm, 36 * mm])]
 
     # ── Section E: Readiness fixes ──
-    reasons = lv.get("reasons") or []
+    reasons = _l(lv.get("reasons"))
     if reasons:
         story += [_para("5. What to strengthen before you apply", S["h"])]
         fr = [[_para("Issue", S["cellb"]), _para("Fix", S["cellb"])]]
