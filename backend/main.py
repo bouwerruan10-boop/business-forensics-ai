@@ -134,6 +134,11 @@ class ActionSimRequest(BaseModel):
     scenario: str = "expected"
     variable: str | None = None   # vestigial — unused by /simulate/actions & /montecarlo; optional so the frontend (which omits it) doesn't 422
 
+class AskRequest(BaseModel):
+    analysis_id: str
+    question: str = ""
+
+
 class OutcomeIn(BaseModel):
     analysis_id: str
     outcome_type: str          # default|repaid|funded|declined|external_score
@@ -445,6 +450,18 @@ def report_reasons(analysis_id: str):
         raise HTTPException(status_code=404, detail="Analysis not found")
     from services.reason_codes import reason_codes
     return reason_codes(result)
+
+
+@app.post("/api/report/{analysis_id}/ask")
+def report_ask(analysis_id: str, body: AskRequest):
+    """Ask Imara: a grounded Q&A over an already-produced analysis. Explains the
+    deterministic facts in the report; never invents numbers; defers what-ifs to
+    the Action Simulator. Cheap (Haiku) and decision-support only."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.ask import answer_question
+    return answer_question(result, body.question)
 
 
 @app.get("/api/report/{analysis_id}/distress")

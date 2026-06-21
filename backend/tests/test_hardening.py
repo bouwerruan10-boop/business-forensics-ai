@@ -1341,3 +1341,19 @@ def test_demo_showcases_new_panels():
     with TestClient(main.app) as c:
         for ep in ["/distress", "/supplier-savings", "/reasons", "/macro", "/actions"]:
             assert c.get(f"/api/report/demo-001{ep}").status_code == 200, ep
+
+
+def test_ask_imara_grounded():
+    """Ask Imara must be grounded (build a context from the report), MOCK-safe, and never crash."""
+    import main
+    from services.ask import build_context, answer_question
+    ctx = build_context(main.DEMO_REPORT)
+    assert "Imara Score" in ctx and "Mzansi" in ctx and len(ctx) > 500
+    a = answer_question(main.DEMO_REPORT, "Why is my score low?")
+    assert a["answer"] and len(a["answer"]) > 10
+    assert answer_question(main.DEMO_REPORT, "")["answer"]   # empty question -> prompt, no crash
+    from fastapi.testclient import TestClient
+    with TestClient(main.app) as c:
+        r = c.post("/api/report/demo-001/ask", json={"analysis_id": "demo-001", "question": "What should I fix first?"})
+        assert r.status_code == 200 and r.json()["answer"]
+        assert c.post("/api/report/nope-9/ask", json={"analysis_id": "nope-9", "question": "x"}).status_code == 404

@@ -1,5 +1,7 @@
 import ScoreCards from './ScoreCards'
 import ImaraScoreHero from './ImaraScoreHero'
+import VerdictHero from './VerdictHero'
+import AskImara from './AskImara'
 import ScoreReasons from './ScoreReasons'
 import FinancialRatios from './FinancialRatios'
 import FindingsList from './FindingsList'
@@ -184,6 +186,9 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
       <div className="lg:flex lg:gap-8 lg:items-start">
         <SectionNav items={navItems} />
         <div className="min-w-0 flex-1">
+
+      <VerdictHero report={report} />
+      <AskImara report={report} analysisId={analysisId} />
 
       {/* Executive Summary */}
       <Section id="summary" title="Executive Summary">

@@ -120,3 +120,13 @@ export async function getOptimize(analysisId, scenario = 'expected', maxActions 
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function askImara(analysisId, question) {
+  const res = await fetch(`${BASE}/report/${analysisId}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ analysis_id: analysisId, question }),
+  })
+  if (!res.ok) throw new Error('ask failed')
+  return res.json()
+}
