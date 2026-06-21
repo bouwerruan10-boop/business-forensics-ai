@@ -19,7 +19,7 @@ from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -40,6 +40,7 @@ from memory.shared_memory import SharedMemory
 from auth import get_principal, Principal
 from config import PUBLIC_API, API_VERSION
 from services.score_contract import score_contract, usage_summary
+from services.jsonsafe import finite_safe
 
 # -- Rate limiter setup -------------------------------------------
 # Configurable via RATE_LIMIT env var, default: 3 per hour
@@ -99,10 +100,20 @@ def verify_admin_key(request: Request):
         )
 
 
+class SafeJSONResponse(JSONResponse):
+    """Default JSON response: strips NaN/inf so no endpoint can ever emit invalid
+    JSON or 500 on a non-finite number — the root-cause guard for that bug class."""
+    def render(self, content) -> bytes:
+        import json as _json
+        return _json.dumps(finite_safe(content), ensure_ascii=False, allow_nan=False,
+                           separators=(",", ":")).encode("utf-8")
+
+
 app = FastAPI(
     title="Imara",
     description="AI-powered multi-agent business consulting platform",
     version="2.1.0",
+    default_response_class=SafeJSONResponse,
 )
 
 app.state.limiter = limiter
@@ -880,6 +891,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             _rev = report.get("annual_revenue") or (report.get("financial_figures") or {}).get("revenue") or 0
             report["supplier_benchmark"] = run_supplier_benchmark(memory.uploaded_financial_text, _rev, profile, report.get("bank_signals"))
 
+            report = finite_safe(report)  # root-cause: strip NaN/inf once -> every consumer + the stored JSON is safe
             report["analysis_id"] = analysis_id  # ensure the report (and audit record) carry their id
             from services.audit_log import record_decision
             try:
@@ -1195,6 +1207,8 @@ def _enrich_demo():
     DEMO_REPORT["llm_usage"] = {"calls": 38, "tokens": 214000, "est_cost_usd": 0.29,
         "by_model": {"claude-sonnet-4-6": 0.24, "claude-haiku-4-5-20251001": 0.05}}
     DEMO_REPORT["total_runtime_seconds"] = 642
+    for _k in list(DEMO_REPORT.keys()):
+        DEMO_REPORT[_k] = finite_safe(DEMO_REPORT[_k])
 
     analyses["demo-001"] = DEMO_REPORT
 

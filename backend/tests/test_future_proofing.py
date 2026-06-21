@@ -98,3 +98,20 @@ def test_audit_record_json_safe_with_nonfinite():
                 {"imara_score": 1e400, "business_name": "X"}):
         rec = build_audit_record(rep, "inputs")
         json.dumps(rec, allow_nan=False)   # raises if a non-finite leaked through
+
+
+def test_finite_safe_recursive():
+    import json
+    from services.jsonsafe import finite_safe
+    out = finite_safe({"a": float("nan"), "b": [1, float("inf"), {"c": float("-inf")}],
+                       "d": "ok", "e": 3.14, "f": None, "g": True})
+    json.dumps(out, allow_nan=False)   # strict-safe
+    assert out == {"a": None, "b": [1, None, {"c": None}], "d": "ok", "e": 3.14, "f": None, "g": True}
+
+
+def test_safe_json_response_strips_nonfinite():
+    """The default response class makes EVERY endpoint finite-safe (root-cause guard)."""
+    import json
+    import main
+    r = main.SafeJSONResponse(content={"x": float("nan"), "y": [float("inf")], "z": 1.5})
+    assert json.loads(r.body.decode()) == {"x": None, "y": [None], "z": 1.5}
