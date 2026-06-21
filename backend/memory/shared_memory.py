@@ -223,7 +223,7 @@ class SharedMemory:
         if self.sa_tax_summary:
             parts.append(f"SA Tax: {self.sa_tax_summary}")
         if self.tax_opt_summary:
-            parts.append(f"SA Tax Optimisation: {self.tax_opt_summary}")
+            parts.append(f"Tax Me If You Can (legal tax saving): {self.tax_opt_summary}")
         if self.sa_legal_summary:
             parts.append(f"SA Legal: {self.sa_legal_summary}")
         return "\n".join(parts)

@@ -100,7 +100,7 @@ generic business language."""
                  "Conducting deep market research and competitor analysis..."),
                 (SATaxAgent(), "SA Tax Compliance Agent",
                  "Reviewing SARS tax obligations..."),
-                (TaxOptimizationAgent(), "SA Tax Optimisation Agent",
+                (TaxOptimizationAgent(), "Tax Me If You Can",
                  "Finding legitimate SA tax reliefs you may be missing (SBC, ETI, allowances)..."),
                 (SALegalAgent(), "SA Corporate Law & BBBEE Agent",
                  "Reviewing Companies Act, BBBEE, POPIA, CIPC compliance..."),

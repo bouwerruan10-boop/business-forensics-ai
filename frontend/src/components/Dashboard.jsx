@@ -176,7 +176,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...(report.lender_view?.available ? [{ id: 'lender-view', label: "Lender's-Eye View" }] : []),
     ...(report.funding_fit?.available ? [{ id: 'funding-fit', label: 'Funding Fit' }] : []),
     ...(report.supplier_benchmark?.available ? [{ id: 'suppliers', label: 'Supplier Savings' }] : []),
-    ...(report.tax_optimization?.available ? [{ id: 'tax-optimisation', label: 'Tax Optimisation' }] : []),
+    ...(report.tax_optimization?.available ? [{ id: 'tax-optimisation', label: 'Tax Me If You Can' }] : []),
     { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
   ]
@@ -370,7 +370,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
       {report.tax_optimization?.available && (
         <Section
           id="tax-optimisation"
-          title="Tax Optimisation"
+          title="Tax Me If You Can"
           subtitle="Legitimate SA tax reliefs you may qualify for but could be missing — legal, GAAR-respecting planning"
         >
           <TaxOptimisation report={report} currency={report.currency} />

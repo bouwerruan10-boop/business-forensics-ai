@@ -24,7 +24,7 @@ export default function TaxOptimisation({ report, currency = 'ZAR' }) {
       <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5">
         <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5">
           Estimated annual tax saving (legal reliefs)
-          <InfoTip label="Tax optimisation" text="Legitimate SA reliefs you may QUALIFY for but could be missing — computed deterministically from your figures and the dated SARS rate corpus. Compliance-positive, GAAR-respecting legal planning only — not avoidance, and not tax advice. Confirm eligibility and current rates with a registered tax practitioner. Does not change the Imara Score." />
+          <InfoTip label="Tax Me If You Can" text="Legitimate SA reliefs you may QUALIFY for but could be missing — computed deterministically from your figures and the dated SARS rate corpus. Compliance-positive, GAAR-respecting legal planning only — not avoidance, and not tax advice. Confirm eligibility and current rates with a registered tax practitioner. Does not change the Imara Score." />
         </div>
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-3xl font-bold text-emerald-400">{money(tx.total_saving_high, cur)}</span>

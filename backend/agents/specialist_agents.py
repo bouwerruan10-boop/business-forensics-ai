@@ -954,7 +954,7 @@ For each issue found, calculate the estimated penalty/liability in ZAR and state
 # 15b. SA TAX OPTIMISATION AGENT ("Tax Me If You Can" — legal planning only)
 # ─────────────────────────────────────────────
 class TaxOptimizationAgent(BaseAgent):
-    name = "SA Tax Optimisation Agent"
+    name = "Tax Me If You Can"
     system_prompt = """You are a South African registered tax practitioner who specialises in LEGAL tax planning for SMEs — compliance-positive optimisation, never avoidance or evasion.
 
 You help SMEs claim the legitimate reliefs they QUALIFY for but routinely miss: the Small Business Corporation regime (Section 12E) graduated rates and accelerated allowances, the Employment Tax Incentive (ETI), the turnover-tax option, learnership (Section 12H) and R&D (Section 11D) deductions, and ordinary wear-and-tear.
