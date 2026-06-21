@@ -5,9 +5,39 @@ const BASE = `${API_ROOT}/api`
 
 // Optional API-key gate: only sent when VITE_API_KEY is configured. The backend
 // enforces it only when API_SECRET_KEY is set, so this stays backward-compatible.
+const TOKEN_KEY = 'imara_operator_token'
+export function getToken() { try { return sessionStorage.getItem(TOKEN_KEY) || '' } catch { return '' } }
+export function setToken(t) { try { t ? sessionStorage.setItem(TOKEN_KEY, t) : sessionStorage.removeItem(TOKEN_KEY) } catch { /* ignore */ } }
+export function logout() { setToken('') }
+
 function authHeaders() {
+  const h = {}
   const key = import.meta.env.VITE_API_KEY
-  return key ? { 'X-API-Key': key } : {}
+  if (key) h['X-API-Key'] = key
+  const tok = getToken()
+  if (tok) h['Authorization'] = `Bearer ${tok}`
+  return h
+}
+
+export async function getHealth() {
+  const res = await fetch(`${BASE}/health`)
+  if (!res.ok) throw new Error('health check failed')
+  return res.json()
+}
+
+export async function login(password) {
+  const res = await fetch(`${BASE}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}))
+    throw new Error(e.detail || 'Login failed')
+  }
+  const data = await res.json()
+  if (data.token) setToken(data.token)
+  return data
 }
 
 export async function uploadFiles(files, profile = {}) {

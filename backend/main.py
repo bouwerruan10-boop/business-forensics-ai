@@ -173,13 +173,64 @@ class OutcomeIn(BaseModel):
 
 # -- Routes --------------------------------------------------------
 
+class LoginRequest(BaseModel):
+    password: str = ""
+
+
+@app.post("/api/login")
+def login(req: LoginRequest):
+    """Operator login. With OPERATOR_PASSWORD set, exchange it for a bearer token;
+    unset = open (dev/operator), reports auth is not required."""
+    from config import AUTH_ENABLED, OPERATOR_PASSWORD
+    if not AUTH_ENABLED:
+        return {"auth_required": False}
+    import hmac as _hmac
+    if not _hmac.compare_digest(req.password or "", OPERATOR_PASSWORD):
+        raise HTTPException(status_code=401, detail="Invalid password")
+    from auth import issue_token
+    return {"token": issue_token(), "token_type": "bearer", "auth_required": True}
+
+
+_AUTH_GATED_PREFIXES = ("/api/report/", "/api/analyze", "/api/status/", "/api/simulate")
+
+
+def _auth_path_public(path: str) -> bool:
+    if path in ("/api/login", "/api/health", "/openapi.json", "/docs", "/redoc"):
+        return True
+    if path.startswith(("/api/shared/", "/api/admin/", "/api/v1/")):
+        return True
+    parts = path.split("/")   # /api/report/demo-001[/...] -> the public demo only
+    if len(parts) >= 4 and parts[1] == "api" and parts[2] == "report" and parts[3] == "demo-001":
+        return True
+    return False
+
+
+@app.middleware("http")
+async def _operator_gate(request: Request, call_next):
+    """Gate the report/analyze/status surface behind the operator token when
+    OPERATOR_PASSWORD is set. Public share links, the demo, admin (own key), /v1 and
+    health stay open. No-op when auth is disabled (dev/test)."""
+    from config import AUTH_ENABLED
+    if AUTH_ENABLED:
+        path = request.url.path
+        if any(path.startswith(p) for p in _AUTH_GATED_PREFIXES) and not _auth_path_public(path):
+            from auth import verify_token
+            h = request.headers.get("Authorization", "")
+            tok = h[7:] if h.lower().startswith("bearer ") else ""
+            if not verify_token(tok):
+                return SafeJSONResponse({"detail": "Authentication required"}, status_code=401)
+    return await call_next(request)
+
+
 @app.get("/api/health")
 def health():
     # RAILWAY_GIT_COMMIT_SHA is injected by Railway at build time; "dev" locally.
+    from config import AUTH_ENABLED
     return {
         "status": "ok",
         "service": "Imara v2.0",
         "commit": os.getenv("RAILWAY_GIT_COMMIT_SHA", "dev")[:8],
+        "auth_required": AUTH_ENABLED,
     }
 
 

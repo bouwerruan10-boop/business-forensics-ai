@@ -5,8 +5,9 @@ import AnalysisProgress from './components/AnalysisProgress'
 import Dashboard from './components/Dashboard'
 import AdminDashboard from './components/AdminDashboard'
 import SharedReport from './components/SharedReport'
+import Login from './components/Login'
 import Toast from './components/Toast'
-import { uploadFiles, pollStatus, getReport } from './api/client'
+import { uploadFiles, pollStatus, getReport, getHealth, getToken } from './api/client'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -20,6 +21,9 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [sharedId, setSharedId] = useState(null)
   const [sharedToken, setSharedToken] = useState(null)
+  const [authRequired, setAuthRequired] = useState(false)
+  const [authed, setAuthed] = useState(() => !!getToken())
+  const [authChecked, setAuthChecked] = useState(false)
   const pollRef = useRef(null)
 
   // Hash routing — handle /report/:id URLs
@@ -39,6 +43,11 @@ export default function App() {
     checkHash()
     window.addEventListener('hashchange', checkHash)
     return () => window.removeEventListener('hashchange', checkHash)
+  }, [])
+
+  // Operator-auth status (whether a login is required for this deployment)
+  useEffect(() => {
+    getHealth().then(h => setAuthRequired(!!h.auth_required)).catch(() => {}).finally(() => setAuthChecked(true))
   }, [])
 
   const showToast = (message, type = 'success') => {
@@ -115,6 +124,12 @@ export default function App() {
     } catch (e) {
       showToast('Could not load report: ' + e.message, 'error')
     }
+  }
+
+  // Operator login gate. Public #/shared/{token} links are exempt (clients never sign in).
+  if (!sharedToken) {
+    if (!authChecked) return <div className="min-h-screen bg-navy" aria-busy="true" />
+    if (authRequired && !authed) return <Login onAuthed={() => setAuthed(true)} />
   }
 
   // Shared report view (hash routing) — by analysis id or by share token

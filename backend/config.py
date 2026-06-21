@@ -34,3 +34,14 @@ PUBLIC_API = os.getenv("PUBLIC_API", "false").lower() in ("true", "1", "yes")
 DEFAULT_OWNER = os.getenv("DEFAULT_OWNER", "operator")
 API_VERSION = "v1"
 IMARA_ENGINE_VERSION = os.getenv("IMARA_ENGINE_VERSION", "2.1.0")  # stamped into the decision audit log
+
+# ── Operator authentication (multi-user-ready seam) ──
+# Set OPERATOR_PASSWORD to require login; unset = open (dev/operator) for backward-compat.
+import hashlib as _hashlib
+OPERATOR_PASSWORD = os.getenv("OPERATOR_PASSWORD", "")
+AUTH_ENABLED = bool(OPERATOR_PASSWORD)
+# Token-signing secret; if unset, derive deterministically from the password so it
+# works with just OPERATOR_PASSWORD set (still secret + stable across restarts).
+AUTH_SECRET = os.getenv("AUTH_SECRET", "") or (
+    _hashlib.sha256(("imara-auth::" + OPERATOR_PASSWORD).encode()).hexdigest() if OPERATOR_PASSWORD else "")
+AUTH_TTL_HOURS = int(os.getenv("AUTH_TTL_HOURS", "12"))
