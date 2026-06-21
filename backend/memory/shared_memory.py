@@ -22,6 +22,8 @@ class AgentFinding:
     quick_win: bool = False
     verification: str = ""        # "" | "confirmed" | "conflict" (vs computed ratios)
     verification_note: str = ""
+    prose_check: str = ""         # "" | "conflict" (qualitative narrative vs computed ratio status)
+    prose_note: str = ""
 
 
 @dataclass
@@ -60,6 +62,7 @@ class SharedMemory:
 
     # Phase 1 — faithfulness verification (findings vs computed ratios)
     faithfulness_summary: dict = field(default_factory=dict)   # {checked, confirmed, conflicts, conflict_titles}
+    prose_verifier_summary: dict = field(default_factory=dict) # {checked, flagged, flag_titles}
     # Phase 0 — observability
     agent_timings: list = field(default_factory=list)          # [{agent, seconds}]
     total_runtime_seconds: float = 0.0

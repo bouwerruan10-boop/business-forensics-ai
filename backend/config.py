@@ -45,3 +45,11 @@ AUTH_ENABLED = bool(OPERATOR_PASSWORD)
 AUTH_SECRET = os.getenv("AUTH_SECRET", "") or (
     _hashlib.sha256(("imara-auth::" + OPERATOR_PASSWORD).encode()).hexdigest() if OPERATOR_PASSWORD else "")
 AUTH_TTL_HOURS = int(os.getenv("AUTH_TTL_HOURS", "12"))
+
+# ── Database backups (Tier 1.5) ──
+# Opt-in (like auth/admin). Set BACKUP_ENABLED=true on Railway to start scheduled
+# snapshots. For true OFF-VOLUME durability set BACKUP_DIR to a second mount.
+BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "false").lower() in ("true", "1", "yes")
+BACKUP_DIR = os.getenv("BACKUP_DIR", "")          # default: <db dir>/backups (same volume)
+BACKUP_INTERVAL_HOURS = int(os.getenv("BACKUP_INTERVAL_HOURS", "24"))
+BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "7"))  # rotation: keep N most recent

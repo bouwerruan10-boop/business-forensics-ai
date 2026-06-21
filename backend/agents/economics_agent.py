@@ -11,6 +11,8 @@ from agents.base_agent import BaseAgent
 from agents.specialist_agents import FINDING_RULES
 from memory.shared_memory import SharedMemory, AgentFinding
 from services.macro_data import firm_macro_sensitivity, macro_summary_text, SA_MACRO
+from services.obs import get_logger
+_log = get_logger("imara.pipeline")
 
 
 class EconomicsAgent(BaseAgent):
@@ -40,7 +42,7 @@ class EconomicsAgent(BaseAgent):
             memory.macro_overall_exposure = sens.get("overall_exposure", "")
             memory.macro_top_driver = sens.get("top_driver", "")
         except Exception as exc:
-            print("[economics] sensitivity failed: {}".format(exc))
+            _log.warning("economics_sensitivity_failed", error=str(exc))
             sens = {}
 
         memory.macro_performed = True
@@ -70,6 +72,6 @@ macro scenario (higher rates + weaker rand + tariff hikes) would push the busine
             raw = self._call_claude(prompt)
             findings = self._parse_findings(raw, memory)
         except Exception as exc:
-            print("[economics] narrative failed, deterministic fields kept: {}".format(exc))
+            _log.warning("economics_narrative_failed", error=str(exc))
             findings = []
         return findings

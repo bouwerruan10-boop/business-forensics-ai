@@ -11,6 +11,9 @@ deterministic regardless of which agent finishes first. Each agent is isolated:
 a failure yields no findings and never sinks the run.
 """
 import contextvars
+from services.obs import get_logger
+_log = get_logger("imara.pipeline")
+
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -31,7 +34,7 @@ def _run_one(AgentClass, business_data, memory):
     try:
         fnds = agent.analyze(business_data, memory)
     except Exception as exc:  # isolate: one agent must not sink the analysis
-        print("[pipeline] {} failed, skipping: {}".format(getattr(agent, "name", "?"), exc))
+        _log.warning("agent_failed_skipped", agent=getattr(agent, "name", "?"), error=str(exc))
         fnds = []
     return agent.name, fnds, round(time.perf_counter() - t, 1)
 
@@ -86,7 +89,7 @@ def run_independent_agents(items, business_data, memory, progress_callback=None,
         try:
             fnds = agent.analyze(business_data, memory)
         except Exception as exc:
-            print("[pipeline] {} failed, skipping: {}".format(label, exc))
+            _log.warning("agent_failed_skipped", agent=label, error=str(exc))
             fnds = []
         if progress_callback:
             progress_callback(label, "{} complete".format(label))

@@ -35,6 +35,9 @@ _METRICS = [
     ("interest coverage",       "interest_coverage","x"),
 ]
 
+# Public alias so prose_verifier reuses the same metric vocabulary (no duplication).
+METRIC_PHRASES = _METRICS
+
 # A number, optionally preceded by ~ and with a %/x/days suffix.
 _NUM_NEAR = re.compile(r"[~≈]?\s*(\d+(?:[.,]\d+)?)\s*(%|x|×|days|day)?", re.IGNORECASE)
 

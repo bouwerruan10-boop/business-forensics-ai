@@ -39,6 +39,11 @@ function FindingCard({ finding }) {
                 ✓ Verified
               </span>
             )}
+            {finding.prose_check === 'conflict' && (
+              <span title={finding.prose_note} className="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5 font-medium">
+                ⚠ Narrative check
+              </span>
+            )}
             {finding.quality === 'weak' && (
               <span title={`Soft finding — ${(finding.quality_flags || []).join(', ').replace(/_/g, ' ') || 'limited supporting detail'}`}
                 className="text-xs bg-slate-500/10 text-slate-400 border border-slate-500/25 rounded-full px-2 py-0.5 font-medium">
@@ -91,6 +96,14 @@ function FindingCard({ finding }) {
                 Figure verification
               </div>
               <div className="text-slate-300 text-xs">{finding.verification_note}</div>
+            </div>
+          )}
+          {finding.prose_note && (
+            <div className="rounded-lg p-3 bg-amber-500/5 border border-amber-500/20">
+              <div className="text-xs font-medium mb-0.5 text-amber-300">
+                Narrative consistency
+              </div>
+              <div className="text-slate-300 text-xs">{finding.prose_note}</div>
             </div>
           )}
         </div>

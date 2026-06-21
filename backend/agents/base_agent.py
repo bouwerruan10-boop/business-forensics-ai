@@ -10,6 +10,8 @@ import os
 from memory.shared_memory import SharedMemory, AgentFinding
 from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS, MOCK_MODE, PARSE_MODEL, MODEL_FALLBACKS
 from services.benchmark_service import format_benchmark_context
+from services.obs import get_logger
+_log = get_logger("imara.pipeline")
 
 # Build an httpx client that works in any environment:
 # - On developer machines: no proxy needed, standard SSL
@@ -110,7 +112,7 @@ class BaseAgent:
             if not (_is_model_unavailable(last_exc) or _is_transient(last_exc)):
                 raise last_exc
             if model != candidates[-1]:
-                print("[model] '{}' unavailable ({}); falling back to next model".format(model, last_exc))
+                _log.warning("model_unavailable_fallback", model=model, error=str(last_exc))
         if response is None:
             raise last_exc
         try:  # observability: attribute token usage + cost to this analysis (never fatal)
@@ -161,7 +163,7 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
         try:
             raw = self._call_claude(parse_prompt, system_override=_parse_system, model_override=PARSE_MODEL)
         except Exception as _exc:
-            print("[parse] {} model failed ({}); retrying on default model".format(PARSE_MODEL, _exc))
+            _log.warning("parse_model_failed_retry", model=PARSE_MODEL, error=str(_exc))
             raw = self._call_claude(parse_prompt, system_override=_parse_system)
         raw = raw.strip()
 

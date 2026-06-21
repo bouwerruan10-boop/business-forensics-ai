@@ -117,13 +117,65 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# ── Observability (Tier 1.4): structured logging + optional Sentry ──
+from services.obs import configure_logging, get_logger, init_sentry, bind_context, clear_context
+configure_logging()
+log = get_logger("imara.api")
+
+
+@app.middleware("http")
+async def _request_logging(request: Request, call_next):
+    import uuid as _uuid, time as _t
+    rid = request.headers.get("X-Request-ID") or _uuid.uuid4().hex[:12]
+    bind_context(request_id=rid)
+    started = _t.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        log.exception("request_error", method=request.method, path=request.url.path)
+        clear_context()
+        raise
+    response.headers["X-Request-ID"] = rid
+    log.info("request", method=request.method, path=request.url.path,
+             status=response.status_code, ms=round((_t.perf_counter() - started) * 1000))
+    clear_context()
+    return response
+
+
 
 @app.on_event("startup")
 def on_startup():
     init_db()
+    if init_sentry():
+        log.info("sentry_enabled")
     _interrupted = mark_interrupted_analyses()
     if _interrupted:
-        print("[startup] flagged {} interrupted analysis(es) from a previous run".format(_interrupted))
+        log.info("interrupted_analyses_flagged", count=_interrupted)
+    _start_backup_scheduler()
+
+
+def _start_backup_scheduler():
+    """Daemon thread: periodic consistent DB snapshots + rotation. Opt-in via
+    BACKUP_ENABLED (default off, backward-compatible). Runs one snapshot at
+    startup, then every BACKUP_INTERVAL_HOURS."""
+    import config as _cfg
+    if not _cfg.BACKUP_ENABLED:
+        return
+    import threading, time
+    from services.backup import create_backup, prune_backups
+
+    def _loop():
+        while True:
+            try:
+                snap = create_backup()
+                prune_backups(_cfg.BACKUP_KEEP)
+                log.info("backup_snapshot", file=snap.name)
+            except Exception as exc:
+                log.error("backup_failed", error=str(exc))
+            time.sleep(max(1, _cfg.BACKUP_INTERVAL_HOURS) * 3600)
+
+    threading.Thread(target=_loop, daemon=True, name="backup-scheduler").start()
+    log.info("backup_scheduler_started", interval_hours=_cfg.BACKUP_INTERVAL_HOURS, keep=_cfg.BACKUP_KEEP)
 
 
 # CORS — restrict to the Vercel frontend (+ preview deploys) and local dev,
@@ -738,6 +790,23 @@ def health_v1():
 
 # -- Admin endpoints -----------------------------------------------
 
+@app.post("/api/admin/backup")
+def admin_create_backup(_admin: None = Depends(verify_admin_key)):
+    """Trigger a consistent DB snapshot now + rotate. Returns the new snapshot list."""
+    import config as _cfg
+    from services.backup import create_backup, prune_backups, list_backups
+    snap = create_backup()
+    prune_backups(_cfg.BACKUP_KEEP)
+    return {"ok": True, "created": snap.name, "backups": list_backups()}
+
+
+@app.get("/api/admin/backups")
+def admin_list_backups(_admin: None = Depends(verify_admin_key)):
+    """List existing DB snapshots (newest first)."""
+    from services.backup import list_backups
+    return {"backups": list_backups()}
+
+
 @app.get("/api/admin/analyses")
 def admin_list_analyses(limit: int = 50, offset: int = 0, _admin: None = Depends(verify_admin_key)):
     """List all historical analyses. Returns metadata only (no report blob)."""
@@ -818,6 +887,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
         try:
             from services.tracing import new_ledger
             _ledger = new_ledger()  # per-analysis token/cost ledger (contextvars)
+            clear_context(); bind_context(analysis_id=analysis_id)  # correlate all logs for this analysis
+            get_logger("imara.pipeline").info("analysis_started", files=len(file_data))
             # 1. Parse uploaded files — route by category
             analysis_status[analysis_id]["current_agent"] = "Parsing uploaded files..."
             parsed_files = []
@@ -922,7 +993,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             try:
                 report["audit"] = record_decision(report, memory)  # hash-chained governance record
             except Exception as _ae:
-                print("[audit] non-fatal: {}".format(_ae))
+                log.warning("audit_non_fatal", error=str(_ae))
             analyses[analysis_id] = report
             save_report(analysis_id, report)
             analysis_status[analysis_id]["status"] = "complete"
@@ -930,10 +1001,13 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             analysis_status[analysis_id]["message"] = "All agents have completed their analysis."
 
         except Exception as e:
+            get_logger("imara.pipeline").exception("analysis_failed")
             save_error(analysis_id, str(e))
             analysis_status[analysis_id]["status"] = "error"
             analysis_status[analysis_id]["error"] = str(e)
             analysis_status[analysis_id]["current_agent"] = "Error: {}".format(e)
+        finally:
+            clear_context()
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _sync_run)

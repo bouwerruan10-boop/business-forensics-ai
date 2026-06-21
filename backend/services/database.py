@@ -47,6 +47,11 @@ _DB_PATH = _resolve_db_path()
 _lock = threading.Lock()
 
 
+def get_db_path():
+    """Public accessor for the resolved live DB path (used by services/backup.py)."""
+    return _DB_PATH
+
+
 def _get_conn() -> sqlite3.Connection:
     """Return a connection with row_factory set for dict-like access."""
     conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)

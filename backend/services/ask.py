@@ -25,6 +25,50 @@ _SYSTEM = (
 )
 
 
+import re as _re
+
+# Pre-LLM scope guard (Tier 1.6): block blatant off-topic abuse ("write me a
+# python script", "write a poem", "act as ...") BEFORE the LLM call - it saves
+# cost and closes the McDonald's-chatbot misuse surface. Deliberately CONSERVATIVE
+# (low false-positive): an off-topic pattern only blocks when NO on-topic finance
+# term is present, so real report questions always pass and the grounded prompt
+# handles anything mixed.
+_OFF_TOPIC = [_re.compile(p, _re.I) for p in [
+    r"\b(?:write|compose|create|draft|generate|build|make|give)\b[\w\s,'-]{0,24}?\b(?:python|java(?:script)?|c\+\+|c#|ruby|php|go(?:lang)?|rust|sql|html|css|bash|shell|code|script|program|programme|function|algorithm|app|website|poem|song|essay|story|novel|haiku|sonnet|rap|joke|limerick|screenplay)\b",
+    r"\bin\s+(?:python|javascript|java|c\+\+|c#|ruby|php|golang)\b",
+    r"\b(?:translate|translation)\b",
+    r"\brecipe\s+for\b",
+    r"\bdo\s+my\s+homework\b",
+    r"\b(?:play|let'?s\s+play)\s+a?\s*game\b",
+    r"\bpretend\s+(?:you|to\s+be)\b",
+    r"\bact\s+as\b",
+    r"\btell\s+me\s+a\s+joke\b",
+    r"\bgenerate\s+(?:code|an?\s+image|a\s+picture)\b",
+    r"\b(?:jailbreak|dan\s+mode|system\s+prompt)\b",
+    r"\bwrite\s+(?:a\s+)?(?:cover\s+letter|resume|cv)\b",
+]]
+_ON_TOPIC = (
+    "report", "score", "imara", "finding", "ratio", "margin", "cash", "revenue",
+    "profit", "loss", "debt", "gearing", "liquid", "vat", "tax", "sars", "paye",
+    "bank", "valuation", "credit", "fund", "loan", "lend", "business", "company",
+    "compliance", "popia", "bbbee", "cipc", "risk", "recommend", "fix", "improve",
+    "simulat", "benchmark", "working capital", "runway", "solven", "audit",
+    "invoice", "supplier", "payroll", "forecast", "distress", "z-score", "z''",
+)
+
+
+def scope_guard(question):
+    """(allowed, reason). Blocks blatant off-topic abuse unless an on-topic finance
+    term is present. Pure/deterministic - no LLM."""
+    q = (question or "").lower()
+    if not any(rx.search(q) for rx in _OFF_TOPIC):
+        return True, "on-topic"
+    if any(term in q for term in _ON_TOPIC):
+        return True, "mixed-but-on-topic"
+    return False, "off-topic"
+
+
+
 def _fnum(v):
     try:
         return "{:,.0f}".format(float(v))
@@ -99,6 +143,17 @@ def answer_question(report: dict, question: str) -> dict:
     if not q:
         return {"answer": "Ask me anything about this analysis — for example: why is the score what it is, "
                           "what should I fix first, or what does a finding mean?"}
+    # Pre-LLM guards (Tier 1.6): defang/redact the question with the shared input
+    # guard, then a deterministic scope check that blocks off-topic abuse without
+    # spending an API call.
+    from services.input_guard import scan_text
+    q, _qfind = scan_text(q)
+    allowed, _reason = scope_guard(q)
+    if not allowed:
+        return {"answer": "I can only help with THIS Imara analysis — your score, the findings, the "
+                          "ratios, and what to do about them. Ask me something about the report and "
+                          "I'll dig in.",
+                "off_topic": True}
     ctx = build_context(report)
     if MOCK_MODE:
         return {"answer": "[demo] Based on this analysis, the score is held back most by the lowest "

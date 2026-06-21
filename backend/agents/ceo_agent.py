@@ -7,6 +7,9 @@ Findings ranked by quantified financial impact, not by agent order.
 """
 import json
 import time
+from services.obs import get_logger
+_log = get_logger("imara.pipeline")
+
 from agents.base_agent import BaseAgent
 from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent
 from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
@@ -71,7 +74,7 @@ generic business language."""
             _fs = fundamentals_score(memory.financial_ratios, memory.industry_key or "general")
             memory.financial_fundamentals_score = _fs.get("score") or 0
         except Exception as exc:
-            print(f"[pipeline] financial ratios skipped: {exc}")
+            _log.warning("financial_ratios_skipped", error=str(exc))
 
         # Phase 1b: Market quick scan — runs first so all specialists get market context
         if progress_callback:
@@ -80,7 +83,7 @@ generic business language."""
         try:
             market_scout.analyze(business_data, memory)
         except Exception as exc:
-            print(f"[pipeline] Market scout failed, skipping: {exc}")
+            _log.warning("market_scout_skipped", error=str(exc))
 
         # Phase 2: Specialist agents — run as two parallel waves (see agents/parallel.py).
         # Wave 1 base analysts, then Wave 2 synthesis agents that see Wave-1 findings.
@@ -113,7 +116,15 @@ generic business language."""
             from services.faithfulness import verify_findings
             memory.faithfulness_summary = verify_findings(memory.findings, memory.financial_ratios)
         except Exception as exc:
-            print(f"[pipeline] faithfulness check skipped: {exc}")
+            _log.warning("faithfulness_skipped", error=str(exc))
+
+        # Phase 2f: Prose verifier — flag findings whose qualitative narrative
+        # contradicts the computed ratio status (complements the numeric check above).
+        try:
+            from services.prose_verifier import verify_prose
+            memory.prose_verifier_summary = verify_prose(memory.findings, memory.financial_ratios)
+        except Exception as exc:
+            _log.warning("prose_verifier_skipped", error=str(exc))
 
         # Phase 3: Cross-agent synthesis
         if progress_callback:
@@ -132,6 +143,7 @@ generic business language."""
         memory.total_runtime_seconds = round(time.perf_counter() - _pipeline_start, 1)
         report = self._generate_report(business_data, memory, synthesis)
         report["faithfulness_summary"] = memory.faithfulness_summary
+        report["prose_verifier_summary"] = memory.prose_verifier_summary
         report["agent_timings"] = memory.agent_timings
         report["total_runtime_seconds"] = memory.total_runtime_seconds
         report["financial_extraction_source"] = memory.financial_extraction_source
@@ -178,7 +190,7 @@ generic business language."""
                     figs[k] = float(v)
             return figs
         except Exception as exc:
-            print("[extract] AI fallback failed: {}".format(exc))
+            _log.warning("ai_extract_fallback_failed", error=str(exc))
             return {}
 
     # ── Phase 1 ──────────────────────────────────────────────────
@@ -476,6 +488,8 @@ Return ONLY valid JSON.
                 "quick_win": f.quick_win,
                 "verification": getattr(f, "verification", ""),
                 "verification_note": getattr(f, "verification_note", ""),
+                "prose_check": getattr(f, "prose_check", ""),
+                "prose_note": getattr(f, "prose_note", ""),
             }
 
         all_findings_serial = [_serialise(f) for f in memory.findings]
