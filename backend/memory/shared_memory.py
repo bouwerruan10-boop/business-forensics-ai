@@ -151,6 +151,13 @@ class SharedMemory:
     sa_tax_clearance_status: str = "unknown" # "valid" | "expired" | "not_provided" | "unknown"
     sa_tax_performed: bool = False           # True once SATaxAgent has run
 
+    # SA Tax Optimisation (legal planning; "Tax Me If You Can")
+    tax_opt_performed: bool = False
+    tax_opt_summary: str = ""
+    tax_opt_total_low: int = 0
+    tax_opt_total_high: int = 0
+    tax_optimization: dict = field(default_factory=dict)
+
     # ── SA Legal Agent Outputs ────────────────────────────────────
     sa_legal_risk_score: int = 0             # 0-100 (100 = highest legal risk)
     sa_legal_summary: str = ""               # injected into CEO synthesis
@@ -215,6 +222,8 @@ class SharedMemory:
             parts.append(f"Entity: {self.entity_type} | BBBEE: {self.bbbee_level or 'unknown'} | VAT: {self.vat_registered}")
         if self.sa_tax_summary:
             parts.append(f"SA Tax: {self.sa_tax_summary}")
+        if self.tax_opt_summary:
+            parts.append(f"SA Tax Optimisation: {self.tax_opt_summary}")
         if self.sa_legal_summary:
             parts.append(f"SA Legal: {self.sa_legal_summary}")
         return "\n".join(parts)

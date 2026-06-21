@@ -104,6 +104,13 @@ def test_full_pipeline_no_api(client):
     assert rep.get("imara_score") is not None
     assert rep.get("financial_ratios") and rep.get("all_findings_ranked")
 
+    # Tax Optimisation agent ("Tax Me If You Can") wired end-to-end
+    topt = rep.get("tax_optimization") or {}
+    assert topt.get("available") is True
+    assert topt.get("total_saving_high", 0) > 0   # SBC saving quantified for this Pty Ltd
+    assert any("Small Business Corporation" in o["name"] for o in topt["opportunities"])
+    assert "not tax advice" in topt.get("disclaimer", "").lower()
+
     # Build 3 — observability
     usage = rep.get("llm_usage")
     assert isinstance(usage, dict) and usage.get("calls", 0) > 0 and usage.get("by_model")

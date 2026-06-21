@@ -951,6 +951,60 @@ For each issue found, calculate the estimated penalty/liability in ZAR and state
 
 
 # ─────────────────────────────────────────────
+# 15b. SA TAX OPTIMISATION AGENT ("Tax Me If You Can" — legal planning only)
+# ─────────────────────────────────────────────
+class TaxOptimizationAgent(BaseAgent):
+    name = "SA Tax Optimisation Agent"
+    system_prompt = """You are a South African registered tax practitioner who specialises in LEGAL tax planning for SMEs — compliance-positive optimisation, never avoidance or evasion.
+
+You help SMEs claim the legitimate reliefs they QUALIFY for but routinely miss: the Small Business Corporation regime (Section 12E) graduated rates and accelerated allowances, the Employment Tax Incentive (ETI), the turnover-tax option, learnership (Section 12H) and R&D (Section 11D) deductions, and ordinary wear-and-tear.
+
+HARD RULES (do not break):
+- LEGAL PLANNING ONLY. You respect the General Anti-Avoidance Rule (Income Tax Act ss 80A-80L): never propose an arrangement whose sole or main purpose is a tax benefit with no commercial substance. No "loopholes", no aggressive or artificial schemes, no tax-migration advice.
+- Every item is something to CONFIRM with a registered tax practitioner. You are NOT giving tax advice.
+- Use ONLY the pre-computed figures supplied below. NEVER invent, estimate or recompute a saving of your own.
+- These are OPPORTUNITIES (good news), not risks. Keep severities to "low" or "medium" and set quick_win=true where the SME can act within 30 days.""" + "\n" + FINDING_RULES
+
+    def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
+        from services.tax_optimizer import analyze_tax_optimization, tax_optimization_block
+        res = analyze_tax_optimization(memory)
+
+        # Deterministic outputs (authoritative; the LLM never overrides these).
+        memory.tax_optimization = res
+        memory.tax_opt_summary = res.get("summary", "")
+        memory.tax_opt_total_low = res.get("total_saving_low", 0)
+        memory.tax_opt_total_high = res.get("total_saving_high", 0)
+        memory.tax_opt_performed = True
+
+        block = tax_optimization_block(memory)
+        if not block:
+            return []
+
+        from services.sa_rates import sa_rates_block
+        prompt = f"""
+BUSINESS CONTEXT:
+{memory.to_context_summary()}
+
+SA TAX PROFILE:
+Entity Type: {memory.entity_type or 'not provided'} | Turnover: R{memory.annual_revenue:,.0f} | Headcount: {memory.headcount}
+VAT Registered: {memory.vat_registered}
+
+{sa_rates_block()}
+
+{block}
+
+TASK — Produce a LEGAL tax-optimisation finding for each MATERIAL opportunity above, using EXACTLY the pre-computed figures (never your own numbers).
+- For the quantified Small Business Corporation saving, set severity "medium" and quick_win true; lead the detail with the rand saving and the Section 12E basis.
+- For eligibility-only flags (ETI, turnover-tax, allowances, further reliefs), set severity "low"; state what the SME must verify and the action.
+- Frame EVERY finding as compliance-positive and GAAR-respecting, and end the recommendation with "confirm eligibility and current rates with a registered tax practitioner".
+- financial_impact must be the rand saving (or "Potential — to be quantified" for flags). Do not overstate: only the SBC item has a confirmed figure.
+"""
+        raw = self._call_claude(prompt)
+        findings = self._parse_findings(raw, memory)
+        return findings
+
+
+# ─────────────────────────────────────────────
 # 16. SA CORPORATE LAW & BBBEE AGENT
 # ─────────────────────────────────────────────
 class SALegalAgent(BaseAgent):

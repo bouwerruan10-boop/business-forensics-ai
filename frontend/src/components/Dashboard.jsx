@@ -13,6 +13,7 @@ import CashFlow13Week from './CashFlow13Week'
 import LenderView from './LenderView'
 import FundingFit from './FundingFit'
 import SupplierSavings from './SupplierSavings'
+import TaxOptimisation from './TaxOptimisation'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
@@ -175,6 +176,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...(report.lender_view?.available ? [{ id: 'lender-view', label: "Lender's-Eye View" }] : []),
     ...(report.funding_fit?.available ? [{ id: 'funding-fit', label: 'Funding Fit' }] : []),
     ...(report.supplier_benchmark?.available ? [{ id: 'suppliers', label: 'Supplier Savings' }] : []),
+    ...(report.tax_optimization?.available ? [{ id: 'tax-optimisation', label: 'Tax Optimisation' }] : []),
     { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
   ]
@@ -361,6 +363,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Per-line-item spend benchmarking and lower-cost suppliers at equivalent service"
         >
           <SupplierSavings report={report} currency={report.currency} />
+        </Section>
+      )}
+
+      {/* Tax Optimisation: legitimate SA reliefs the SME may be missing (legal planning) */}
+      {report.tax_optimization?.available && (
+        <Section
+          id="tax-optimisation"
+          title="Tax Optimisation"
+          subtitle="Legitimate SA tax reliefs you may qualify for but could be missing — legal, GAAR-respecting planning"
+        >
+          <TaxOptimisation report={report} currency={report.currency} />
         </Section>
       )}
 

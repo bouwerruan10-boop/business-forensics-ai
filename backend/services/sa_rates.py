@@ -58,3 +58,41 @@ def sa_rates_block() -> str:
         vatv=VAT_VOLUNTARY_THRESHOLD, tt=TURNOVER_TAX_LIMIT, sbc=SBC_GROSS_INCOME_CEILING,
         eme=BBBEE_EME_CEILING, qse=BBBEE_QSE_CEILING,
     )
+
+
+# ── Corporate income tax / Small Business Corporation (Section 12E) ──
+COMPANY_FLAT_RATE = 27.0          # %  standard company income-tax rate
+SBC_TAX_YEAR = "2025/26"          # SBC graduated table below is the 2025/26 year of assessment
+# (lower, upper_or_None, marginal_rate, base_tax_at_lower) — verify the current SARS SBC table each year
+SBC_BRACKETS = [
+    (0,        95_750,   0.00, 0),
+    (95_750,   365_000,  0.07, 0),
+    (365_000,  550_000,  0.21, 18_848),
+    (550_000,  None,     0.27, 57_698),
+]
+
+
+def sbc_tax(taxable_income) -> float:
+    """SBC (Section 12E) graduated income tax on taxable income (ZAR)."""
+    ti = max(0.0, float(taxable_income or 0))
+    for lo, hi, rate, base in SBC_BRACKETS:
+        if hi is None or ti <= hi:
+            return base + rate * (ti - lo)
+    return 0.0
+
+
+def company_flat_tax(taxable_income) -> float:
+    """Flat 27% company income tax on taxable income (ZAR)."""
+    return max(0.0, float(taxable_income or 0)) * COMPANY_FLAT_RATE / 100.0
+
+
+# ── Employment Tax Incentive (ETI) — from 1 April 2025 ──
+ETI_MAX_MONTHLY_Y1 = 2500         # R/month per qualifying employee, first 12 months
+ETI_MAX_MONTHLY_Y2 = 1250         # R/month per qualifying employee, second 12 months
+ETI_AGE_MIN = 18
+ETI_AGE_MAX = 29
+ETI_EARN_CEILING = 7500           # R/month; employees earning >= this do not qualify
+
+# ── Skills Development Levy ──
+SDL_RATE = 1.0                    # %  of total annual payroll
+SDL_EXEMPT_PAYROLL = 500_000      # R/year; below this the employer is SDL-exempt
