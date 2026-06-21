@@ -1153,11 +1153,15 @@ State the uncertainty range and the most critical assumption to monitor.
     def analyze(self, business_data: dict, memory) -> list:
         benchmark_block = self._build_benchmark_block(memory)
         cur = memory.currency
+        from services.cashflow_13week import cashflow_summary_block
+        cf = cashflow_summary_block(memory)
         prompt = f"""
 BUSINESS CONTEXT:
 {memory.to_context_summary()}
 
 {benchmark_block}
+
+{cf}
 
 FINANCIAL DATA (use this as the historical baseline):
 {json.dumps(business_data.get('financial', {}), indent=2)[:4000]}

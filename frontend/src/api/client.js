@@ -114,6 +114,12 @@ export async function getMacro(analysisId) {
   return res.json()
 }
 
+export async function getCashflow(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/cashflow`, { headers: authHeaders() })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function getLenderView(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/lender-view`, { headers: authHeaders() })
   if (!res.ok) throw new Error(await res.text())

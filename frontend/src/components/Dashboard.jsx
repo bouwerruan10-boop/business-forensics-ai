@@ -10,6 +10,7 @@ import Simulator from './Simulator'
 import ActionSimulator from './ActionSimulator'
 import EconomicEnvironment from './EconomicEnvironment'
 import BankabilityEvidence from './BankabilityEvidence'
+import CashFlow13Week from './CashFlow13Week'
 import LenderView from './LenderView'
 import FundingFit from './FundingFit'
 import SupplierSavings from './SupplierSavings'
@@ -167,6 +168,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     { id: 'roadmap', label: 'Roadmap' },
     ...((report.credit_score > 0 || (report.fraud_risk_level && report.fraud_risk_level !== 'unknown')) ? [{ id: 'credit', label: 'Credit & Fraud' }] : []),
     ...((report.valuation_mid > 0 || report.forecast_base_12m > 0) ? [{ id: 'valuation', label: 'Valuation & Forecast' }] : []),
+    ...(report.cashflow_13week?.available ? [{ id: 'cashflow', label: '13-Week Cash Flow' }] : []),
     ...((report.market_search_performed || report.market_visibility_score > 0) ? [{ id: 'market', label: 'Market Intelligence' }] : []),
     ...((report.sa_tax_performed || report.sa_legal_performed) ? [{ id: 'sa-compliance', label: 'SA Compliance' }] : []),
     ...(report.macro_performed ? [{ id: 'economics', label: 'Economic Environment' }] : []),
@@ -316,6 +318,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Independent distress cross-check, bank-statement cash-flow signals, and how to use this rating"
         >
           <BankabilityEvidence report={report} currency={report.currency} />
+        </Section>
+      )}
+
+      {/* 13-Week Cash Flow: short-term liquidity horizon */}
+      {report.cashflow_13week?.available && (
+        <Section
+          id="cashflow"
+          title="13-Week Cash Flow"
+          subtitle="The short-term liquidity horizon — when cash gets tight — complementing the 12-month forecast"
+        >
+          <CashFlow13Week analysisId={analysisId} currency={report.currency} />
         </Section>
       )}
 
