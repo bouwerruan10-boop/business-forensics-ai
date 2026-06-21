@@ -11,6 +11,7 @@ import ActionSimulator from './ActionSimulator'
 import EconomicEnvironment from './EconomicEnvironment'
 import BankabilityEvidence from './BankabilityEvidence'
 import LenderView from './LenderView'
+import FundingFit from './FundingFit'
 import SupplierSavings from './SupplierSavings'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
@@ -171,6 +172,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...(report.macro_performed ? [{ id: 'economics', label: 'Economic Environment' }] : []),
     ...((report.distress_score?.available || report.bank_signals?.available) ? [{ id: 'evidence', label: 'Bankability Evidence' }] : []),
     ...(report.lender_view?.available ? [{ id: 'lender-view', label: "Lender's-Eye View" }] : []),
+    ...(report.funding_fit?.available ? [{ id: 'funding-fit', label: 'Funding Fit' }] : []),
     ...(report.supplier_benchmark?.available ? [{ id: 'suppliers', label: 'Supplier Savings' }] : []),
     { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
@@ -325,6 +327,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Why a lender would approve or decline you on cash-flow grounds — with the fixes and your true earning power"
         >
           <LenderView analysisId={analysisId} currency={report.currency} />
+        </Section>
+      )}
+
+      {/* Funding-Fit: which funding archetype fits, with the reasons + fixes */}
+      {report.funding_fit?.available && (
+        <Section
+          id="funding-fit"
+          title="Funding Fit"
+          subtitle="Which TYPE of funding fits this profile — with what is needed and what to strengthen first"
+        >
+          <FundingFit analysisId={analysisId} />
         </Section>
       )}
 

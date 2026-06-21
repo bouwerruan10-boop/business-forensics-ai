@@ -540,6 +540,20 @@ def report_lender_view(analysis_id: str):
     return result.get("lender_view") or {"available": False, "reason": "Not computed for this analysis."}
 
 
+@app.get("/api/report/{analysis_id}/funding-fit")
+def report_funding_fit(analysis_id: str):
+    """Funding-Fit / which-path: maps the firm to the funding ARCHETYPES that fit, with the
+    reasons, what is still needed, and a strengthen-first gate. Objective info on funding TYPES
+    (FAIS s1(3)(a)) — not a product recommendation, not a credit decision, not a Score input."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("funding_fit"):
+        return result["funding_fit"]
+    from services.funding_fit import recommend_funding
+    return recommend_funding(result)
+
+
 @app.get("/api/report/{analysis_id}/audit")
 def report_audit(analysis_id: str):
     """The decision audit record(s) for this analysis: how the score was produced —
@@ -885,6 +899,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["normalization"] = normalize_earnings(report.get("financial_figures") or {}, memory.uploaded_financial_text, getattr(memory, "uploaded_legal_text", ""))
             from services.lender_view import run_lender_view
             report["lender_view"] = run_lender_view(report.get("financial_figures") or {}, report.get("bank_signals") or {}, report.get("normalization") or {}, report.get("annual_revenue") or 0)
+            from services.funding_fit import recommend_funding
+            report["funding_fit"] = recommend_funding(report)
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark
@@ -1180,6 +1196,8 @@ def _enrich_demo():
                  "Entertainment 110 000\nDonations 60 000\nRestructuring costs 180 000\nDrawings 300 000\n")
     DEMO_REPORT["normalization"] = normalize_earnings(figs, _demo_fin)
     DEMO_REPORT["lender_view"] = run_lender_view(figs, DEMO_REPORT["bank_signals"], DEMO_REPORT["normalization"], 24_500_000)
+    from services.funding_fit import recommend_funding
+    DEMO_REPORT["funding_fit"] = recommend_funding(DEMO_REPORT)
     DEMO_REPORT["decision_support"] = decision_support_notice()
     from services.audit_log import build_audit_record
     _arec = build_audit_record(DEMO_REPORT, "demo-inputs")

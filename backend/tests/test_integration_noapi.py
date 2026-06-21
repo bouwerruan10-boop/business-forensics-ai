@@ -164,6 +164,8 @@ def test_full_pipeline_no_api(client):
     aud = client.get(f"/api/report/{aid}/audit").json()
     assert aud.get("available") and aud["records"][0].get("record_hash")
     assert client.get("/api/admin/audit").json().get("chain", {}).get("intact") is True
+    ff = client.get(f"/api/report/{aid}/funding-fit").json()
+    assert ff.get("available") and "options" in ff and ff["gate"]["status"] in ("application-ready", "strengthen-first")
     mcd = client.get("/api/v1/model-card")
     assert mcd.status_code == 200 and mcd.json()["method"]["weight_derivation"]["consistent"] is True
     assert client.get(f"/api/report/{aid}/supplier-savings").status_code == 200
