@@ -46,7 +46,24 @@ from services.score_contract import score_contract, usage_summary
 RATE_LIMIT = os.getenv("RATE_LIMIT", "3/hour")
 # Ask Imara is an open LLM endpoint (cost/abuse vector) -> its own per-IP limit.
 ASK_RATE_LIMIT = os.getenv("ASK_RATE_LIMIT", "20/hour")
-limiter = Limiter(key_func=get_remote_address, default_limits=[RATE_LIMIT])
+
+
+def client_ip(request: Request) -> str:
+    """Real client IP for rate limiting.
+
+    Behind Railway's edge proxy the raw socket address (what
+    get_remote_address sees) is the proxy connection, not the caller -- so
+    per-IP limits never key on the actual user and silently never trip. The
+    true client IP is the first hop in X-Forwarded-For. Fall back to the
+    socket address for local/dev where no proxy header is present.
+    """
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=client_ip, default_limits=[RATE_LIMIT])
 
 # -- Optional API key gate ----------------------------------------
 # Set API_SECRET_KEY in your .env to enable. Leave blank to disable.
