@@ -87,7 +87,8 @@ def test_full_pipeline_no_api(client):
     data = {"company_name": "Acme Trading (Pty) Ltd", "industry_key": "retail", "annual_revenue": "12000000",
             "headcount": "12", "currency": "ZAR", "country": "South Africa", "primary_concern": "VAT and cash flow",
             "entity_type": "Private Company (Pty) Ltd", "vat_registered": "no", "bbbee_level": "Level 4",
-            "years_in_business": "6", "file_categories": json.dumps(["financial"])}
+            "years_in_business": "6", "consent": "true", "consent_at": "2026-06-21T00:00:00Z",
+            "file_categories": json.dumps(["financial"])}
     r = client.post("/api/analyze", files={"files": ("financials.csv", _CSV, "text/csv")}, data=data)
     assert r.status_code == 200
     aid = r.json()["analysis_id"]

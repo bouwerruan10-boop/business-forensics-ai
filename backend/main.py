@@ -152,6 +152,7 @@ def on_startup():
     if _interrupted:
         log.info("interrupted_analyses_flagged", count=_interrupted)
     _start_backup_scheduler()
+    _start_retention_scheduler()
 
 
 def _start_backup_scheduler():
@@ -176,6 +177,29 @@ def _start_backup_scheduler():
 
     threading.Thread(target=_loop, daemon=True, name="backup-scheduler").start()
     log.info("backup_scheduler_started", interval_hours=_cfg.BACKUP_INTERVAL_HOURS, keep=_cfg.BACKUP_KEEP)
+
+
+def _start_retention_scheduler():
+    """Daemon: POPIA s14 retention. Opt-in via RETENTION_ENABLED (default off).
+    Deletes analyses older than RETENTION_DAYS - one pass at startup, then daily."""
+    import config as _cfg
+    if not _cfg.RETENTION_ENABLED:
+        return
+    import threading, time
+    from services.database import purge_old_analyses
+
+    def _loop():
+        while True:
+            try:
+                res = purge_old_analyses(_cfg.RETENTION_DAYS)
+                if res["deleted"]:
+                    log.info("retention_purge", deleted=res["deleted"], cutoff=res["cutoff"])
+            except Exception as exc:
+                log.error("retention_purge_failed", error=str(exc))
+            time.sleep(24 * 3600)
+
+    threading.Thread(target=_loop, daemon=True, name="retention-scheduler").start()
+    log.info("retention_scheduler_started", retention_days=_cfg.RETENTION_DAYS)
 
 
 # CORS — restrict to the Vercel frontend (+ preview deploys) and local dev,
@@ -309,6 +333,9 @@ async def analyze(
     bbbee_level: Optional[str] = Form(""),
     banking_partner: Optional[str] = Form(""),
     report_audience: Optional[str] = Form("owner"),
+    # POPIA consent capture (intake gate)
+    consent: Optional[str] = Form(None),
+    consent_at: Optional[str] = Form(None),
     # File category labels — JSON array matching files[] order
     # e.g. '["financial","bank","tax"]'
     file_categories: Optional[str] = Form("[]"),
@@ -334,6 +361,12 @@ async def analyze(
         "message": "Reading and classifying your business data...",
     }
 
+    # POPIA: record that the user affirmed they have the right to upload this data
+    # and consented to processing (auditable in the structured logs).
+    _consented = str(consent).lower() in ("true", "1", "yes", "on")
+    log.info("consent_recorded", analysis_id=analysis_id,
+             consented=_consented, consent_at=consent_at or "")
+
     # Read file bytes immediately -- can't read in background task
     file_data = []
     for i, f in enumerate(files):
@@ -352,6 +385,7 @@ async def analyze(
         "currency": currency or "ZAR",
         "country": country or "",
         "primary_concern": primary_concern or "",
+        "consent_at": consent_at or "",
         # SA-specific
         "entity_type": entity_type or "",
         "cipc_number": cipc_number or "",
@@ -805,6 +839,27 @@ def admin_list_backups(_admin: None = Depends(verify_admin_key)):
     """List existing DB snapshots (newest first)."""
     from services.backup import list_backups
     return {"backups": list_backups()}
+
+
+@app.get("/api/admin/retention")
+def admin_retention_preview(_admin: None = Depends(verify_admin_key)):
+    """Preview the POPIA-retention purge (dry run): how many analyses are past RETENTION_DAYS."""
+    import config as _cfg
+    from services.database import purge_old_analyses
+    res = purge_old_analyses(_cfg.RETENTION_DAYS, dry_run=True)
+    res["retention_days"] = _cfg.RETENTION_DAYS
+    res["enabled"] = _cfg.RETENTION_ENABLED
+    return res
+
+
+@app.post("/api/admin/retention/purge")
+def admin_retention_purge(_admin: None = Depends(verify_admin_key)):
+    """Run the POPIA-retention purge now (deletes analyses older than RETENTION_DAYS)."""
+    import config as _cfg
+    from services.database import purge_old_analyses
+    res = purge_old_analyses(_cfg.RETENTION_DAYS)
+    log.info("retention_purge_manual", **res)
+    return res
 
 
 @app.get("/api/admin/analyses")

@@ -51,6 +51,8 @@ export async function uploadFiles(files, profile = {}) {
   if (profile.currency)       form.append('currency',       profile.currency)
   if (profile.country)        form.append('country',        profile.country)
   if (profile.primary_concern) form.append('primary_concern', profile.primary_concern)
+  if (profile.consent)        form.append('consent',        String(profile.consent))
+  if (profile.consent_at)     form.append('consent_at',     profile.consent_at)
 
   if (profile.entity_type)       form.append('entity_type',       profile.entity_type)
   if (profile.cipc_number)       form.append('cipc_number',       profile.cipc_number)

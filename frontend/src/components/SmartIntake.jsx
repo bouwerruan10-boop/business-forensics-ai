@@ -152,6 +152,7 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+  const [consent, setConsent] = useState(false)
 
   // Restore non-file fields from sessionStorage (Back/refresh must not punish progress).
   useEffect(() => {
@@ -235,6 +236,7 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
       entity_type: entityType, cipc_number: cipcNumber, vat_registered: vatRegistered,
       vat_number: vatNumber, tax_year_end: taxYearEnd, years_in_business: yearsInBusiness,
       bbbee_level: bbbeeLevel, banking_partner: bankingPartner, report_audience: reportAudience,
+      consent: true, consent_at: new Date().toISOString(),
       file_categories: JSON.stringify(allCategories),
     }
     try {
@@ -455,6 +457,20 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
         </div>
       )}
 
+      {step === STEPS.length - 1 && (
+        <label className="flex items-start gap-2.5 mt-5 mb-1 text-[12px] text-slate-300 leading-relaxed cursor-pointer">
+          <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}
+            className="mt-0.5 w-4 h-4 flex-shrink-0 accent-gold" aria-label="POPIA processing consent" />
+          <span>
+            I confirm I have the right and authority to upload these documents and the personal information they
+            contain, and I consent to processing per the <a href="#" className="text-gold underline">Privacy&nbsp;Policy</a> and{' '}
+            <a href="#" className="text-gold underline">Terms</a>. I understand that to generate the analysis, document text is
+            processed by an AI service on servers <strong className="text-slate-200">outside South Africa</strong> (personal
+            identifiers are redacted first). Privacy queries go to our Information Officer.
+          </span>
+        </label>
+      )}
+
       {/* Footer nav */}
       <div className="flex items-center gap-3 mt-2">
         {step > 0 && (
@@ -469,7 +485,7 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
             Continue <ChevronRight size={16} aria-hidden="true" />
           </button>
         ) : (
-          <button type="submit" disabled={submitting || !companyName.trim() || !hasFinancial}
+          <button type="submit" disabled={submitting || !companyName.trim() || !hasFinancial || !consent}
             className="bg-gold text-navy font-black text-[14px] px-8 py-3 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-amber-400 transition-colors">
             {submitting ? 'Starting analysis…' : 'Run Analysis →'}
           </button>

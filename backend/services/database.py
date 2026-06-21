@@ -381,6 +381,29 @@ def delete_analysis(analysis_id: str) -> bool:
             conn.close()
 
 
+def purge_old_analyses(retention_days: int, dry_run: bool = False) -> dict:
+    """POPIA s14 retention enforcement: delete analyses whose created_at is older
+    than `retention_days`. `dry_run` returns the candidate count WITHOUT deleting.
+    created_at is fixed-width ISO (UTC), so a string comparison is chronological.
+    Returns {cutoff, candidates, deleted, dry_run}."""
+    from datetime import timedelta
+    days = max(1, int(retention_days))
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute("SELECT id FROM analyses WHERE created_at < ?", (cutoff,)).fetchall()
+            candidates = len(rows)
+            deleted = 0
+            if not dry_run and candidates:
+                cur = conn.execute("DELETE FROM analyses WHERE created_at < ?", (cutoff,))
+                conn.commit()
+                deleted = cur.rowcount
+            return {"cutoff": cutoff, "candidates": candidates, "deleted": deleted, "dry_run": bool(dry_run)}
+        finally:
+            conn.close()
+
+
 # ── Helpers ────────────────────────────────────────────────────────
 
 def _utcnow() -> str:

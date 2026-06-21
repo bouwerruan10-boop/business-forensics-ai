@@ -53,3 +53,8 @@ BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "false").lower() in ("true", "1", "
 BACKUP_DIR = os.getenv("BACKUP_DIR", "")          # default: <db dir>/backups (same volume)
 BACKUP_INTERVAL_HOURS = int(os.getenv("BACKUP_INTERVAL_HOURS", "24"))
 BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "7"))  # rotation: keep N most recent
+
+# ── POPIA s14 retention enforcement (Tier: legal/compliance) ──
+# Opt-in. When enabled, analyses older than RETENTION_DAYS are auto-deleted daily.
+RETENTION_ENABLED = os.getenv("RETENTION_ENABLED", "false").lower() in ("true", "1", "yes")
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "365"))
