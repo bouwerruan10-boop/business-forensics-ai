@@ -66,8 +66,7 @@ Rank findings by annual financial impact (highest first).
 For each finding, calculate the exact gap vs the benchmark provided above
 and state the annual currency impact.
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -112,8 +111,7 @@ and data quality issues. For each issue, state what it misrepresents and
 the estimated financial distortion. Flag anything that could cause a management
 team to make a wrong decision based on these numbers.
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -173,8 +171,7 @@ Perform a forensic audit. Look for fraud indicators, control weaknesses,
 compliance failures, and anomalies. For each risk, state the maximum
 financial exposure if it materialises. Flag the top 3 as most urgent.
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -220,8 +217,7 @@ and process inefficiency. For each issue, state the current performance level,
 the benchmark, and the annual cost of the gap. Identify which quick wins could
 be implemented in under 30 days.
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -267,8 +263,7 @@ Analyse the logistics and fleet operation. Calculate fleet utilisation, fuel eff
 route performance, and driver productivity vs the benchmarks above. For each gap,
 calculate the annual financial impact and recommend a specific intervention.
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -316,8 +311,7 @@ and benchmark. For each gap, calculate the annual revenue upside if closed.
 Flag customer concentration risks and pricing discipline issues.
 Which quick wins (under 30 days) would have the highest revenue impact?
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -365,8 +359,7 @@ Analyse marketing effectiveness. Calculate ROI on marketing spend, CAC, and chan
 performance. Identify wasted spend and highest-return opportunities. For each gap,
 state the financial impact and recommend a specific, testable change.
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -409,8 +402,7 @@ labour cost ratios, overtime patterns, and turnover costs vs benchmarks.
 Identify structural inefficiencies and recommend specific workforce optimisations.
 What is the total annual cost of HR underperformance vs benchmark?
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -457,8 +449,7 @@ overpaying patterns, inventory excess, and working capital trapped in stock.
 Calculate the annual saving from each identified optimisation.
 Which supplier negotiations should be prioritised first?
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -507,8 +498,7 @@ What strategic moves would create the most sustainable value? Where is the busin
 fighting in the wrong arena? What should management stop doing, start doing, and
 do more of?
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────
@@ -559,8 +549,7 @@ findings above. For each risk, state the specific legal exposure, the estimated 
 financial liability, and the specific document or action needed to mitigate it.
 Prioritise by financial exposure size.
 """
-        raw = self._call_claude(prompt)
-        return self._parse_findings(raw, memory)
+        return self._findings_from(prompt, memory)
 
 
 # ─────────────────────────────────────────────

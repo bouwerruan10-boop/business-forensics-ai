@@ -14,6 +14,11 @@ PARSE_MODEL = os.getenv("PARSE_MODEL", "claude-haiku-4-5-20251001")
 # model retirement degrades quality instead of taking the pipeline down.
 MODEL_FALLBACKS = [m.strip() for m in os.getenv("MODEL_FALLBACKS", PARSE_MODEL).split(",") if m.strip()]
 
+# Tier 1.3 T2 (opt-in, default OFF): drop the 2nd (parse) Claude call per agent by having
+# each specialist's analysis call emit structured findings directly in ONE call (~40% fewer
+# agent calls). Reversible: the classic two-call path is the default and the automatic fallback.
+SINGLE_CALL_FINDINGS = os.getenv("SINGLE_CALL_FINDINGS", "false").lower() in ("true", "1", "yes")
+
 # Set MOCK_MODE=true in .env to run without an API key (returns demo data)
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() in ("true", "1", "yes")
 

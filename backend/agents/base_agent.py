@@ -8,7 +8,7 @@ import httpx
 import json
 import os
 from memory.shared_memory import SharedMemory, AgentFinding
-from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS, MOCK_MODE, PARSE_MODEL, MODEL_FALLBACKS
+from config import ANTHROPIC_API_KEY, MODEL, MAX_TOKENS, MOCK_MODE, PARSE_MODEL, MODEL_FALLBACKS, SINGLE_CALL_FINDINGS
 from services.benchmark_service import format_benchmark_context
 from services.obs import get_logger
 _log = get_logger("imara.pipeline")
@@ -50,6 +50,13 @@ _FINDINGS_OUTPUT_CONFIG = {
         },
     }
 }
+
+_STRUCTURED_FINDINGS_SUFFIX = (
+    "\n\nReturn your analysis directly as the structured findings JSON described by the "
+    "enforced schema. Emit one finding object per distinct issue or opportunity, each obeying "
+    "the FINDING_RULES above: specific ZAR amounts, real SA legislation/benchmark references, "
+    "and no generic language."
+)
 
 # Build an httpx client that works in any environment:
 # - On developer machines: no proxy needed, standard SSL
@@ -221,15 +228,17 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
             except Exception as _exc2:
                 _log.warning("parse_model_failed_retry", model=PARSE_MODEL, error=str(_exc2))
                 raw = self._call_claude(parse_prompt, system_override=_parse_system)
-        raw = raw.strip()
+        return self._findings_from_items(self._items_from_raw(raw, raw_text))
 
-        # Strip markdown code fences
+    def _items_from_raw(self, raw, raw_text_for_fallback):
+        """Parse a model response (structured-output object, bare array, or fenced) into finding
+        dicts. Falls back to a single review-required finding when the text isn't valid JSON."""
+        raw = (raw or "").strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
                 raw = raw[4:]
         raw = raw.strip().rstrip("`").strip()
-
         try:
             data = json.loads(raw)
             if isinstance(data, dict) and isinstance(data.get("findings"), list):
@@ -239,13 +248,12 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
             else:
                 items = [data]
         except Exception:
-            # Fallback: single finding preserving the analysis text
             items = [{
                 "category": "General",
                 "severity": "medium",
-                "title": "Analysis finding — review required",
-                "detail": raw_text[:400],
-                "financial_impact": "Unquantified — requires client data",
+                "title": "Analysis finding \u2014 review required",
+                "detail": (raw_text_for_fallback or "")[:400],
+                "financial_impact": "Unquantified \u2014 requires client data",
                 "recommendation": "Review this area with management team",
                 "roi_estimate": "TBD with client",
                 "cost_of_inaction": "Risk of continued underperformance if unaddressed",
@@ -253,9 +261,14 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
                 "data_source": "Uploaded data",
                 "quick_win": False
             }]
+        return items
 
+    def _findings_from_items(self, items):
+        """Convert finding dicts into AgentFinding objects (skips non-dicts defensively)."""
         findings = []
         for item in items:
+            if not isinstance(item, dict):
+                continue
             findings.append(AgentFinding(
                 agent=self.name,
                 category=item.get("category", "General"),
@@ -271,6 +284,25 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
                 quick_win=bool(item.get("quick_win", False))
             ))
         return findings
+
+    def _findings_from(self, prompt, memory, system_override="", model_override=""):
+        """Single entry point for a specialist's findings.
+        SINGLE_CALL_FINDINGS on  -> one structured call emits findings directly (drops the 2nd parse call).
+        off (default)            -> classic two-call path: prose analysis, then a structured parse call.
+        Any failure in single-call mode degrades automatically to the classic path."""
+        if SINGLE_CALL_FINDINGS:
+            try:
+                raw = self._call_claude(
+                    prompt + _STRUCTURED_FINDINGS_SUFFIX,
+                    system_override=system_override, model_override=model_override,
+                    output_config=_FINDINGS_OUTPUT_CONFIG)
+                items = self._items_from_raw(raw, raw)
+                if items:
+                    return self._findings_from_items(items)
+            except Exception as _exc:
+                _log.warning("single_call_findings_fallback", agent=self.name, error=str(_exc)[:100])
+        raw = self._call_claude(prompt, system_override=system_override, model_override=model_override)
+        return self._parse_findings(raw, memory)
 
     def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
         """Override in each specialist agent."""
