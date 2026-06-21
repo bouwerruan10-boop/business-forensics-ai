@@ -13,6 +13,44 @@ from services.benchmark_service import format_benchmark_context
 from services.obs import get_logger
 _log = get_logger("imara.pipeline")
 
+# Tier 1.3 — native structured outputs schema for the findings parse call.
+# Guarantees schema-valid JSON in one call (Anthropic GA: output_config.format),
+# so the parse step never falls back to the lossy generic finding.
+_FINDING_PROPS = {
+    "category": {"type": "string"},
+    "severity": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+    "title": {"type": "string"},
+    "detail": {"type": "string"},
+    "financial_impact": {"type": "string"},
+    "recommendation": {"type": "string"},
+    "roi_estimate": {"type": "string"},
+    "cost_of_inaction": {"type": "string"},
+    "benchmark_reference": {"type": "string"},
+    "data_source": {"type": "string"},
+    "quick_win": {"type": "boolean"},
+}
+_FINDINGS_OUTPUT_CONFIG = {
+    "format": {
+        "type": "json_schema",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "findings": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": _FINDING_PROPS,
+                        "required": list(_FINDING_PROPS.keys()),
+                        "additionalProperties": False,
+                    },
+                }
+            },
+            "required": ["findings"],
+            "additionalProperties": False,
+        },
+    }
+}
+
 # Build an httpx client that works in any environment:
 # - On developer machines: no proxy needed, standard SSL
 # - In sandboxes/CI that use an HTTP CONNECT proxy: use HTTPS_PROXY env var
@@ -74,7 +112,8 @@ class BaseAgent:
     role: str = ""
     system_prompt: str = ""
 
-    def _call_claude(self, user_message: str, system_override: str = "", model_override: str = "") -> str:
+    def _call_claude(self, user_message: str, system_override: str = "", model_override: str = "",
+                     output_config: "dict | None" = None) -> str:
         system = system_override or self.system_prompt
         primary = model_override or MODEL
         # Provider-resilience: try the chosen model, then ordered fallbacks if it is
@@ -90,12 +129,21 @@ class BaseAgent:
             _attempts = 3
             for _attempt in range(_attempts):
                 try:
-                    response = client.messages.create(
-                        model=model,
-                        max_tokens=MAX_TOKENS,
-                        system=system,
-                        messages=[{"role": "user", "content": user_message}]
-                    )
+                    _kwargs = dict(model=model, max_tokens=MAX_TOKENS, system=system,
+                                   messages=[{"role": "user", "content": user_message}])
+                    if output_config is not None:
+                        _kwargs["output_config"] = output_config
+                    try:
+                        response = client.messages.create(**_kwargs)
+                    except TypeError as _te:
+                        # SDK too old for native structured outputs -> degrade to a plain call
+                        if output_config is not None and "output_config" in str(_te):
+                            _log.warning("structured_outputs_unsupported_sdk", error=str(_te)[:80])
+                            output_config = None
+                            _kwargs.pop("output_config", None)
+                            response = client.messages.create(**_kwargs)
+                        else:
+                            raise
                     used_model = model
                     break
                 except Exception as _exc:
@@ -160,11 +208,19 @@ ANALYSIS TO EXTRACT FROM:
 Return ONLY a valid JSON array. No explanation text. No markdown fences.
 """
         _parse_system = "You are a precise JSON data-extraction engine. Output only valid JSON — no prose, no markdown fences."
+        # Native structured outputs (Tier 1.3): guaranteed schema-valid JSON, so the
+        # parse never degrades to the lossy generic finding. Falls back to the plain
+        # call if the model/SDK can't do structured output.
         try:
-            raw = self._call_claude(parse_prompt, system_override=_parse_system, model_override=PARSE_MODEL)
+            raw = self._call_claude(parse_prompt, system_override=_parse_system,
+                                    model_override=PARSE_MODEL, output_config=_FINDINGS_OUTPUT_CONFIG)
         except Exception as _exc:
-            _log.warning("parse_model_failed_retry", model=PARSE_MODEL, error=str(_exc))
-            raw = self._call_claude(parse_prompt, system_override=_parse_system)
+            _log.warning("structured_parse_fallback", error=str(_exc)[:100])
+            try:
+                raw = self._call_claude(parse_prompt, system_override=_parse_system, model_override=PARSE_MODEL)
+            except Exception as _exc2:
+                _log.warning("parse_model_failed_retry", model=PARSE_MODEL, error=str(_exc2))
+                raw = self._call_claude(parse_prompt, system_override=_parse_system)
         raw = raw.strip()
 
         # Strip markdown code fences
@@ -175,9 +231,13 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
         raw = raw.strip().rstrip("`").strip()
 
         try:
-            items = json.loads(raw)
-            if not isinstance(items, list):
-                items = [items]
+            data = json.loads(raw)
+            if isinstance(data, dict) and isinstance(data.get("findings"), list):
+                items = data["findings"]            # native structured-output shape
+            elif isinstance(data, list):
+                items = data                        # bare array (plain fallback)
+            else:
+                items = [data]
         except Exception:
             # Fallback: single finding preserving the analysis text
             items = [{
