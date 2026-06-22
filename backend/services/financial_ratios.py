@@ -9,6 +9,7 @@ carries the exact source figures it was derived from, for traceability.
 
 Pure functions, no API, no side effects — fully unit-testable.
 """
+import math
 import re
 from services.benchmark_service import get_benchmarks
 
@@ -53,6 +54,8 @@ def parse_amount(raw: str):
     try:
         val = float(s) * mult
     except ValueError:
+        return None
+    if not math.isfinite(val):   # reject inf/nan from absurd inputs so they never poison the figures/score
         return None
     return -val if neg else val
 

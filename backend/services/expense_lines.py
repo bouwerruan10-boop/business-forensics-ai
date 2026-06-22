@@ -7,6 +7,7 @@ Feeds the supplier-benchmarking engine. Degrades gracefully: if the financials
 only give totals (no itemised rows), it returns [] and the engine says so.
 """
 
+import math
 import re
 
 # (canonical_key, display_label, [patterns], substitutable?)
@@ -58,6 +59,8 @@ def _amount(line: str):
         try:
             v = float(digits)
         except ValueError:
+            continue
+        if not math.isfinite(v):   # skip inf/nan from absurd digit runs
             continue
         money_like = ("," in tok) or ("." in digits) or v >= 100
         vals.append((v, money_like))

@@ -17,6 +17,7 @@ Robust, format-agnostic signals (the ones that survive messy text):
   - activity cadence (transactions, months covered)
 """
 
+import math
 import re
 
 # ── patterns ──────────────────────────────────────────────────────────────
@@ -53,6 +54,8 @@ def _to_float(tok: str):
     try:
         v = float(digits)
     except ValueError:
+        return None
+    if not math.isfinite(v):   # reject inf/nan from absurd digit runs
         return None
     return -v if neg else v
 
