@@ -239,6 +239,10 @@ async def _security_headers(request, call_next):
     h.setdefault("Referrer-Policy", "no-referrer")
     h.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
     h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    # no-store: this API serves live + sensitive (client financial) data. Stops intermediaries/
+    # CDNs caching responses — fixes the stale /api/health + /openapi.json seen behind the edge,
+    # and prevents client reports being cached downstream.
+    h.setdefault("Cache-Control", "no-store")
     return response
 
 # In-memory store for active sessions -- SQLite is the durable store

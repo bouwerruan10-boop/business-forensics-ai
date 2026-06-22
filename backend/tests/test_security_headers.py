@@ -11,6 +11,7 @@ def test_security_headers_present_on_responses():
         assert r.headers.get("Referrer-Policy") == "no-referrer"
         assert "geolocation=()" in (r.headers.get("Permissions-Policy") or "")
         assert "max-age=" in (r.headers.get("Strict-Transport-Security") or "")
+        assert "no-store" in (r.headers.get("Cache-Control") or "")   # live API — caches must not store responses
 
 
 def test_docs_and_openapi_disabled_in_prod_by_default():
