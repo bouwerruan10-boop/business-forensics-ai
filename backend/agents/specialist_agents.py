@@ -961,9 +961,6 @@ HARD RULES (do not break):
         # Deterministic outputs (authoritative; the LLM never overrides these).
         memory.tax_optimization = res
         memory.tax_opt_summary = res.get("summary", "")
-        memory.tax_opt_total_low = res.get("total_saving_low", 0)
-        memory.tax_opt_total_high = res.get("total_saving_high", 0)
-        memory.tax_opt_performed = True
 
         block = tax_optimization_block(memory)
         if not block:

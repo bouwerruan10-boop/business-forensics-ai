@@ -151,11 +151,10 @@ class SharedMemory:
     sa_tax_clearance_status: str = "unknown" # "valid" | "expired" | "not_provided" | "unknown"
     sa_tax_performed: bool = False           # True once SATaxAgent has run
 
-    # SA Tax Optimisation (legal planning; "Tax Me If You Can")
-    tax_opt_performed: bool = False
+    # SA Tax Optimisation (legal planning; "Tax Me If You Can").
+    # tax_opt_summary feeds to_context_summary(); the full dict is serialised into the report.
+    # (The unread total_low / total_high / performed scalar mirrors were removed.)
     tax_opt_summary: str = ""
-    tax_opt_total_low: int = 0
-    tax_opt_total_high: int = 0
     tax_optimization: dict = field(default_factory=dict)
 
     # ── SA Legal Agent Outputs ────────────────────────────────────

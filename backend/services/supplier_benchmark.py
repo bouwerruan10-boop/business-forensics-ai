@@ -49,22 +49,22 @@ def run_supplier_benchmark(financial_text: str, revenue, profile=None) -> dict:
         sav = ref.get("typical_savings_pct")
         raw_low = (line.get("raw") or "").lower()
 
-        def _match(names):
+        def _match(names, hay):
             for n in (names or []):
-                if re.search(r"\b" + re.escape(n.lower()) + r"\b", raw_low):
+                if re.search(r"\b" + re.escape(n.lower()) + r"\b", hay):
                     return n
             return None
 
         # Incumbent: the banking partner from the profile, else a higher-cost provider
         # named in the expense line itself (e.g. "Telephone Vodacom contract").
-        detected = _match(ref.get("higher_cost_incumbents"))
+        detected = _match(ref.get("higher_cost_incumbents"), raw_low)
         if cat == "bank_charges" and banking_partner:
             incumbent = banking_partner
             incumbent_higher = any(h in banking_partner.lower() for h in ref.get("higher_cost_incumbents", []))
         else:
             incumbent = detected
             incumbent_higher = detected is not None
-        already_low = _match(ref.get("low_cost_providers")) is not None   # already on a cheap provider
+        already_low = _match(ref.get("low_cost_providers"), raw_low) is not None   # already on a cheap provider
 
         save_low = save_high = None
         confidence = "low"
