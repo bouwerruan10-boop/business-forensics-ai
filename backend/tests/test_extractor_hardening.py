@@ -40,3 +40,21 @@ def test_normal_parsing_unchanged():
     assert parse_amount("1.2m") == 1_200_000.0
     assert _amount("Rent 120,000") == 120_000.0
     assert extract_financials("Revenue 5,000,000\nNet profit 400,000") == {"revenue": 5_000_000.0, "net_profit": 400_000.0}
+
+
+# ── /api/analyze ingestion: file_categories must never crash the endpoint (pressure-test) ──
+from main import _coerce_categories
+
+
+def test_coerce_categories_total_on_hostile_input():
+    # number / null / bool used to crash the handler with len() TypeError -> 500
+    for raw in ("123", "null", "true", '"financial"', '[{"a":1}]', "{}", "[1,null]", "not json", ""):
+        out = _coerce_categories(raw, 2)
+        assert isinstance(out, list) and len(out) == 2 and all(isinstance(x, str) for x in out)
+
+
+def test_coerce_categories_preserves_valid_and_pads():
+    assert _coerce_categories('["financial","bank"]', 2) == ["financial", "bank"]
+    assert _coerce_categories('["tax"]', 3) == ["tax", "general", "general"]   # short list padded
+    assert _coerce_categories('["a","b","c"]', 1) == ["a"]                      # long list truncated to n
+    assert _coerce_categories("[]", 0) == []

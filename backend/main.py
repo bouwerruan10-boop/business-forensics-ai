@@ -310,6 +310,28 @@ def health():
     }
 
 
+MAX_UPLOAD_FILES = 40   # generous for the 6 upload zones; bounds memory/time on abusive requests
+
+
+def _coerce_categories(raw_json, n):
+    """Turn the file_categories form field into EXACTLY n category strings.
+    Tolerates malformed JSON, non-list values, wrong lengths, and non-string elements
+    (anything unexpected -> 'general'), so a bad client payload can never crash the upload
+    or the routing membership test."""
+    import json as _json
+    try:
+        cats = _json.loads(raw_json or "[]")
+    except Exception:
+        cats = []
+    if not isinstance(cats, list):
+        cats = []
+    out = []
+    for i in range(n):
+        c = cats[i] if i < len(cats) else "general"
+        out.append(c if isinstance(c, str) else "general")
+    return out
+
+
 @app.post("/api/analyze")
 @limiter.limit(RATE_LIMIT)
 async def analyze(
@@ -343,15 +365,14 @@ async def analyze(
     principal: Principal = Depends(get_principal),
 ):
     """Accept files + business profile. Returns analysis_id to poll."""
-    import json as _json
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
+    if len(files) > MAX_UPLOAD_FILES:
+        raise HTTPException(status_code=400,
+                            detail="Too many files ({}); max {} per analysis.".format(len(files), MAX_UPLOAD_FILES))
 
-    # Parse file category labels
-    try:
-        categories = _json.loads(file_categories or "[]")
-    except Exception:
-        categories = []
+    # Parse file category labels (robust to malformed / non-list / wrong-length / non-string payloads)
+    categories = _coerce_categories(file_categories, len(files))
 
     analysis_id = str(uuid.uuid4())
     analysis_status[analysis_id] = {
@@ -379,7 +400,7 @@ async def analyze(
         file_data.append({
             "filename": f.filename,
             "content": content,
-            "category": categories[i] if i < len(categories) else "general",
+            "category": categories[i],
         })
 
     profile = {
