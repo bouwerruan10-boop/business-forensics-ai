@@ -17,13 +17,22 @@ MAX_SAMPLE_ROWS = 60
 MAX_SHEETS = 20
 # Max PDF pages
 MAX_PDF_PAGES = 30
+MAX_CONTENT_BYTES = 25 * 1024 * 1024   # 25 MB — financial docs are small; bounds memory/time on pathological uploads
+_MAX_CELL_CHARS = 2000                 # truncate absurdly long individual cell values (prompt-bloat + DoS guard)
 
 
 def parse_file(filename: str, content: bytes) -> dict:
     """
     Route to the correct parser based on file extension.
-    Returns a dict with domain-keyed sections.
+    Returns a dict with domain-keyed sections. Total: never raises on bad input.
     """
+    filename = filename or "upload"
+    if content is None:
+        return {"general": {"filename": filename, "error": "no content"}}
+    if len(content) > MAX_CONTENT_BYTES:
+        return {"general": {"filename": filename,
+                            "error": "file too large ({:.0f} MB; max {:.0f} MB)".format(
+                                len(content) / 1e6, MAX_CONTENT_BYTES / 1e6)}}
     ext = Path(filename).suffix.lower()
     if ext in (".xlsx", ".xls", ".xlsm", ".xlsb"):
         return _parse_excel(filename, content)
@@ -158,8 +167,13 @@ def _coerce_types(df: pd.DataFrame) -> pd.DataFrame:
         if converted.notna().sum() / max(len(df), 1) > 0.6:
             df[col] = converted
             continue
-        # Try date
+        # Try date — but skip columns whose values are too long to be a date. No real
+        # date is >40 chars, and dateutil's fallback is pathologically slow on huge
+        # strings, so one giant cell could otherwise hang the whole parse (DoS guard).
         try:
+            _maxlen = df[col].astype(str).str.len().max()
+            if pd.notna(_maxlen) and _maxlen > 40:
+                continue
             date_converted = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
             if date_converted.notna().sum() / max(len(df), 1) > 0.6:
                 df[col] = date_converted.dt.strftime("%Y-%m-%d")
@@ -299,6 +313,15 @@ def _parse_text(filename: str, content: bytes) -> dict:
 
 # ── Summary builder ────────────────────────────────────────────────
 
+def _cap(x):
+    """Stringify non-primitive cells and truncate absurdly long values (prompt-bloat guard)."""
+    if not isinstance(x, (int, float, str, bool)):
+        x = str(x)
+    if isinstance(x, str) and len(x) > _MAX_CELL_CHARS:
+        return x[:_MAX_CELL_CHARS] + "\u2026(truncated)"
+    return x
+
+
 def _df_to_summary(df: pd.DataFrame, sheet_name: str = "") -> dict:
     """Convert a DataFrame to a compact JSON-serializable summary for agents."""
     sample = df.head(MAX_SAMPLE_ROWS)
@@ -322,7 +345,7 @@ def _df_to_summary(df: pd.DataFrame, sheet_name: str = "") -> dict:
         records = (
             sample
             .fillna("")
-            .applymap(lambda x: str(x) if not isinstance(x, (int, float, str, bool)) else x)
+            .applymap(_cap)
             .to_dict(orient="records")
         )
     except Exception:
@@ -364,7 +387,7 @@ def _df_to_text(df, max_rows: int = MAX_SAMPLE_ROWS) -> str:
                     continue
             except Exception:
                 pass
-            sv = str(v).strip()
+            sv = str(v).strip()[:_MAX_CELL_CHARS]
             if sv and sv.lower() != "nan":
                 cells.append(sv)
         if not cells:
@@ -395,6 +418,8 @@ def merge_parsed_data(files: list) -> dict:
     """Merge multiple file parse results into one business data dict."""
     merged = {}
     for file_data in files:
+        if not isinstance(file_data, dict):   # skip None / non-dict entries defensively
+            continue
         for key, value in file_data.items():
             if key not in merged:
                 merged[key] = value
