@@ -36,7 +36,7 @@ from services.database import (
 from agents.ceo_agent import CEOAgent
 from memory.shared_memory import SharedMemory
 from auth import get_principal, Principal
-from config import PUBLIC_API, API_VERSION
+from config import PUBLIC_API, API_VERSION, EXPOSE_DOCS
 from services.score_contract import score_contract, usage_summary
 from services.jsonsafe import finite_safe
 
@@ -112,6 +112,11 @@ app = FastAPI(
     description="AI-powered multi-agent business consulting platform",
     version="2.1.0",
     default_response_class=SafeJSONResponse,
+    # Hide the OpenAPI schema + Swagger/ReDoc in production (enumeration surface);
+    # EXPOSE_DOCS=true re-enables them in dev.
+    docs_url="/docs" if EXPOSE_DOCS else None,
+    redoc_url="/redoc" if EXPOSE_DOCS else None,
+    openapi_url="/openapi.json" if EXPOSE_DOCS else None,
 )
 
 app.state.limiter = limiter
@@ -214,7 +219,8 @@ ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    # Only THIS project's Vercel preview deploys, not any *.vercel.app site.
+    allow_origin_regex=r"https://business-forensics-ai-[a-z0-9-]+\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -83,8 +83,8 @@
 ### P1 — buildable soon (I can do)
 - Pin dependencies + lockfile; promote `pip-audit` from advisory to a CI gate once clean.
 - Add **secret-scanning** (gitleaks) to CI as a hard gate.
-- Disable or auth-gate `/docs` + `/openapi.json` in production.
-- Tighten the `*.vercel.app` CORS regex to the exact production host.
+- ✅ **(done v1.43)** Disabled `/docs` + `/redoc` + `/openapi.json` in production (gated behind `EXPOSE_DOCS`, default off).
+- ✅ **(done v1.43)** Tightened the CORS regex to this project's Vercel deploys only (`business-forensics-ai-*.vercel.app`), not any `*.vercel.app` site.
 - A hard per-analysis token/cost budget (belt-and-braces over the existing caps).
 
 ### P2 — scale / pivot-gated (don't build before needed)
