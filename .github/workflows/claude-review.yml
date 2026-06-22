@@ -1,0 +1,84 @@
+name: Claude Code Review
+
+# AI code review for pull requests — the roadmap's "adopt: AI code review on PRs" item.
+#
+# WHY: much of Imara is AI-generated, and research shows AI-written code carries more
+# logic/architecture/security defects than human code — exactly what the CI ratchet
+# (ruff hard-gate + vulture + tests) CANNOT catch. This reviews logic, architecture and
+# security; ruff still owns style/dead-code.
+#
+# DORMANT BY DEFAULT (opt-in, like OPERATOR_PASSWORD / BACKUP_ENABLED): the job no-ops
+# with a notice until an `ANTHROPIC_API_KEY` repository secret is added
+# (GitHub > Settings > Secrets and variables > Actions). To use it, also adopt a
+# feature-branch -> PR -> merge flow for NON-TRIVIAL changes; trivial changes can stay
+# direct-to-main via push_imara.bat.
+#
+# NOTE: the review action is not hardened against prompt injection — keep
+# "Require approval for all external contributors" on, and only review trusted PRs.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+jobs:
+  review:
+    name: AI review (logic / architecture / security)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate on ANTHROPIC_API_KEY (stay dormant until set)
+        id: gate
+        env:
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::notice::ANTHROPIC_API_KEY not set — AI PR review is dormant. Add the repo secret to activate."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Claude review
+        if: steps.gate.outputs.enabled == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are reviewing a pull request for Imara, a South African SME bankability and
+            business-intelligence platform (FastAPI backend, React/Vite frontend). Much of the
+            code is AI-generated, so review what linters cannot. Be concise and specific; cite
+            file:line; label each finding [critical] / [warning] / [nit]. If the change is clean,
+            say so briefly.
+
+            REVIEW FOR:
+            - Logic correctness and unhandled edge cases — None / empty / zero / negative / huge /
+              unicode inputs. Watch specifically for the `dict.get(key, default)` trap: the default
+              does NOT fire when the key exists with a None value (coerce with `or 0` / `or []`).
+            - Architecture and maintainability — unnecessary complexity, duplication, leaky or
+              broken abstractions, dead branches.
+            - Security — injection (prompt/SQL/command), authn/authz gaps, secret leakage, unsafe
+              deserialization, SSRF, path traversal, missing input validation.
+            - Deterministic-first DNA — all money/ratios/scores must be COMPUTED IN CODE; the LLM
+              only narrates. Flag any place an LLM output feeds a number, ratio, or score directly,
+              or where injected document text could move a computed figure.
+
+            DO NOT comment on code style or formatting — ruff (hard gate) and vulture already own
+            that in CI. No nitpicking whitespace, imports, or naming conventions.
+
+            MARK [critical] for any change that touches:
+            - authentication / authorization (auth.py, operator login, admin key gates),
+            - the tamper-evident audit log / hash chain,
+            - data deletion or retention (hard deletes, purge_old_analyses),
+            - the financial-ratio / Imara Score / scoring-weight engines
+              (financial_ratios.py, score_contract.py, ahp.py, the agent finding buckets),
+            - POPIA / personal-data handling or cross-border data flow.
