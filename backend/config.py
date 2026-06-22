@@ -23,7 +23,7 @@ SINGLE_CALL_FINDINGS = os.getenv("SINGLE_CALL_FINDINGS", "false").lower() in ("t
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() in ("true", "1", "yes")
 
 # Serper.dev API key for live web search in the Market Research Agent.
-# Free tier: 2,500 searches/month — sign up at https://serper.dev
+# Free tier: 2,500 searches/month - sign up at https://serper.dev
 # If not set, the Market Research Agent falls back to Claude-only analysis.
 SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
 
@@ -33,17 +33,38 @@ if not ANTHROPIC_API_KEY and not MOCK_MODE:
         "Tip: set MOCK_MODE=true in .env to run a live demo without an API key."
     )
 
-# ── Future-proofing flags (operator-run today; flip on the pivot to mass distribution) ──
+# -- Future-proofing flags (operator-run today; flip on the pivot to mass distribution) --
 MULTI_TENANT = os.getenv("MULTI_TENANT", "false").lower() in ("true", "1", "yes")
 PUBLIC_API = os.getenv("PUBLIC_API", "false").lower() in ("true", "1", "yes")
 DEFAULT_OWNER = os.getenv("DEFAULT_OWNER", "operator")
 API_VERSION = "v1"
 IMARA_ENGINE_VERSION = os.getenv("IMARA_ENGINE_VERSION", "2.1.0")  # stamped into the decision audit log
 
-# ── Operator authentication (multi-user-ready seam) ──
+# -- Operator authentication (multi-user-ready seam) --
 # Set OPERATOR_PASSWORD to require login; unset = open (dev/operator) for backward-compat.
 import hashlib as _hashlib
-OPERATOR_PASSWORD = os.getenv("OPERATOR_PASSWORD", "").strip()   # .strip(): tolerate trailing newline/space from the host env (a common cause of false "Invalid password")
+
+
+def _clean_secret(raw: str) -> str:
+    """Normalise a secret read from a host env var.
+
+    Hosting dashboards (Railway, etc.) commonly capture paste artifacts that
+    silently break exact-match auth:
+      - leading/trailing whitespace or a trailing newline, and
+      - a single pair of matching surrounding quotes (e.g. pasting "pw" or 'pw').
+    .strip() alone fixes the first but NOT the second, so a quoted value still
+    produces a false "Invalid password". This strips both: outer whitespace,
+    then ONE pair of matching surrounding quotes, then whitespace again. Only a
+    single matched pair is removed, so a password that genuinely contains quotes
+    inside it is left intact.
+    """
+    v = (raw or "").strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+        v = v[1:-1].strip()
+    return v
+
+
+OPERATOR_PASSWORD = _clean_secret(os.getenv("OPERATOR_PASSWORD", ""))
 AUTH_ENABLED = bool(OPERATOR_PASSWORD)
 # Token-signing secret; if unset, derive deterministically from the password so it
 # works with just OPERATOR_PASSWORD set (still secret + stable across restarts).
@@ -51,7 +72,7 @@ AUTH_SECRET = os.getenv("AUTH_SECRET", "") or (
     _hashlib.sha256(("imara-auth::" + OPERATOR_PASSWORD).encode()).hexdigest() if OPERATOR_PASSWORD else "")
 AUTH_TTL_HOURS = int(os.getenv("AUTH_TTL_HOURS", "12"))
 
-# ── Database backups (Tier 1.5) ──
+# -- Database backups (Tier 1.5) --
 # Opt-in (like auth/admin). Set BACKUP_ENABLED=true on Railway to start scheduled
 # snapshots. For true OFF-VOLUME durability set BACKUP_DIR to a second mount.
 BACKUP_ENABLED = os.getenv("BACKUP_ENABLED", "false").lower() in ("true", "1", "yes")
@@ -63,7 +84,7 @@ BACKUP_DIR = os.getenv("BACKUP_DIR", "")          # default: <db dir>/backups (s
 BACKUP_INTERVAL_HOURS = int(os.getenv("BACKUP_INTERVAL_HOURS", "24"))
 BACKUP_KEEP = int(os.getenv("BACKUP_KEEP", "7"))  # rotation: keep N most recent
 
-# ── POPIA s14 retention enforcement (Tier: legal/compliance) ──
+# -- POPIA s14 retention enforcement (Tier: legal/compliance) --
 # Opt-in. When enabled, analyses older than RETENTION_DAYS are auto-deleted daily.
 RETENTION_ENABLED = os.getenv("RETENTION_ENABLED", "false").lower() in ("true", "1", "yes")
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "365"))

@@ -19,3 +19,19 @@ def test_login_tolerates_whitespace_and_unicode(monkeypatch):
     assert "token" in _login("SecretéPass!").json()
     assert _login("wrong").status_code == 401
     assert _login("").status_code == 401
+
+
+def test_clean_secret_strips_surrounding_quotes():
+    """config._clean_secret: a host env value pasted with surrounding quotes (a common
+    Railway artifact) must normalise to the bare password, not a quoted one (else exact-match
+    auth gives a false 'Invalid password'). Inner quotes are preserved."""
+    cs = cfg._clean_secret
+    assert cs('"hunter2"') == "hunter2"          # double-quoted paste
+    assert cs("'hunter2'") == "hunter2"          # single-quoted paste
+    assert cs('  "hunter2"  ') == "hunter2"      # quotes + outer whitespace
+    assert cs('"hunter2"\n') == "hunter2"        # quotes + trailing newline
+    assert cs("plain") == "plain"                # untouched
+    assert cs('pa"ss') == 'pa"ss'                # inner quote preserved
+    assert cs("'mismatched\"") == "'mismatched\""  # non-matching pair: left as-is
+    assert cs('"') == '"'                        # single lone quote: not a pair
+    assert cs("") == ""                          # empty stays empty

@@ -991,6 +991,51 @@ TASK — Produce a LEGAL tax-optimisation finding for each MATERIAL opportunity 
 
 
 # ─────────────────────────────────────────────
+# 15c. SA STRUCTURAL TAX-RISK AGENT (GAAR / SARS scrutiny — the mirror of "Tax Me If You Can")
+# ─────────────────────────────────────────────
+class TaxStructureRiskAgent(BaseAgent):
+    name = "GAAR & SARS Scrutiny"
+    system_prompt = """You are a South African registered tax practitioner who reviews a business's STRUCTURE for patterns that commonly attract SARS audit selection or fall within the General Anti-Avoidance Rule (Income Tax Act ss 80A-80L).
+
+HARD RULES (do not break):
+- RISK-AWARENESS ONLY. You flag structural patterns so the owner can ensure commercial substance and documentation. You NEVER accuse the business of evasion or wrongdoing, and you NEVER give tax advice.
+- Use ONLY the pre-detected flags supplied below. NEVER invent a flag, a number, or a legal conclusion of your own.
+- Frame every flag constructively: what to document, how to evidence commercial substance, and "confirm your position with a registered tax practitioner".
+- These are risks to MANAGE, not crimes. Keep severities to the level given in each flag.""" + "\n" + FINDING_RULES
+
+    def analyze(self, business_data: dict, memory: SharedMemory) -> list[AgentFinding]:
+        from services.tax_risk_flags import analyze_tax_risk_flags, tax_risk_block
+        res = analyze_tax_risk_flags(memory)
+
+        # Deterministic outputs (authoritative; the LLM never overrides these).
+        memory.tax_risk_flags = res
+        memory.tax_risk_summary = res.get("summary", "")
+
+        block = tax_risk_block(memory)
+        if not block:
+            return []
+
+        prompt = f"""
+BUSINESS CONTEXT:
+{memory.to_context_summary()}
+
+SA TAX PROFILE:
+Entity Type: {memory.entity_type or 'not provided'} | Turnover: R{memory.annual_revenue:,.0f} | VAT Registered: {memory.vat_registered}
+
+{block}
+
+TASK — Produce ONE finding per pre-detected structural tax-risk flag above, using EXACTLY the flag's severity, basis (statute) and recommended action.
+- Frame each as a risk to MANAGE through commercial substance + documentation, never as an accusation of evasion.
+- financial_impact should describe the EXPOSURE (penalties / interest / disallowed deductions / reassessment risk), not an invented rand amount, unless the flag supplies one.
+- End every recommendation with "confirm your position with a registered tax practitioner".
+- Put the specific section/act in benchmark_reference (e.g. "Income Tax Act ss 80A-80L (GAAR)").
+"""
+        raw = self._call_claude(prompt)
+        findings = self._parse_findings(raw, memory)
+        return findings
+
+
+# ─────────────────────────────────────────────
 # 16. SA CORPORATE LAW & BBBEE AGENT
 # ─────────────────────────────────────────────
 class SALegalAgent(BaseAgent):

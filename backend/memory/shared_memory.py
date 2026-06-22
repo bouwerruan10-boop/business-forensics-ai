@@ -157,6 +157,12 @@ class SharedMemory:
     tax_opt_summary: str = ""
     tax_optimization: dict = field(default_factory=dict)
 
+    # SA structural tax-risk flags (GAAR ss80A-80L / SARS scrutiny) — the mirror of
+    # tax_optimization. tax_risk_summary feeds to_context_summary(); the full dict is
+    # serialised into the report.
+    tax_risk_summary: str = ""
+    tax_risk_flags: dict = field(default_factory=dict)
+
     # ── SA Legal Agent Outputs ────────────────────────────────────
     sa_legal_risk_score: int = 0             # 0-100 (100 = highest legal risk)
     sa_legal_summary: str = ""               # injected into CEO synthesis
@@ -223,12 +229,8 @@ class SharedMemory:
             parts.append(f"SA Tax: {self.sa_tax_summary}")
         if self.tax_opt_summary:
             parts.append(f"Tax Me If You Can (legal tax saving): {self.tax_opt_summary}")
+        if self.tax_risk_summary:
+            parts.append(f"Structural tax-risk (GAAR/SARS): {self.tax_risk_summary}")
         if self.sa_legal_summary:
             parts.append(f"SA Legal: {self.sa_legal_summary}")
         return "\n".join(parts)
-
-    def to_dict(self):
-        """Serialise findings to plain dicts for JSON output."""
-        d = self.__dict__.copy()
-        d["findings"] = [f.__dict__ for f in self.findings]
-        return d

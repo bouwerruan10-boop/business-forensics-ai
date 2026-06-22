@@ -11,7 +11,7 @@ from services.obs import get_logger
 _log = get_logger("imara.pipeline")
 
 from agents.base_agent import BaseAgent
-from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent, TaxOptimizationAgent
+from agents.specialist_agents import ALL_AGENTS, SATaxAgent, SALegalAgent, TaxOptimizationAgent, TaxStructureRiskAgent
 from agents.market_research_agent import MarketResearchAgent, MarketDeepDiveAgent
 from agents.economics_agent import EconomicsAgent
 from memory.shared_memory import SharedMemory, AgentFinding
@@ -102,6 +102,8 @@ generic business language."""
                  "Reviewing SARS tax obligations..."),
                 (TaxOptimizationAgent(), "Tax Me If You Can",
                  "Finding legitimate SA tax reliefs you may be missing (SBC, ETI, allowances)..."),
+                (TaxStructureRiskAgent(), "GAAR & SARS Scrutiny",
+                 "Flagging structures that can attract SARS/GAAR scrutiny (substance + documentation)..."),
                 (SALegalAgent(), "SA Corporate Law & BBBEE Agent",
                  "Reviewing Companies Act, BBBEE, POPIA, CIPC compliance..."),
                 (EconomicsAgent(), "Economic Environment Agent",
@@ -636,6 +638,7 @@ Return ONLY valid JSON.
             "sa_tax_risk_score": memory.sa_tax_risk_score,
             "sa_tax_summary": memory.sa_tax_summary,
             "tax_optimization": memory.tax_optimization,
+            "tax_risk_flags": memory.tax_risk_flags,
             "sa_vat_status": memory.sa_vat_status,
             "sa_tax_clearance_status": memory.sa_tax_clearance_status,
             "sa_tax_performed": memory.sa_tax_performed,

@@ -155,6 +155,7 @@ def score_bar_chart(scores: dict, width: float = 6.0, height: float = 2.8) -> by
 
 def severity_donut(findings: list, width: float = 4.0) -> bytes:
     """Donut chart showing breakdown of finding severities."""
+    findings = findings or []          # tolerate None / missing (caller is wrapped in try/except)
     counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
     for f in findings:
         sev = (f.get("severity") or "medium").lower()

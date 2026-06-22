@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Navbar from './components/Navbar'
 import SmartIntake from './components/SmartIntake'
 import AnalysisProgress from './components/AnalysisProgress'
@@ -24,7 +24,6 @@ export default function App() {
   const [authRequired, setAuthRequired] = useState(false)
   const [authed, setAuthed] = useState(() => !!getToken())
   const [authChecked, setAuthChecked] = useState(false)
-  const pollRef = useRef(null)
 
   // Hash routing — handle /report/:id URLs
   useEffect(() => {
@@ -70,23 +69,45 @@ export default function App() {
 
   useEffect(() => {
     if (!analysisId || phase !== 'analyzing') return
-    pollRef.current = setInterval(async () => {
+    let cancelled = false
+    let timer = null
+    const startedAt = Date.now()
+    const MAX_POLL_MS = 40 * 60 * 1000      // hard stop: surface an error instead of polling forever
+    const BASE_MS = 2000
+    const MAX_INTERVAL_MS = 30000
+    let interval = BASE_MS
+
+    const tick = async () => {
+      if (cancelled) return
+      if (Date.now() - startedAt > MAX_POLL_MS) {
+        setError('Analysis is taking longer than expected. Please try again or contact support.')
+        setPhase('intake')
+        return
+      }
       try {
         const s = await pollStatus(analysisId)
+        if (cancelled) return
         setStatus(s)
         if (s.status === 'complete') {
-          clearInterval(pollRef.current)
           const r = await getReport(analysisId)
+          if (cancelled) return
           setReport(r)
           setPhase('done')
-        } else if (s.status === 'error') {
-          clearInterval(pollRef.current)
+          return
+        }
+        if (s.status === 'error') {
           setError(s.error || 'Analysis failed. Please try again.')
           setPhase('intake')
+          return
         }
-      } catch (e) { /* network hiccup — keep polling */ }
-    }, 2000)
-    return () => clearInterval(pollRef.current)
+        interval = BASE_MS                  // healthy response -> reset backoff
+      } catch (e) {
+        interval = Math.min(MAX_INTERVAL_MS, Math.round(interval * 1.6))  // back off on transient errors
+      }
+      timer = setTimeout(tick, interval)
+    }
+    timer = setTimeout(tick, interval)
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [analysisId, phase])
 
   const loadDemo = async () => {

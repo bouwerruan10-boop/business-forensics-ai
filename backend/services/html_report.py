@@ -529,6 +529,32 @@ def generate_html_report(report: dict) -> str:
           <p style="font-size:11px;color:{GRAY};font-style:italic;margin-top:8px">{_tesc(_tx.get("disclaimer", ""))}</p>
         </div>"""
 
+    # ── GAAR / SARS structural tax-risk flags ─────────────────────
+    risk_html = ""
+    _rk = report.get("tax_risk_flags") or {}
+    if _rk.get("available") and _rk.get("flags"):
+        def _resc(t):
+            return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        _sevcol = {"high": RED, "medium": AMBER, "low": GRAY}
+        _band = _rk.get("risk_band", "low")
+        _frows = ""
+        for _f in (_rk.get("flags") or []):
+            _sc = _sevcol.get(_f.get("severity"), GRAY)
+            _frows += (f'<div style="padding:8px 0;border-bottom:1px solid #eee">'
+                       f'<strong>{_resc(_f.get("title"))}</strong> '
+                       f'<span style="color:{_sc};font-weight:700;text-transform:uppercase;font-size:11px">[{_resc(_f.get("severity"))}]</span><br>'
+                       f'<span style="font-size:12px;color:{DARK}">{_resc(_f.get("detail"))}</span><br>'
+                       f'<span style="font-size:12px;color:{GRAY}">Basis: {_resc(_f.get("basis"))}</span><br>'
+                       f'<span style="font-size:12px;color:{GRAY}">Action: {_resc(_f.get("action"))}</span></div>')
+        risk_html = f"""
+        <div class="section-block">
+          <h2 class="section-title">GAAR &amp; SARS SCRUTINY \u2014 STRUCTURAL TAX-RISK FLAGS</h2>
+          <p style="font-size:14px;color:{NAVY}">Overall structural-risk band: <strong style="color:{_sevcol.get(_band, GRAY)};text-transform:uppercase">{_resc(_band)}</strong></p>
+          <p style="font-size:13px;color:{NAVY}">{_resc(_rk.get("summary", ""))}</p>
+          {_frows}
+          <p style="font-size:11px;color:{GRAY};font-style:italic;margin-top:8px">{_resc(_rk.get("disclaimer", ""))}</p>
+        </div>"""
+
     # ── CSS ────────────────────────────────────────────────────────
     css = f"""
     :root {{
@@ -885,6 +911,7 @@ def generate_html_report(report: dict) -> str:
 <div id="page-valuation" class="page">
   {val_html or '<div class="section-block"><p>Valuation data not available. Provide audited financials.</p></div>'}
   {tax_html}
+  {risk_html}
 </div>
 
 <!-- ── FORECAST ───────────────────────────────────────────── -->

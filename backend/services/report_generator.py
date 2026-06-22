@@ -146,6 +146,9 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
     # ── Tax Me If You Can — legal tax savings (when applicable) ────
     if (report.get("tax_optimization") or {}).get("available"):
         _tax_optimisation_section(story, report)
+    _rk_pdf = report.get("tax_risk_flags") or {}
+    if _rk_pdf.get("available") and _rk_pdf.get("flags"):
+        _tax_risk_section(story, report)
         story.append(PageBreak())
 
     # ── Roadmap + closing ─────────────────────────────────────────
@@ -1015,6 +1018,35 @@ def _tax_optimisation_section(story, report):
         story.append(_para("Action: " + _esc(o.get("action")), _style(fontSize=8.5, textColor=muted)))
         story.append(Spacer(1, 0.15 * cm))
     story.append(_para(_esc(tx.get("disclaimer", "")), _style(fontSize=7.5, textColor=muted)))
+
+
+def _tax_risk_section(story, report):
+    """GAAR / SARS structural tax-risk flags (deterministic; risk-awareness, NOT accusation)."""
+    rk = report.get("tax_risk_flags") or {}
+    if not rk.get("available") or not rk.get("flags"):
+        return
+    _section_header(story, "GAAR & SARS SCRUTINY  -  STRUCTURAL TAX-RISK FLAGS")
+    muted = colors.HexColor("#5A6B7A")
+    sevcol = {"high": colors.HexColor("#C0392B"), "medium": colors.HexColor("#E67E22"),
+              "low": colors.HexColor("#5A6B7A")}
+
+    def _esc(t):
+        return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    band = rk.get("risk_band", "low")
+    story.append(_para("Overall structural-risk band: <b>{}</b>".format(_esc(band).upper()),
+                       _style(fontSize=12, fontName="Helvetica-Bold", textColor=sevcol.get(band, muted))))
+    story.append(_para(_esc(rk.get("summary", "")), _style(fontSize=9, textColor=NAVY)))
+    story.append(Spacer(1, 0.3 * cm))
+    for f in (rk.get("flags") or []):
+        sc = sevcol.get(f.get("severity"), muted)
+        story.append(_para("<b>{}</b>  [{}]".format(_esc(f.get("title")), _esc(f.get("severity")).upper()),
+                           _style(fontSize=9.5, fontName="Helvetica-Bold", textColor=sc)))
+        story.append(_para(_esc(f.get("detail")), _style(fontSize=8.5, textColor=muted)))
+        story.append(_para("Basis: " + _esc(f.get("basis")), _style(fontSize=8.5, textColor=muted)))
+        story.append(_para("Action: " + _esc(f.get("action")), _style(fontSize=8.5, textColor=muted)))
+        story.append(Spacer(1, 0.15 * cm))
+    story.append(_para(_esc(rk.get("disclaimer", "")), _style(fontSize=7.5, textColor=muted)))
 
 
 def _section_header(story, title: str):

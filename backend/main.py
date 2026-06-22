@@ -74,7 +74,8 @@ def verify_api_key(request: Request):
     if not API_SECRET_KEY:
         return  # gate disabled
     provided = request.headers.get("X-API-Key", "")
-    if provided != API_SECRET_KEY:
+    import hmac as _hmac
+    if not _hmac.compare_digest(provided, API_SECRET_KEY):
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing API key. Provide it in the X-API-Key header.",
@@ -91,7 +92,8 @@ def verify_admin_key(request: Request):
     if not ADMIN_API_KEY:
         return  # gate disabled
     provided = request.headers.get("X-Admin-Key", "")
-    if provided != ADMIN_API_KEY:
+    import hmac as _hmac
+    if not _hmac.compare_digest(provided, ADMIN_API_KEY):
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing admin key. Provide it in the X-Admin-Key header.",
@@ -339,6 +341,9 @@ def health():
 
 
 MAX_UPLOAD_FILES = 40   # generous for the 6 upload zones; bounds memory/time on abusive requests
+MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024     # per-file cap (aligns with the parser's content cap)
+MAX_UPLOAD_TOTAL_BYTES = 150 * 1024 * 1024   # aggregate cap across all files in one request
+ANALYSIS_TIMEOUT_SECONDS = int(os.getenv("ANALYSIS_TIMEOUT_SECONDS", "1800"))  # wall-clock cap on a single run
 
 
 def _coerce_categories(raw_json, n):
@@ -403,6 +408,11 @@ async def analyze(
     categories = _coerce_categories(file_categories, len(files))
 
     analysis_id = str(uuid.uuid4())
+    # Bound the in-memory status dict so a long-running server can't leak memory
+    # (entries persist after completion); evict the oldest once it grows large.
+    if len(analysis_status) > 1000:
+        for _old in list(analysis_status)[:200]:
+            analysis_status.pop(_old, None)
     analysis_status[analysis_id] = {
         "status": "processing",
         "progress": [],
@@ -421,10 +431,25 @@ async def analyze(
         raise HTTPException(status_code=400,
                             detail="Consent is required: confirm you have the right to upload this data and consent to processing.")
 
-    # Read file bytes immediately -- can't read in background task
+    # Read file bytes immediately -- can't read in background task.
+    # Validate per-file (empty / oversize) and aggregate size at the door so a
+    # pathological upload can't exhaust memory or hang the parser.
     file_data = []
+    _total = 0
     for i, f in enumerate(files):
         content = await f.read()
+        if not content:
+            analysis_status.pop(analysis_id, None)
+            raise HTTPException(status_code=400, detail="File '{}' is empty.".format(f.filename or "?"))
+        if len(content) > MAX_UPLOAD_FILE_BYTES:
+            analysis_status.pop(analysis_id, None)
+            raise HTTPException(status_code=413, detail="File '{}' exceeds the {}MB per-file limit.".format(
+                f.filename or "?", MAX_UPLOAD_FILE_BYTES // (1024 * 1024)))
+        _total += len(content)
+        if _total > MAX_UPLOAD_TOTAL_BYTES:
+            analysis_status.pop(analysis_id, None)
+            raise HTTPException(status_code=413, detail="Total upload exceeds the {}MB limit.".format(
+                MAX_UPLOAD_TOTAL_BYTES // (1024 * 1024)))
         file_data.append({
             "filename": f.filename,
             "content": content,
@@ -1059,9 +1084,10 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             def on_progress(agent, message):
                 analysis_status[analysis_id]["current_agent"] = agent
                 analysis_status[analysis_id]["message"] = message
-                analysis_status[analysis_id]["progress"].append(
-                    {"agent": agent, "message": message}
-                )
+                _prog = analysis_status[analysis_id]["progress"]
+                _prog.append({"agent": agent, "message": message})
+                if len(_prog) > 200:               # bound unbounded growth on long runs
+                    del _prog[:-200]
 
             # 4. Run full CEO-orchestrated analysis
             ceo = CEOAgent()
@@ -1111,15 +1137,36 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
 
         except Exception as e:
             get_logger("imara.pipeline").exception("analysis_failed")
-            save_error(analysis_id, str(e))
+            # Flip the client-visible status to a GENERIC message FIRST so a failure in
+            # save_error() can't leave the run stuck on "processing"; never echo the raw
+            # exception to the client (it can leak file paths / internal detail - the full
+            # trace is in the server log above).
+            _generic = "Analysis failed. Please try again or contact support."
             analysis_status[analysis_id]["status"] = "error"
-            analysis_status[analysis_id]["error"] = str(e)
-            analysis_status[analysis_id]["current_agent"] = "Error: {}".format(e)
+            analysis_status[analysis_id]["error"] = _generic
+            analysis_status[analysis_id]["message"] = _generic
+            analysis_status[analysis_id]["current_agent"] = "Error"
+            try:
+                save_error(analysis_id, _generic)
+            except Exception as _se:
+                get_logger("imara.pipeline").warning("save_error_failed", error=str(_se))
         finally:
             clear_context()
 
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _sync_run)
+    try:
+        await asyncio.wait_for(loop.run_in_executor(None, _sync_run), timeout=ANALYSIS_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        get_logger("imara.pipeline").error("analysis_timeout", analysis_id=analysis_id,
+                                           timeout_s=ANALYSIS_TIMEOUT_SECONDS)
+        _msg = "Analysis timed out. Please try again with fewer or smaller documents."
+        st = analysis_status.get(analysis_id)
+        if st is not None:
+            st["status"] = "error"; st["error"] = _msg; st["message"] = _msg; st["current_agent"] = "Error"
+        try:
+            save_error(analysis_id, _msg)
+        except Exception as _se:
+            get_logger("imara.pipeline").warning("save_error_failed", error=str(_se))
 
 
 # -- Demo endpoint (no API key required) --------------------------
@@ -1408,6 +1455,27 @@ def _enrich_demo():
     DEMO_REPORT["macro_top_driver"] = "Inflation / input costs"
 
     DEMO_REPORT["quick_wins"] = [f for f in DEMO_REPORT["all_findings_ranked"] if f.get("quick_win")]
+
+    # Populate the report's Department Findings + forecast curve from data the demo already
+    # holds, so any HTML/PDF EXPORT of the demo (the sales surface) is complete - the live
+    # pipeline sets these per run (ceo_agent by_agent + forecast engine); the demo did not.
+    _dept = {}
+    for _f in (DEMO_REPORT.get("all_findings_ranked") or []):
+        _dept.setdefault(_f.get("agent") or "Other", []).append(_f)
+    DEMO_REPORT["department_findings"] = _dept
+
+    _b = DEMO_REPORT.get("forecast_base_12m", 0) or 0
+    _u = DEMO_REPORT.get("forecast_bull_12m", 0) or 0
+    _r = DEMO_REPORT.get("forecast_bear_12m", 0) or 0
+    _months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    _curve = []
+    for _i in range(12):
+        _ramp = 0.90 + 0.20 * (_i / 11.0)   # gentle upward ramp; averages ~1.0 across the year
+        _curve.append({"month": _months[_i],
+                       "base": round(_b / 12.0 * _ramp),
+                       "bull": round(_u / 12.0 * _ramp),
+                       "bear": round(_r / 12.0 * _ramp)})
+    DEMO_REPORT["forecast_monthly"] = _curve
     DEMO_REPORT["quick_wins_narrative"] = ("Five quick wins (each under 30 days) recover an estimated "
         "R760k in margin and remove R180k of CCMA risk at minimal cost.")
     _crit = [f for f in DEMO_REPORT["all_findings_ranked"] if f.get("severity") == "critical"][:5]

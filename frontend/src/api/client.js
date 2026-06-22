@@ -19,6 +19,18 @@ function authHeaders() {
   return h
 }
 
+// Turn a non-OK response into a human-readable Error, never raw HTML / server text
+// (avoids dumping stack-trace-ish strings into the UI; surfaces the backend's detail).
+async function _friendlyError(res) {
+  if (res.status === 429) return new Error('Rate limit reached - too many analyses in a short time. Please wait a little and try again.')
+  if (res.status === 401) return new Error('Your session has expired or the key is invalid. Please sign in again.')
+  if (res.status === 413) return new Error('Upload too large. Please reduce the file sizes and try again.')
+  if (res.status >= 500) return new Error('The server hit an error. Please try again shortly.')
+  let detail = ''
+  try { const j = await res.json(); detail = j && j.detail ? j.detail : '' } catch { /* response was not JSON */ }
+  return new Error(detail || `Request failed (${res.status}).`)
+}
+
 export async function getHealth() {
   const res = await fetch(`${BASE}/health`)
   if (!res.ok) throw new Error('health check failed')
@@ -67,19 +79,19 @@ export async function uploadFiles(files, profile = {}) {
   form.append('file_categories', profile.file_categories || '[]')
 
   const res = await fetch(`${BASE}/analyze`, { method: 'POST', body: form, headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function pollStatus(analysisId) {
   const res = await fetch(`${BASE}/status/${analysisId}`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getReport(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
@@ -89,7 +101,7 @@ export function getPdfUrl(analysisId) {
 
 export async function getActions(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/actions`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
@@ -99,13 +111,13 @@ export async function simulateActions(analysisId, actions, scenario = 'expected'
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ analysis_id: analysisId, actions, scenario }),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getLevers(analysisId, scenario = 'expected') {
   const res = await fetch(`${BASE}/report/${analysisId}/levers?scenario=${scenario}`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
@@ -115,37 +127,37 @@ export async function monteCarlo(analysisId, actions) {
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ analysis_id: analysisId, actions }),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getReasons(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/reasons`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getMacro(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/macro`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getCashflow(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/cashflow`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getLenderView(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/lender-view`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getNormalization(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/normalization`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
@@ -155,14 +167,14 @@ export function getBankReadyPackUrl(analysisId) {
 
 export async function getFundingFit(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/funding-fit`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 
 export async function getOptimize(analysisId, scenario = 'expected', maxActions = 3, objective = 'imara') {
   const q = `scenario=${scenario}&max_actions=${maxActions}&objective=${objective}`
   const res = await fetch(`${BASE}/report/${analysisId}/optimize?${q}`, { headers: authHeaders() })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
 

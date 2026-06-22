@@ -14,6 +14,7 @@ import LenderView from './LenderView'
 import FundingFit from './FundingFit'
 import SupplierSavings from './SupplierSavings'
 import TaxOptimisation from './TaxOptimisation'
+import TaxRiskFlags from './TaxRiskFlags'
 import ReportActions from './ReportActions'
 import CreditReport from './CreditReport'
 import ValuationPanel from './ValuationPanel'
@@ -177,6 +178,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...(report.funding_fit?.available ? [{ id: 'funding-fit', label: 'Funding Fit' }] : []),
     ...(report.supplier_benchmark?.available ? [{ id: 'suppliers', label: 'Supplier Savings' }] : []),
     ...(report.tax_optimization?.available ? [{ id: 'tax-optimisation', label: 'Tax Me If You Can' }] : []),
+    ...(report.tax_risk_flags?.available ? [{ id: 'tax-risk', label: 'GAAR & SARS Scrutiny' }] : []),
     { id: 'simulator', label: 'Action Simulator' },
     { id: 'methodology', label: 'Methodology' },
   ]
@@ -374,6 +376,17 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Legitimate SA tax reliefs you may qualify for but could be missing — legal, GAAR-respecting planning"
         >
           <TaxOptimisation report={report} currency={report.currency} />
+        </Section>
+      )}
+
+      {/* GAAR / SARS structural tax-risk flags: the mirror of Tax Me If You Can (risk-awareness) */}
+      {report.tax_risk_flags?.available && (
+        <Section
+          id="tax-risk"
+          title="GAAR & SARS Scrutiny"
+          subtitle="Structural patterns that can attract SARS / GAAR scrutiny — manage with commercial substance and documentation"
+        >
+          <TaxRiskFlags report={report} />
         </Section>
       )}
 

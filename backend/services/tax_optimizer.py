@@ -159,12 +159,64 @@ def analyze_tax_optimization(memory) -> dict:
             "caveat": "Election has lock-in rules; compare both with your practitioner.",
         })
 
-    # 4) Other reliefs to review (single combined flag)
+    # 4) Learnership allowance (Section 12H) - employer skills-development relief
+    if headcount >= 1:
+        opps.append({
+            "name": "Learnership allowance (Section 12H)",
+            "eligible": "possibly", "quantified": False,
+            "est_saving_low": 0, "est_saving_high": 0,
+            "basis": "Each SETA-registered learnership/apprenticeship agreement earns an ANNUAL allowance (R40,000, or R60,000 for a learner with a disability) plus a COMPLETION allowance of the same amount. Available for agreements entered on or before 31 March 2027.",
+            "action": "Register qualifying learnerships with your SETA and claim the s12H annual + completion allowances in your IT14.",
+            "caveat": "Needs a SETA-registered agreement; per-agreement amounts and the 31 Mar 2027 sunset must be confirmed with your practitioner.",
+        })
+
+    # 5) R&D deduction (Section 11D) - 150% on approved R&D
+    opps.append({
+        "name": "Research & Development deduction (Section 11D)",
+        "eligible": "review", "quantified": False,
+        "est_saving_low": 0, "est_saving_high": 0,
+        "basis": "Approved scientific or technological R&D earns a 150% deduction (R1.5m deductible per R1m spent), extended to 31 December 2033. Often missed by SMEs developing new products, software or processes.",
+        "action": "If you develop new products/processes/software, apply to the DSI for s11D pre-approval (the 50% uplift applies only from the approval-application date).",
+        "caveat": "Requires DSI approval; routine/non-qualifying work is excluded - confirm scope with your practitioner.",
+    })
+
+    # 6) Energy & renewables (Section 12B permanent; Section 12L efficiency)
+    opps.append({
+        "name": "Energy & renewable-asset allowances (Section 12B / 12L)",
+        "eligible": "review", "quantified": False,
+        "est_saving_low": 0, "est_saving_high": 0,
+        "basis": "Section 12B gives an accelerated write-off on renewable-generation assets (e.g. solar PV) and is PERMANENT; Section 12L gives 95c per kWh of verified energy-efficiency savings (extended to 31 December 2030). NOTE: the enhanced 125% Section 12BA allowance EXPIRED for assets brought into use after 28 February 2025 - do not assume it.",
+        "action": "If you've invested (or plan to) in solar/renewables or efficiency measures, claim s12B and/or have s12L savings verified by a SANEDI-accredited M&V body.",
+        "caveat": "s12B rates depend on asset type/size; s12L needs accredited measurement. Confirm current rules with your practitioner.",
+    })
+
+    # 7) Doubtful-debt allowance (Section 11(j)) - timing benefit on aged debtors
+    opps.append({
+        "name": "Doubtful-debt allowance (Section 11(j))",
+        "eligible": "review", "quantified": False,
+        "est_saving_low": 0, "est_saving_high": 0,
+        "basis": "If you carry aged trade debtors, s11(j) allows a deduction (generally 25%, rising to 40% on debts 120+ days overdue) for doubtful debts WITHOUT writing them off - a timing benefit many SMEs overlook.",
+        "action": "Apply the s11(j) doubtful-debt allowance to your aged-debtor book in the IT14.",
+        "caveat": "Based on your actual debtor ageing; quantify with your practitioner.",
+    })
+
+    # 8) Donations to PBOs (Section 18A) - only meaningful where there is taxable income
+    if taxable and taxable > 0:
+        opps.append({
+            "name": "Donations to PBOs (Section 18A)",
+            "eligible": "review", "quantified": False,
+            "est_saving_low": 0, "est_saving_high": 0,
+            "basis": "Bona fide donations to s18A-approved public benefit organisations are deductible up to 10% of taxable income, with any excess carried forward - a genuine CSI/giving programme can be tax-efficient.",
+            "action": "Obtain valid s18A certificates for donations and claim the deduction (cap 10% of taxable income).",
+            "caveat": "Only s18A-approved PBOs qualify and a valid s18A certificate is required.",
+        })
+
+    # 9) Residual pointer to further fact-specific reliefs
     opps.append({
         "name": "Further reliefs to review",
         "eligible": "review", "quantified": False,
         "est_saving_low": 0, "est_saving_high": 0,
-        "basis": "Commonly missed by SMEs: learnership allowances (Section 12H, R40,000-R60,000 per registered agreement), R&D deduction (Section 11D, 150%), wear-and-tear (Section 11(e)/12C), and prepaid/bad-debt deductions.",
+        "basis": "Also commonly missed: wear-and-tear (Section 11(e)) and the 50/30/20 plant write-off (Section 12C), prepaid-expense timing (Section 23H), and bad-debt write-offs (Section 11(i)).",
         "action": "Ask your practitioner which of these apply to your operations.",
         "caveat": "Eligibility is fact-specific.",
     })

@@ -108,8 +108,15 @@ def test_only_named_statutory_reliefs_surface():
     allowed = {"Small Business Corporation rates (Section 12E)",
                "Accelerated capital allowances (Section 12E)",
                "Employment Tax Incentive (ETI)", "Skills Development Levy position",
-               "Turnover-tax option (micro business)", "Further reliefs to review"}
-    assert all(o["name"] in allowed for o in r["opportunities"])
+               "Turnover-tax option (micro business)",
+               "Learnership allowance (Section 12H)",
+               "Research & Development deduction (Section 11D)",
+               "Energy & renewable-asset allowances (Section 12B / 12L)",
+               "Doubtful-debt allowance (Section 11(j))",
+               "Donations to PBOs (Section 18A)",
+               "Further reliefs to review"}
+    assert all(o["name"] in allowed for o in r["opportunities"]), \
+        [o["name"] for o in r["opportunities"] if o["name"] not in allowed]
 
 
 def test_non_sa_business_is_gated_out():
@@ -118,7 +125,6 @@ def test_non_sa_business_is_gated_out():
     m.currency = "USD"; m.country = "United States"
     r = analyze_tax_optimization(m)
     assert r["available"] is False and r["opportunities"] == []
-
 
 def test_sa_context_via_country_even_if_currency_blank():
     m = _mk()
