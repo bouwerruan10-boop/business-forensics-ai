@@ -220,6 +220,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def _security_headers(request, call_next):
+    """Baseline OWASP secure-headers on every response. CSP is intentionally left to the
+    frontend/Vercel: the self-contained HTML report uses inline styles, so a strict backend
+    CSP would break it."""
+    response = await call_next(request)
+    h = response.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "no-referrer")
+    h.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+    h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
 # In-memory store for active sessions -- SQLite is the durable store
 analyses: dict = {}
 analysis_status: dict = {}
@@ -1423,7 +1438,8 @@ def demo_pdf(audience: str = "owner"):
             headers={"Content-Disposition": "attachment; filename={}".format(filename)},
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail="PDF generation error: {}".format(str(e)))
+        log.error("pdf_generation_failed", error=str(e)[:200])
+        raise HTTPException(status_code=500, detail="Could not generate the PDF report.")
 
 
 if __name__ == "__main__":

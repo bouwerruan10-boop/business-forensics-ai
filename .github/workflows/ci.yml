@@ -36,6 +36,12 @@ jobs:
           ruff check . --select F401,F811,F841   # HARD gate: unused imports / redefs / unused vars
           echo "--- vulture (advisory dead-code scan; candidates to verify, not a gate) ---"
           vulture . --min-confidence 80 --exclude tests,evals,__pycache__ || true
+      - name: Dependency vulnerability scan (advisory)
+        working-directory: backend
+        run: |
+          pip install pip-audit
+          echo "--- pip-audit: known-CVE scan of dependencies (advisory; promote to a gate later) ---"
+          pip-audit -r requirements.txt --progress-spinner=off || true
       - name: Run regression tests (no API key)
         working-directory: backend
         env:
