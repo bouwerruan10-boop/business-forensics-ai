@@ -73,14 +73,69 @@ def _country_code(country: str) -> str:
     return mapping.get((country or "").lower().strip(), "za")
 
 
+def _san(t):
+    """Defang prompt-injection + redact PII from a single string (input_guard)."""
+    from services.input_guard import scan_text
+    return scan_text(str(t if t is not None else ""))[0]
+
+
+def _scrub_results(items):
+    """Sanitise third-party SERP result text BEFORE it enters any prompt / the market
+    context summary — the one LLM-input surface that otherwise bypasses input_guard."""
+    out = []
+    for r in (items or []):
+        if isinstance(r, dict):
+            r = dict(r)
+            for k in ("title", "snippet", "source", "link"):
+                if isinstance(r.get(k), str):
+                    r[k] = _san(r[k])
+        out.append(r)
+    return out
+
+
 def _extract_organic(data: dict) -> list[dict]:
-    """Pull organic results list from Serper response."""
-    return data.get("organic", [])
+    """Pull organic results list from Serper response (sanitised)."""
+    return _scrub_results(data.get("organic", []))
 
 
 def _extract_news_items(data: dict) -> list[dict]:
-    """Pull news items from Serper news response."""
-    return data.get("news", [])
+    """Pull news items from Serper news response (sanitised)."""
+    return _scrub_results(data.get("news", []))
+
+
+# Prefixes/tokens that mark a listicle or generic SERP result, not a real company name.
+_COMP_NOISE_PREFIX = ("top ", "best ", "the best", "list of", "leading ", "10 ", "20 ", "5 ", "the top")
+_COMP_GENERIC = {"companies", "company", "businesses", "business", "brands", "suppliers", "providers",
+                 "services", "service", "list", "guide", "directory", "reviews", "review", "near",
+                 "best", "top", "leading", "compare", "vs", "and", "in", "for", "the"}
+
+
+def _clean_competitor_names(names, company_name: str = "", industry: str = "") -> list[str]:
+    """Filter competitor candidates (LLM-named or heuristic) down to plausible company names:
+    drop listicle/generic/self/industry-word/numeric entries, trim, de-dupe case-insensitively.
+    Pure; tolerates None / non-list / non-string input."""
+    out, seen = [], set()
+    comp_l = (company_name or "").lower().strip()
+    ind_l = (industry or "").lower().strip()
+    for raw in (names or []):
+        n = str(raw if raw is not None else "").strip().strip("-–—:|•").strip()
+        if not (3 <= len(n) <= 60):
+            continue
+        low = n.lower()
+        if any(low.startswith(pfx) for pfx in _COMP_NOISE_PREFIX):
+            continue
+        if comp_l and comp_l in low:                       # the company itself
+            continue
+        toks = [t for t in low.replace(",", " ").replace("/", " ").split() if t]
+        if toks and all(t in _COMP_GENERIC or t == ind_l or t.isdigit() for t in toks):
+            continue                                       # all-generic / industry-word / numeric
+        if low in seen:
+            continue
+        seen.add(low)
+        out.append(n)
+        if len(out) >= 6:
+            break
+    return out
 
 
 # ── Mock data (MOCK_MODE=true) ────────────────────────────────────────────────
@@ -142,7 +197,7 @@ If data is sparse, say so explicitly."""
             return []
 
         cc = _country_code(memory.country)
-        name = memory.business_name
+        name = _san(memory.business_name)
         industry = memory.industry or memory.industry_key or "business"
 
         # Search 1: company name presence
@@ -225,14 +280,14 @@ Rules:
             return self._mock_findings(memory)
 
         cc    = _country_code(memory.country)
-        name  = memory.business_name
+        name  = _san(memory.business_name)
         ind   = memory.industry or memory.industry_key or "business"
         ctry  = memory.country or "Africa"
 
         search_data = self._run_searches(name, ind, ctry, cc)
         score, sentiment = self._calculate_visibility(search_data)
         news_items  = self._extract_news(search_data)
-        competitors = self._extract_competitors(search_data, name)
+        competitors = self._extract_competitors(search_data, name, ind)
 
         memory.market_visibility_score = score
         memory.market_sentiment = sentiment
@@ -245,6 +300,10 @@ Rules:
 
         memory.market_opportunities = structured.get("opportunities", [])
         memory.market_risks = structured.get("risks", [])
+        # Prefer the LLM-named competitors (cleaned) over the heuristic title-slice; heuristic stays as fallback.
+        _llm_comps = _clean_competitor_names(structured.get("competitor_names"), name, ind)
+        if _llm_comps:
+            memory.market_competitors = _llm_comps
 
         findings = self._build_findings(name, score, sentiment, structured, memory, search_data)
         return findings
@@ -305,8 +364,10 @@ Rules:
             (r.get("snippet", "") + " " + r.get("title", "")).lower()
             for r in organic + news + reviews
         )
-        positive_words = ["award", "growth", "expansion", "launch", "partner", "success", "trusted", "leading"]
-        negative_words = ["scam", "fraud", "complaint", "lawsuit", "scandal", "bankrupt", "closure", "fail"]
+        positive_words = ["award", "growth", "expansion", "launch", "partner", "success", "trusted",
+                          "leading", "innovative", "quality", "reliable", "milestone", "funding", "recommend"]
+        negative_words = ["scam", "fraud", "complaint", "lawsuit", "scandal", "bankrupt", "closure",
+                          "fail", "liquidation", "retrench", "default", "recall", "dispute", "warning"]
 
         pos_count = sum(all_snippets.count(w) for w in positive_words)
         neg_count = sum(all_snippets.count(w) for w in negative_words)
@@ -339,27 +400,20 @@ Rules:
             })
         return items
 
-    def _extract_competitors(self, data: dict, company_name: str) -> list[str]:
-        """Extract named competitors from industry search results."""
-        competitors = []
-        seen = set()
-        comp_lower = company_name.lower()
+    def _extract_competitors(self, data: dict, company_name: str, industry: str = "") -> list[str]:
+        """Heuristic competitor candidates from the competitor search, cleaned of listicle/generic
+        noise. Used as a FALLBACK when the LLM can't name competitors from the snippets."""
+        candidates = []
+        comp_lower = (company_name or "").lower()
         for r in _extract_organic(data.get("competitors", {})):
             title = r.get("title", "")
             snippet = r.get("snippet", "")
-            # Skip the company itself
-            if comp_lower in title.lower() or comp_lower in snippet.lower():
+            if comp_lower and (comp_lower in title.lower() or comp_lower in snippet.lower()):
                 continue
-            # Extract company-like names from titles (capitalised words, 2-4 words)
             words = title.split()
             if len(words) >= 2:
-                candidate = " ".join(words[:3])
-                if candidate not in seen and len(candidate) > 3:
-                    competitors.append(candidate)
-                    seen.add(candidate)
-            if len(competitors) >= 6:
-                break
-        return competitors
+                candidates.append(" ".join(words[:3]))
+        return _clean_competitor_names(candidates, company_name, industry)
 
     # ── Claude analysis ───────────────────────────────────────────
 
@@ -596,7 +650,8 @@ Return ONLY valid JSON. No markdown. No explanation."""
             ))
 
         # Finding 4: Competitor threat (if competitors found)
-        comps = structured.get("competitor_names") or memory.market_competitors
+        comps = _clean_competitor_names(structured.get("competitor_names") or memory.market_competitors,
+                                        name, memory.industry or memory.industry_key)
         if comps:
             comp_list = ", ".join(comps[:5])
             findings.append(AgentFinding(

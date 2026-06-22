@@ -166,6 +166,6 @@ def answer_question(report: dict, question: str) -> dict:
         resp = client.messages.create(
             model=PARSE_MODEL, max_tokens=600, system=_SYSTEM,
             messages=[{"role": "user", "content": "ANALYSIS CONTEXT:\n" + ctx + "\n\nQUESTION: " + q}])
-        return {"answer": resp.content[0].text, "grounded": True}
+        return {"answer": (resp.content[0].text if resp.content else "Sorry — no answer was generated."), "grounded": True}
     except Exception as e:
         return {"answer": "Sorry — I couldn't generate an answer right now.", "error": str(e)[:140]}

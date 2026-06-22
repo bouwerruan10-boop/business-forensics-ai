@@ -12,12 +12,13 @@ dated snapshot keeps the pipeline self-contained and reproducible.
 """
 
 # Curated dated snapshot — refresh periodically. Each value carries provenance via as_of/source.
+from services import sa_rates as _sa_rates   # single source of truth for repo/prime (avoids cross-agent drift)
 SA_MACRO = {
     "as_of": "2026-06",
     "source": "Curated from SARB / Stats SA / World Bank (snapshot; not live)",
     "indicators": {
-        "repo_rate":        {"value": 7.25, "unit": "%", "label": "SARB repo rate"},
-        "prime_rate":       {"value": 10.75, "unit": "%", "label": "Prime lending rate"},
+        "repo_rate":        {"value": _sa_rates.REPO_RATE, "unit": "%", "label": "SARB repo rate"},
+        "prime_rate":       {"value": _sa_rates.PRIME_RATE, "unit": "%", "label": "Prime lending rate"},
         "cpi_inflation":    {"value": 3.5, "unit": "%", "label": "CPI inflation (SARB target 3-6%)"},
         "gdp_growth":       {"value": 1.3, "unit": "%", "label": "Real GDP growth (~1.4% next year est.)"},
         "zar_usd":          {"value": 18.2, "unit": "ZAR/USD", "label": "Rand / US dollar"},

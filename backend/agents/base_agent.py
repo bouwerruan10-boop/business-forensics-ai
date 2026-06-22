@@ -179,7 +179,10 @@ class BaseAgent:
                         int((_time.perf_counter() - _t0) * 1000))
         except Exception:
             pass
-        return response.content[0].text
+        try:
+            return response.content[0].text
+        except (AttributeError, IndexError, TypeError):
+            return ""   # empty / non-text content -> callers degrade gracefully
 
     def _build_benchmark_block(self, memory: SharedMemory) -> str:
         return format_benchmark_context(
@@ -266,13 +269,17 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
     def _findings_from_items(self, items):
         """Convert finding dicts into AgentFinding objects (skips non-dicts defensively)."""
         findings = []
-        for item in items:
+        _VALID_SEV = {"critical", "high", "medium", "low"}
+        for item in items[:40]:                      # cap findings/agent (cost/DoS guard)
             if not isinstance(item, dict):
                 continue
+            _sev = str(item.get("severity", "medium")).lower().strip()
+            if _sev not in _VALID_SEV:               # unknown severity must not score as medium silently
+                _sev = "medium"
             findings.append(AgentFinding(
                 agent=self.name,
                 category=item.get("category", "General"),
-                severity=item.get("severity", "medium"),
+                severity=_sev,
                 title=item.get("title", "Finding"),
                 detail=item.get("detail", ""),
                 financial_impact=item.get("financial_impact", "Unquantified"),

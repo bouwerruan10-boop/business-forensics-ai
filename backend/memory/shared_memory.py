@@ -93,6 +93,7 @@ class SharedMemory:
 
     # Credit Readiness
     credit_score: int = 0                    # 0-100 credit readiness score
+    credit_source: str = "model"             # "model" (credit agent) | "derived" (CEO fallback)
     credit_grade: str = ""                   # "A" | "B" | "C" | "D" | "F"
     credit_barriers: list = field(default_factory=list)
     credit_strengths: list = field(default_factory=list)

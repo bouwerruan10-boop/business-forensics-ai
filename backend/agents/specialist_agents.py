@@ -18,7 +18,8 @@ MANDATORY RULES FOR EVERY FINDING YOU WRITE:
 6. Give one specific, actionable recommendation (not generic advice)
 7. Flag as quick_win=true if fixable in under 30 days
 8. If there is insufficient data to make a specific finding, say so and note what data would be needed.
-Never write vague statements like "costs appear elevated" — always anchor to numbers.
+9. NEVER invent, infer, estimate, or fabricate a figure that is not in the supplied data. If the data does not contain the number, write "not quantifiable from supplied data" for the financial impact rather than guessing one.
+Never write vague statements like "costs appear elevated" — always anchor to numbers FROM THE DATA.
 """
 
 
@@ -333,7 +334,7 @@ Marketing benchmarks you apply:
 - Customer retention rate: top quartile businesses retain >85% annually
 
 For each marketing finding:
-- State what the current metric appears to be (from data or inferred)
+- State what the current metric appears to be (from the supplied data ONLY; if it is not in the data, say "not assessable" — never infer or invent a number)
 - State the benchmark
 - Calculate the financial impact of the gap
 - Recommend a specific change (not "improve digital marketing" — name the specific tactic)
@@ -626,7 +627,7 @@ Conclude with the JSON risk block specified in your system prompt.
                 level = str(data.get("fraud_risk_level", "")).lower().strip()
                 if level in ("low", "medium", "high", "critical"):
                     memory.fraud_risk_level = level
-                memory.fraud_risk_score = int(float(data.get("fraud_risk_score", 0)))
+                memory.fraud_risk_score = max(0, min(100, int(float(data.get("fraud_risk_score", 0)))))
                 memory.fraud_indicators = data.get("fraud_indicators", []) or []
             except Exception:
                 pass
@@ -731,7 +732,7 @@ specified in your system prompt.
         if match:
             try:
                 data = json.loads(match.group())
-                memory.credit_score = int(float(data.get("credit_score", 0)))
+                memory.credit_score = max(0, min(100, int(float(data.get("credit_score", 0)))))
                 grade = str(data.get("credit_grade", "")).upper().strip()
                 if grade in ("A", "B", "C", "D", "F"):
                     memory.credit_grade = grade
@@ -812,9 +813,10 @@ EBITDA and justify the multiple. Conclude with the JSON valuation block specifie
         if match:
             try:
                 data = json.loads(match.group())
-                memory.valuation_low = float(data.get("valuation_low", 0))
-                memory.valuation_mid = float(data.get("valuation_mid", 0))
-                memory.valuation_high = float(data.get("valuation_high", 0))
+                _vl = max(0.0, float(data.get("valuation_low", 0)))
+                _vm = max(0.0, float(data.get("valuation_mid", 0)))
+                _vh = max(0.0, float(data.get("valuation_high", 0)))
+                memory.valuation_low, memory.valuation_mid, memory.valuation_high = sorted([_vl, _vm, _vh])
                 memory.valuation_method = data.get("valuation_method", "") or ""
                 memory.valuation_ebitda_multiple = float(data.get("valuation_ebitda_multiple", 0))
                 memory.valuation_normalised_ebitda = float(data.get("valuation_normalised_ebitda", 0))
@@ -1166,10 +1168,12 @@ For each issue, calculate the estimated maximum financial liability under the re
             # score that feeds the Imara Score, so a firm's ownership profile can never lower
             # its bankability rating. See MODEL_CARD.md (Fairness).
             def _is_bbbee(f):
-                t = (f.title + " " + f.detail).lower()
-                return ("bbbee" in t or "b-bbee" in t or "broad-based black" in t
-                        or "bee level" in t or "bee scorecard" in t or "bee compliance" in t
-                        or "bee certificate" in t)
+                t = (f.title + " " + f.detail + " " + getattr(f, "category", "")).lower()
+                return any(k in t for k in (
+                    "bbbee", "b-bbee", "bbb-ee", "broad-based black", "broad based black",
+                    "black economic empowerment", "bee level", "bee scorecard", "bee compliance",
+                    "bee certificate", "transformation", "ownership element",
+                    "preferential procurement", "enterprise development", "supplier development"))
             bbbee_findings = [f for f in findings if _is_bbbee(f)]
             scored = [f for f in findings if not _is_bbbee(f)]
             top = sorted(scored, key=lambda f: severity_order.get(f.severity, 0), reverse=True)
@@ -1294,9 +1298,11 @@ Include all 12 months in forecast_monthly.
         if json_match:
             try:
                 forecast_data = json.loads(json_match.group())
-                memory.forecast_base_12m = float(forecast_data.get("forecast_base_12m", 0))
-                memory.forecast_bull_12m = float(forecast_data.get("forecast_bull_12m", 0))
-                memory.forecast_bear_12m = float(forecast_data.get("forecast_bear_12m", 0))
+                _fbear = max(0.0, float(forecast_data.get("forecast_bear_12m", 0)))
+                _fbase = max(0.0, float(forecast_data.get("forecast_base_12m", 0)))
+                _fbull = max(0.0, float(forecast_data.get("forecast_bull_12m", 0)))
+                _fbear, _fbase, _fbull = sorted([_fbear, _fbase, _fbull])   # enforce bear <= base <= bull
+                memory.forecast_base_12m, memory.forecast_bull_12m, memory.forecast_bear_12m = _fbase, _fbull, _fbear
                 memory.forecast_assumptions = forecast_data.get("forecast_assumptions", [])
                 memory.forecast_monthly = forecast_data.get("forecast_monthly", [])
             except Exception:

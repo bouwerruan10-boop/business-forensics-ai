@@ -360,10 +360,14 @@ Return ONLY valid JSON.
         """
         findings = memory.findings
         if not findings:
-            memory.business_health_score = 70
-            memory.profitability_score = 70
-            memory.efficiency_score = 70
-            memory.risk_score = 70
+            # Distinguish "agents ran, found nothing" (genuinely clean -> 70) from "nothing ran"
+            # (total pipeline failure -> leave scores at 0 so the Imara Score reflects low
+            # completeness/confidence instead of a falsely-reassuring 70).
+            if memory.agent_timings:
+                memory.business_health_score = 70
+                memory.profitability_score = 70
+                memory.efficiency_score = 70
+                memory.risk_score = 70
             return
 
         def _sev_weight(f: AgentFinding) -> float:
@@ -396,8 +400,11 @@ Return ONLY valid JSON.
 
         # Derive credit_grade from credit_score if the agent already set it
         if memory.credit_score == 0:
-            # Fallback: estimate from financial health
+            # Fallback: estimate from financial health (NOT a lender-model assessment — flag provenance)
             memory.credit_score = min(100, max(5, int(memory.profitability_score * 0.6 + memory.risk_score * 0.4)))
+            memory.credit_source = "derived"
+        else:
+            memory.credit_source = "model"
         if not memory.credit_grade:
             s = memory.credit_score
             memory.credit_grade = "A" if s >= 80 else "B" if s >= 60 else "C" if s >= 40 else "D" if s >= 20 else "F"
@@ -603,6 +610,7 @@ Return ONLY valid JSON.
 
             # Credit Readiness
             "credit_score": memory.credit_score,
+            "credit_source": memory.credit_source,
             "credit_grade": memory.credit_grade,
             "credit_barriers": memory.credit_barriers,
             "credit_strengths": memory.credit_strengths,
