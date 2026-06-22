@@ -282,7 +282,10 @@ def login(req: LoginRequest):
     if not AUTH_ENABLED:
         return {"auth_required": False}
     import hmac as _hmac
-    if not _hmac.compare_digest(req.password or "", OPERATOR_PASSWORD):
+    # strip both sides (a trailing newline/space in the host env var or the typed value is the
+    # usual cause of a false "Invalid password"); compare as bytes so non-ASCII passwords work.
+    submitted = (req.password or "").strip()
+    if not OPERATOR_PASSWORD or not _hmac.compare_digest(submitted.encode("utf-8"), OPERATOR_PASSWORD.encode("utf-8")):
         raise HTTPException(status_code=401, detail="Invalid password")
     from auth import issue_token
     return {"token": issue_token(), "token_type": "bearer", "auth_required": True}

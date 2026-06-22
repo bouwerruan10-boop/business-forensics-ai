@@ -43,7 +43,7 @@ IMARA_ENGINE_VERSION = os.getenv("IMARA_ENGINE_VERSION", "2.1.0")  # stamped int
 # ── Operator authentication (multi-user-ready seam) ──
 # Set OPERATOR_PASSWORD to require login; unset = open (dev/operator) for backward-compat.
 import hashlib as _hashlib
-OPERATOR_PASSWORD = os.getenv("OPERATOR_PASSWORD", "")
+OPERATOR_PASSWORD = os.getenv("OPERATOR_PASSWORD", "").strip()   # .strip(): tolerate trailing newline/space from the host env (a common cause of false "Invalid password")
 AUTH_ENABLED = bool(OPERATOR_PASSWORD)
 # Token-signing secret; if unset, derive deterministically from the password so it
 # works with just OPERATOR_PASSWORD set (still secret + stable across restarts).
