@@ -316,6 +316,10 @@ async def _operator_gate(request: Request, call_next):
     """Gate the report/analyze/status surface behind the operator token when
     OPERATOR_PASSWORD is set. Public share links, the demo, admin (own key), /v1 and
     health stay open. No-op when auth is disabled (dev/test)."""
+    # CORS preflight (OPTIONS) carries no Authorization header by design. Never gate it,
+    # or the browser preflight 401s and the real (token-bearing) request never fires.
+    if request.method == "OPTIONS":
+        return await call_next(request)
     from config import AUTH_ENABLED
     if AUTH_ENABLED:
         path = request.url.path

@@ -125,6 +125,10 @@ function Field({ label, required, hint, error, children }) {
 
 const inputCls = "w-full bg-[#0f1117] border border-white/10 rounded-lg px-3 py-2 text-white text-[13px] outline-none focus:border-gold/40 transition-colors"
 
+// Pipeline agents shown on the intake — kept in sync with AnalysisProgress AGENT_ORDER (21 total).
+const GENERAL_AGENTS = ['CEO Synthesiser','Financial Forensics','Accounting','Auditor','Operations','Logistics','Sales','Marketing','HR','Procurement','Strategy','Legal Risk','Fraud Detection','Credit Readiness','Valuation','Forecast','Market Research','Market Intelligence','Economic Environment']
+const SA_AGENTS = ['SA Tax Compliance','SA Corporate Law & BBBEE']
+
 export default function SmartIntake({ onAnalyze, onDemo, error }) {
   const [step, setStep] = useState(0)
 
@@ -439,13 +443,14 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
             </Field>
           </div>
           <div className="mt-5 bg-gold/4 border border-gold/15 rounded-xl p-4">
-            <div className="text-[11px] font-bold text-white mb-2">⚡ 17 Specialist Agents Will Run</div>
+            <div className="text-[11px] font-bold text-white mb-2">⚡ {GENERAL_AGENTS.length + SA_AGENTS.length} Specialist Agents Will Run</div>
             <div className="flex flex-wrap gap-1.5">
-              {['CEO Synthesiser','Financial Forensics','Accounting','Auditor','Operations','Logistics','Sales','Marketing','HR','Procurement','Strategy','Legal Risk','Fraud Detection','Credit Readiness','Valuation','Market Research'].map(a => (
+              {GENERAL_AGENTS.map(a => (
                 <span key={a} className="text-[9px] px-2 py-0.5 rounded-full bg-white/5 border border-white/8 text-slate-300">{a}</span>
               ))}
-              <span className="text-[9px] px-2 py-0.5 rounded-full bg-gold/10 border border-gold/25 text-gold font-bold">✦ SA Tax Compliance</span>
-              <span className="text-[9px] px-2 py-0.5 rounded-full bg-gold/10 border border-gold/25 text-gold font-bold">✦ SA Corporate Law & BBBEE</span>
+              {SA_AGENTS.map(a => (
+                <span key={a} className="text-[9px] px-2 py-0.5 rounded-full bg-gold/10 border border-gold/25 text-gold font-bold">✦ {a}</span>
+              ))}
             </div>
           </div>
         </div>
