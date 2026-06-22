@@ -68,6 +68,30 @@ def scope_guard(question):
     return False, "off-topic"
 
 
+# Prompt/logic-extraction guard (OWASP LLM07 - system-prompt leakage). UNLIKE scope_guard,
+# this ALWAYS refuses regardless of on-topic terms: the attack is an on-topic-looking question
+# that tries to make the assistant reveal its instructions, the model it uses, or how Imara
+# works internally - someone probing the API to copy the idea. Deterministic; pure.
+_EXTRACTION = [_re.compile(p, _re.I) for p in [
+    r"\b(?:system|developer|initial|original)\s+prompt\b",
+    r"\b(?:your|the)\s+(?:instructions?|prompt|rules?|system\s+message|guidelines?|configuration|directives?|persona|source\s+code)\b",
+    r"\b(?:reveal|show|print|repeat|recite|display|dump|output|share|expose|leak)\b[\w\s,-]{0,40}?\b(?:prompt|instruction|rule|system\s+message|guideline|configuration|directive)\b",
+    r"\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|your|the)\b",
+    r"\brepeat\s+(?:everything|the\s+text|all\s+text|the\s+words)\s+(?:above|before)\b",
+    r"\bverbatim\b",
+    r"\bprompt\s+injection\b",
+    r"\bhow\s+(?:are|were|do)\s+you\s+(?:built|made|configured|programmed|prompted|trained|designed)\b",
+    r"\b(?:what|which)\s+(?:model|llm|ai|engine)\b[\w\s,-]{0,30}?\b(?:are\s+you|do\s+you\s+use|powering|behind)\b",
+    r"\bhow\s+(?:does|do)\s+(?:imara|the\s+score|the\s+scoring|the\s+model|the\s+algorithm)\s+work\b",
+]]
+
+
+def extraction_attempt(question):
+    """True if the question tries to extract the system prompt / internal rules / model config /
+    source logic (prompt-leaking). Pure/deterministic."""
+    return any(rx.search(question or "") for rx in _EXTRACTION)
+
+
 
 def _fnum(v):
     try:
@@ -143,6 +167,15 @@ def answer_question(report: dict, question: str) -> dict:
     if not q:
         return {"answer": "Ask me anything about this analysis — for example: why is the score what it is, "
                           "what should I fix first, or what does a finding mean?"}
+    if extraction_attempt(q):
+        try:
+            from services.obs import get_logger
+            get_logger("imara.ask").warning("ask_extraction_attempt", sample=q[:120])
+        except Exception:
+            pass
+        return {"answer": "I can only explain THIS analysis - your score, the findings, the ratios and what "
+                          "to do about them. I cannot share how Imara works internally or what powers it.",
+                "refused": True}
     # Pre-LLM guards (Tier 1.6): defang/redact the question with the shared input
     # guard, then a deterministic scope check that blocks off-topic abuse without
     # spending an API call.

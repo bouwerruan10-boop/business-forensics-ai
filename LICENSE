@@ -1,0 +1,28 @@
+Imara — Proprietary Software License
+Copyright (c) 2026 Ruan Bouwer. All rights reserved.
+
+This software and its source code — including but not limited to the multi-agent
+analysis pipeline, the Imara Score methodology and weights, the deterministic
+scoring / financial-ratio / tax / macro engines, all prompts, the curated South
+African legislation and rates corpus, evaluation sets, and associated documentation
+(collectively, the "Software") — are the confidential and proprietary property and
+TRADE SECRETS of the copyright holder.
+
+THIS IS NOT OPEN-SOURCE SOFTWARE. No licence or right is granted to any person or
+entity to use, copy, reproduce, modify, adapt, translate, publish, distribute,
+sublicense, sell, rent, lease, host, reverse-engineer, decompile, disassemble, or
+create derivative works of the Software, in whole or in part, by any means, except
+under a separate written agreement signed by the copyright holder.
+
+Being given access to the Software or to the hosted Imara service — whether for
+evaluation, demonstration, pilot, or production use — transfers NO ownership or
+intellectual-property right of any kind. An authorised user of the hosted service
+receives only a limited, revocable, non-transferable right to USE the service, and
+acquires no right whatsoever to the source code, models, prompts, weights, or
+methodology, and may not attempt to extract, copy, or reconstruct them.
+
+Unauthorised use, copying, disclosure, or reverse-engineering is a violation of
+copyright and trade-secret law and may be pursued through injunctive relief and
+damages. The Software is provided "AS IS", without warranty of any kind.
+
+Licensing enquiries: bouwer.ruan10@gmail.com

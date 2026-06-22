@@ -65,3 +65,15 @@ jobs:
       - name: Build (catches JSX truncation / compile errors)
         working-directory: frontend
         run: npm run build
+
+  secrets:
+    name: Secret scan (gitleaks) — block committed keys
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks (scans diff + history; HARD gate on a real leak)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

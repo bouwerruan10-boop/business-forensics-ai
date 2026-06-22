@@ -1,0 +1,18 @@
+title = "Imara secret-scan config"
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe non-secret values / paths (dummies, examples, fixtures)"
+paths = [
+  '''\.env\.example$''',
+  '''(^|/)backend/tests/''',
+  '''(^|/)backend/evals/''',
+  '''\.gitleaks\.toml$''',
+]
+regexes = [
+  '''ci-dummy-key''',
+  '''sk-ant-xxx+''',
+  '''your[-_]?(api[-_]?)?key''',
+  '''placeholder''',
+]
