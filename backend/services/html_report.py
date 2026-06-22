@@ -47,6 +47,8 @@ def _rag_color(val: float, lo: float, hi: float, invert: bool = False) -> str:
 
 def generate_html_report(report: dict) -> str:
     """Return a fully self-contained HTML string for the report."""
+    from services.report_safety import normalize_report
+    report = normalize_report(report)
     biz      = _e(report.get("business_name", "Business"))
     industry = _e(report.get("industry", "General"))
     cur      = _e(report.get("currency", "ZAR"))

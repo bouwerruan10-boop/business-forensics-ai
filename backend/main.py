@@ -1135,7 +1135,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             analysis_status[analysis_id]["current_agent"] = "Analysis complete"
             analysis_status[analysis_id]["message"] = "All agents have completed their analysis."
 
-        except Exception as e:
+        except Exception:
             get_logger("imara.pipeline").exception("analysis_failed")
             # Flip the client-visible status to a GENERIC message FIRST so a failure in
             # save_error() can't leave the run stuck on "processing"; never echo the raw

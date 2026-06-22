@@ -75,6 +75,8 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
               "investor"— valuation, growth story, strategy findings
     """
     audience = audience.lower() if audience else "owner"
+    from services.report_safety import normalize_report
+    report = normalize_report(report)
 
     buffer = io.BytesIO()
     biz_name = report.get("business_name", "Business")

@@ -98,7 +98,6 @@ def test_expired_12BA_is_not_recommended():
     it must never be offered as a current relief (only the permanent s12B)."""
     r = analyze_tax_optimization(_sme())
     for o in r["opportunities"]:
-        blob = (o.get("name", "") + o.get("basis", "") + o.get("action", "")).lower()
         # 12BA may only appear as an explicit expiry warning, never as an action to claim
         assert "claim" not in o.get("action", "").lower() or "12ba" not in o.get("action", "").lower()
     # and the energy item explicitly warns it expired

@@ -1,6 +1,5 @@
 """Regression tests for the end-to-end hardening pass (v1.50): constant-time key
 compares, charts None-guard, and that the client-facing error path is generic."""
-import os
 import importlib
 import pytest
 from fastapi import HTTPException
@@ -67,3 +66,33 @@ def test_upload_rejects_empty_and_oversize(monkeypatch):
                   data={"file_categories": '["financial"]'})
     assert over.status_code == 413 and "per-file" in over.json()["detail"].lower()
     logging.disable(logging.NOTSET)
+
+
+def test_report_renderers_survive_none_and_wrongtyped_fields():
+    """Renderers must be total even on a corrupted/old report record with None-valued or
+    wrong-typed container fields (normalize_report neutralises the class)."""
+    from services.html_report import generate_html_report
+    from services.report_generator import generate_pdf_report
+    bad = [
+        {},
+        {"scores": None, "financial_ratios": None, "forecast_monthly": None,
+         "department_findings": None, "all_findings_ranked": None, "business_name": None},
+        {"scores": [1, 2, 3], "financial_ratios": "x", "forecast_monthly": "z",
+         "department_findings": "y", "all_findings_ranked": "q", "imara_components": 42},
+        {"valuation_high": 1e18, "imara_score": 99999, "business_name": "X" * 4000},
+    ]
+    for r in bad:
+        html = generate_html_report(r)
+        assert isinstance(html, str) and len(html) > 200
+        pdf = generate_pdf_report(r, "banker")
+        assert isinstance(pdf, (bytes, bytearray)) and pdf[:4] == b"%PDF"
+
+
+def test_normalize_report_is_pure_and_total():
+    from services.report_safety import normalize_report
+    assert normalize_report(None) == {}
+    assert normalize_report("nope") == {}
+    out = normalize_report({"scores": None, "a": 1, "all_findings_ranked": "x"})
+    assert "scores" not in out               # None-valued key stripped
+    assert out["all_findings_ranked"] == []  # wrong-typed list coerced
+    assert out["a"] == 1
