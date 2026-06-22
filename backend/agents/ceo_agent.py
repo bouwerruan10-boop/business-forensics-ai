@@ -340,6 +340,10 @@ Return ONLY valid JSON.
         raw = _strip_json(raw)
         try:
             synthesis = json.loads(raw)
+            if not isinstance(synthesis, dict):
+                # Valid JSON but not an object (e.g. the model returned an array or a string):
+                # downstream report assembly calls synthesis.get(...), so coerce to an empty dict.
+                return {}
             memory.post_message("CEO", "All Agents", json.dumps(synthesis))
             return synthesis
         except Exception:
