@@ -203,3 +203,62 @@ def test_selecting_only_new_corridors():
     # Mauritius (no CGT) and Malta (foreign CGT untaxed) both keep capital_gains at 0%
     for d in r["destinations"]:
         assert d["income_treatment"].get("capital_gains")
+
+
+# ── v1.79: full-capability expansion (flat-fee corridors + enrichment + sequencing) ──
+
+def test_eight_corridors_incl_flat_fee():
+    from services.relocation_tax import DESTINATIONS
+    for c in ("AE", "CY", "PT", "MU", "MT", "GR", "IT", "CH"):
+        assert c in DESTINATIONS
+    r = relocation_first_pass({"income_types": ["dividends"]})
+    codes = {d["code"] for d in r["destinations"]}
+    assert {"GR", "IT", "CH"} <= codes
+
+
+def test_corridor_enrichment_fields_present():
+    r = relocation_first_pass({"income_types": ["employment"]})
+    for d in r["destinations"]:
+        assert d["regime"] in ("rate", "flat_fee")
+        assert "investment_route" in d and "substance" in d
+        assert d["dta_with_sa"] is True
+        if d["regime"] == "flat_fee":
+            assert d["flat_fee"]["amount_zar"] and d["flat_fee"]["note"]
+
+
+def test_flat_fee_strong_for_ultra_high_income():
+    r = relocation_first_pass({"income": {"employment": 20_000_000, "dividends": 5_000_000}})
+    gr = next(d for d in r["destinations"] if d["code"] == "GR")
+    assert gr["regime"] == "flat_fee"
+    assert gr["indicative_destination_tax"] == 2_000_000  # the fixed EUR100k fee in ZAR
+    assert gr["fit"]["level"] == "strong"  # current SA tax >> the fee
+    assert gr["indicative_annual_saving"] > 0
+
+
+def test_flat_fee_weak_for_modest_income():
+    r = relocation_first_pass({"income": {"employment": 900_000}})
+    for code in ("GR", "IT", "CH"):
+        d = next(x for x in r["destinations"] if x["code"] == code)
+        assert d["fit"]["level"] == "weak"  # fixed fee exceeds modest SA tax
+        assert d["indicative_annual_saving"] < 0  # it would COST more
+
+
+def test_sequencing_and_cost_and_cfc_guardrail():
+    r = relocation_first_pass({})
+    assert isinstance(r["sequencing"], list) and len(r["sequencing"]) >= 6
+    assert isinstance(r["cost_considerations"], list) and r["cost_considerations"]
+    assert "fx_assumption" in r
+    # a CFC guardrail must now exist (6th)
+    assert any("CFC" in g["title"] or "company" in g["title"].lower() for g in r["guardrails"])
+    assert len(r["guardrails"]) >= 6
+
+
+def test_flat_fee_corridors_survive_no_amounts_and_adversarial():
+    # no amounts -> flat-fee cards still render with the fee + a generic fit, no crash
+    r = relocation_first_pass({"destinations": ["GR", "IT", "CH"], "income_types": ["pension"]})
+    assert len(r["destinations"]) == 3
+    for d in r["destinations"]:
+        assert d["flat_fee"]["amount_zar"] > 0
+    for bad in [None, {"income": "x"}, {"income": {"employment": float("nan")}}, {"destinations": ["GR", "ZZ"]}]:
+        out = relocation_first_pass(bad)
+        assert out["available"] and out["destinations"]

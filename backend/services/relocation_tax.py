@@ -14,6 +14,9 @@ Design invariants (non-negotiable):
 """
 
 AS_OF = "2026-06"  # corpus date — rules change yearly; re-verify before relying.
+FX_AS_OF = "Jun 2026 (indicative)"
+ZAR_PER_EUR = 20.0   # indicative, dated — flat-fee regimes are quoted in EUR/CHF
+ZAR_PER_CHF = 21.0
 
 INCOME_TYPES = ("employment", "business", "dividends", "interest", "rental", "capital_gains", "pension")
 
@@ -165,6 +168,88 @@ DESTINATIONS = {
         "effective_rates": {"employment": 0.35, "business": 0.05, "dividends": 0.0, "interest": 0.0, "rental": 0.0, "capital_gains": 0.0, "pension": 0.0},
         "sources": ["PwC Tax Summaries (Malta)", "Malta Commissioner for Tax and Customs", "Trident Trust non-dom key facts"],
     },
+    "GR": {
+        "name": "Greece (non-dom EUR 100k flat / 7% pension)",
+        "residency_test": "183 days; the EUR 100k HNWI regime needs you to NOT have been GR-tax-resident in 7 of the last 8 years (5 of last 6 for the pension regime).",
+        "headline": "A FIXED EUR 100,000/yr fee on ALL foreign income (HNWI non-dom, 15 yrs, needs a EUR 500k investment) - worth it ONLY for very high earners; SEPARATELY, a 7% flat on foreign PENSIONS for retirees.",
+        "income_treatment": {
+            "employment": "foreign employment covered by the EUR 100k flat fee; GR-source income on the normal scale up to 44%.",
+            "business": "foreign business income covered by the flat fee; GR-source taxed normally.",
+            "dividends": "foreign dividends covered by the EUR 100k flat fee (no extra tax).",
+            "interest": "foreign interest covered by the flat fee.",
+            "rental": "foreign rental covered by the flat fee; GR-source rental taxed.",
+            "capital_gains": "foreign capital gains covered by the flat fee.",
+            "pension": "the SEPARATE regime: 7% flat on foreign pension - far cheaper than the EUR 100k fee for retirees.",
+        },
+        "gotchas": ["The EUR 100k regime only beats SA tax once your SA bill exceeds ~R2m (very high income).", "Pensioners should use the separate 7% foreign-pension regime instead.", "Needs a EUR 500k investment for the HNWI regime; EU member - DAC6 applies."],
+        "flat_fee_zar": 2000000, "flat_fee_local": "EUR 100,000/yr",
+        "flat_fee_note": "Fixed EUR 100k/yr on all foreign income (HNWI non-dom) ~= R2.0m at ~R20/EUR, regardless of income - so it only saves money above ~R2m of current SA tax. The 7% pension regime is a separate, far cheaper option for retirees.",
+        "sources": ["Astons (Greek non-dom 2025)", "PwC Tax Summaries (Greece)", "Grant Thornton GR 2025 reform"],
+    },
+    "IT": {
+        "name": "Italy (EUR 200k/300k flat / 7% pension)",
+        "residency_test": "Italian tax residence; the flat regime needs no IT residence in 9 of the last 10 years.",
+        "headline": "A FIXED annual fee on all foreign income - RAISED to EUR 300,000/yr for new residents from 1 Jan 2026 (EUR 200k for 2025 entrants; EUR 100k grandfathered pre-Aug-2024). SEPARATELY, a 7% flat on foreign pension for retirees in small Southern-Italy towns.",
+        "income_treatment": {
+            "employment": "foreign income covered by the flat fee; IT-source income on the normal scale up to 43%.",
+            "business": "foreign business income covered by the flat fee.",
+            "dividends": "foreign dividends covered by the flat fee.",
+            "interest": "foreign interest covered by the flat fee.",
+            "rental": "foreign rental covered by the flat fee.",
+            "capital_gains": "foreign capital gains covered (a substantial-shareholding exclusion can apply in the first years).",
+            "pension": "the SEPARATE regime: 7% flat on foreign pension for retirees settling in a <20,000-population town in Southern Italy (Sicily/Calabria/Puglia/etc.), 10 yrs.",
+        },
+        "gotchas": ["At EUR 300k/yr (2026) the flat regime only beats SA tax above roughly R14m income - very niche.", "The 7% Southern-Italy pension regime is the accessible route for retirees.", "EU member - DAC6 applies."],
+        "flat_fee_zar": 6000000, "flat_fee_local": "EUR 300,000/yr (2026 new entrants)",
+        "flat_fee_note": "Fixed fee on all foreign income, raised to EUR 300k/yr from 1 Jan 2026 for new residents (~R6.0m at ~R20/EUR). Ultra-high-income only. The 7% Southern-Italy pension regime is separate and far cheaper.",
+        "sources": ["PwC Tax Summaries (Italy)", "Agenzia delle Entrate (new-residents regime)", "Italy Budget Law 2026"],
+    },
+    "CH": {
+        "name": "Switzerland (lump-sum / forfait)",
+        "residency_test": "Swiss tax domicile; available only to foreigners NOT gainfully employed in Switzerland who are new (or 10+ years absent).",
+        "headline": "Expenditure-based 'lump-sum' (forfait) tax: a minimum federal taxable base of CHF 434,700 taxed at ordinary cantonal rates - a fixed, canton-negotiated annual bill (often ~CHF 130k-200k) regardless of actual worldwide income.",
+        "income_treatment": {
+            "employment": "you may NOT be gainfully employed in CH; foreign employment is covered by the lump-sum base.",
+            "business": "no Swiss gainful activity permitted under the regime.",
+            "dividends": "covered by the lump-sum base (not taxed separately on the expenditure basis).",
+            "interest": "covered by the lump-sum base.",
+            "rental": "covered by the lump-sum base (Swiss-situated property can raise the base).",
+            "capital_gains": "private capital gains are generally tax-free in Switzerland.",
+            "pension": "covered by the lump-sum base.",
+        },
+        "gotchas": ["Only worth it for the very wealthy; some cantons (e.g. Zurich) have ABOLISHED it.", "You may NOT work in Switzerland.", "The base + cost of living are high; the deal is negotiated per canton (Ticino/Vaud favourable)."],
+        "flat_fee_zar": 3150000, "flat_fee_local": "~CHF 150,000/yr (indicative; canton-dependent)",
+        "flat_fee_note": "Forfait min federal base CHF 434,700 taxed at cantonal rates -> indicative tax ~CHF 150k (~R3.15m at ~R21/CHF). Canton-negotiated; no gainful Swiss activity allowed.",
+        "sources": ["KPMG CH (lump-sum 2025)", "Swiss Federal Dept of Finance", "PwC Tax Summaries (Switzerland)"],
+    },
+}
+
+# Residency / investment-route / substance enrichment per corridor (all have a SA double-tax treaty).
+_ENRICH = {
+    "AE": {"regime": "rate", "dta_with_sa": True,
+           "investment_route": "UAE Golden Visa via ~AED 2m property (or ~AED 500k entrepreneur route); 10-yr renewable.",
+           "substance": "Real presence for a Tax Residency Certificate (a mailbox won't pass); 9% corporate tax on active UAE business profit."},
+    "CY": {"regime": "rate", "dta_with_sa": True,
+           "investment_route": "Cyprus permanent residence ~EUR 300k property, or the 60-day rule with a home + ties.",
+           "substance": "Permanent home + genuine ties; maintain non-dom status (17-yr clock)."},
+    "PT": {"regime": "rate", "dta_with_sa": True,
+           "investment_route": "Portugal Golden Visa ~EUR 500k qualifying funds/VC (real-estate route removed 2023/25) or EUR 250k cultural donation; D7 passive-income visa for retirees.",
+           "substance": "183 days or a PT home on 31 Dec; IFICI eligibility is narrow (qualifying role + degree + no PT residence 5 yrs)."},
+    "MU": {"regime": "rate", "dta_with_sa": True,
+           "investment_route": "Mauritius residence via ~US$375k property (PDS/IRS/RES) or the Premium / Occupation-permit route.",
+           "substance": "183 days (or 270 over 3 yrs); remittance basis - plan what you bring in."},
+    "MT": {"regime": "rate", "dta_with_sa": True,
+           "investment_route": "Malta residence ~EUR 375k owned property (or ~EUR 14k/yr rent) + ~EUR 60k admin/contribution fees.",
+           "substance": "Ordinary residence; non-dom; EUR 5k (or EUR 15k GRP/MRP) minimum tax."},
+    "GR": {"regime": "flat_fee", "dta_with_sa": True,
+           "investment_route": "Greece Golden Visa EUR 250k-800k property (EUR 800k Athens/Thessaloniki/islands); the EUR 100k regime additionally needs a EUR 500k investment.",
+           "substance": "183+ days; genuine Greek residence; HNWI non-dom clock (not GR-resident 7 of last 8 yrs)."},
+    "IT": {"regime": "flat_fee", "dta_with_sa": True,
+           "investment_route": "Italy investor visa EUR 250k (innovative startup) / EUR 500k (company) / EUR 2m (govt bonds), or ordinary residence.",
+           "substance": "Genuine Italian residence; flat regime needs no IT residence in 9 of last 10 yrs."},
+    "CH": {"regime": "flat_fee", "dta_with_sa": True,
+           "investment_route": "Residence permit tied to the canton-negotiated lump-sum arrangement; no fixed investment but a high living-cost commitment.",
+           "substance": "Genuine domicile in the chosen canton; no gainful Swiss activity."},
 }
 
 GUARDRAILS = [
@@ -173,6 +258,26 @@ GUARDRAILS = [
     {"title": "Transparency is the default (CRS)", "detail": "Under the CRS your financial accounts are reported automatically between countries (CARF extends this to crypto). This is about LEGAL relocation, not hiding income — assume everything is visible to tax authorities."},
     {"title": "This is information, not an arrangement (DAC6/MDR)", "detail": "Designing or marketing a reportable cross-border tax arrangement makes the designer an 'intermediary' with disclosure duties and penalties. This tool gives you the factual landscape; it does not design or recommend a specific arrangement."},
     {"title": "Use a licensed advisor", "detail": "Only a licensed cross-border tax advisor / attorney (with professional-indemnity insurance) may ADVISE on or implement any of this. Treat this first-pass as preparation for that conversation, not a substitute for it."},
+    {"title": "Keep a company? Model the company, not just you (CFC)", "detail": "If you relocate but keep a >50%-SA-owned foreign company, SA's controlled-foreign-company rules (s9D) can attribute its net income back to you while you remain a resident; and an SA company you keep stays SA-taxed. Relocating the person without restructuring the business often does NOT achieve the saving - model the company too, with a licensed advisor."},
+]
+
+# Compliant order-of-operations (preparation, not an instruction to act).
+SEQUENCING = [
+    "Decide you GENUINELY intend to relocate - real home, real days, real ties (substance), not a paper move.",
+    "Plan the SA exit: ceasing SA tax residency triggers the s9H deemed-disposal exit CGT - model and time it.",
+    "Cease SA tax residency correctly (the 330-day physical-presence route or a DTA tie-breaker) and file the SARS RAV01 + obtain a tax-clearance.",
+    "Establish genuine residency + substance in the destination (days, a home, ties, and a Tax Residency Certificate where needed).",
+    "Address any company or trust you keep - SA CFC (s9D) and SA-company tax may still apply; restructure with advice.",
+    "Stay transparent: CRS/CARF report your accounts automatically; for EU destinations a designed arrangement can be reportable under DAC6/MDR.",
+    "Engage a LICENSED cross-border tax advisor + immigration agent (with PI insurance) to review, sign off and execute - this tool is preparation, not a substitute.",
+]
+
+COST_CONSIDERATIONS = [
+    "Residency / golden-visa investment threshold (varies widely - see each corridor's investment_route).",
+    "Cross-border tax + immigration advisory fees (commonly R100k-R500k+ to set up correctly).",
+    "Ongoing substance + cost-of-living in the destination (real days, a real home).",
+    "The SA exit CGT (s9H) - a one-off cost of LEAVING, before any destination saving.",
+    "Double-tax-treaty relief: SA has a DTA with every corridor here, which governs the residence tie-breaker + withholding relief.",
 ]
 
 
@@ -218,6 +323,8 @@ def _fit(income, code):
         if passive:
             return {"level": "strong", "reason": "Non-dom remittance basis keeps un-remitted foreign passive income at 0%, and foreign capital gains are untaxed even if remitted - strong for passive-heavy profiles."}
         return {"level": "possible", "reason": "Malta-source salary hits the scale (up to 35%); the non-dom benefit mainly helps foreign passive income and gains."}
+    if code in ("GR", "IT", "CH"):
+        return {"level": "possible", "reason": "A FIXED-FEE regime - it only beats SA tax for very high earners. Provide income amounts to model whether the fixed fee is below your current SA tax."}
     return {"level": "unknown", "reason": "Not in the modelled corpus."}
 
 
@@ -255,16 +362,32 @@ def relocation_first_pass(profile):
         treatment = d["income_treatment"]
         # show only the income types the user actually has (or all, if none specified)
         shown = {k: treatment[k] for k in (income or set(INCOME_TYPES)) if k in treatment}
+        en = _ENRICH.get(c, {})
+        regime = en.get("regime", "rate")
         card = {
-            "code": c, "name": d["name"], "residency_test": d["residency_test"],
+            "code": c, "name": d["name"], "regime": regime,
+            "residency_test": d["residency_test"], "investment_route": en.get("investment_route", ""),
+            "substance": en.get("substance", ""), "dta_with_sa": en.get("dta_with_sa", True),
             "headline": d["headline"], "income_treatment": shown, "gotchas": d["gotchas"],
             "fit": _fit(income, c), "sources": d["sources"],
         }
+        if regime == "flat_fee":
+            card["flat_fee"] = {"amount_zar": d.get("flat_fee_zar"), "local": d.get("flat_fee_local"), "note": d.get("flat_fee_note")}
         if quantify:
-            dt = round(_dest_tax(income_amounts, d.get("effective_rates", {})), 2)
+            if regime == "flat_fee":
+                dt = round(float(d.get("flat_fee_zar") or 0), 2)
+            else:
+                dt = round(_dest_tax(income_amounts, d.get("effective_rates", {})), 2)
             card["indicative_destination_tax"] = dt
             card["indicative_annual_saving"] = round(current_sa_tax - dt, 2)
             card["saving_pct"] = round((current_sa_tax - dt) / current_sa_tax * 100, 1) if current_sa_tax > 0 else 0.0
+            if regime == "flat_fee" and current_sa_tax > 0:
+                if dt < current_sa_tax * 0.9:
+                    card["fit"] = {"level": "strong", "reason": "Your current SA tax exceeds the fixed fee - the flat-fee regime saves money at your income level."}
+                elif dt <= current_sa_tax * 1.1:
+                    card["fit"] = {"level": "possible", "reason": "The fixed fee is roughly your current SA tax - marginal; only worth it for non-tax reasons or higher income."}
+                else:
+                    card["fit"] = {"level": "weak", "reason": "The fixed fee is MORE than your current SA tax - these flat-fee regimes only pay off at much higher incomes."}
         dests.append(card)
     # rank: strong > possible > weak > unknown
     order = {"strong": 0, "possible": 1, "weak": 2, "unknown": 3}
@@ -299,6 +422,9 @@ def relocation_first_pass(profile):
         "origin_exit": origin_exit,
         "destinations": dests,
         "guardrails": GUARDRAILS,
+        "sequencing": SEQUENCING,
+        "cost_considerations": COST_CONSIDERATIONS,
+        "fx_assumption": ("Flat-fee regimes (Greece/Italy/Switzerland) converted at ~R" + str(ZAR_PER_EUR) + "/EUR and ~R" + str(ZAR_PER_CHF) + "/CHF (" + FX_AS_OF + ") - indicative."),
         "classification": "decision-support / factual landscape",
         "is_not": "tax, legal, or financial advice, and not a recommendation to adopt any particular arrangement or move to any particular country",
         "estimates_disclaimer": ("All Rand figures are INDICATIVE estimates from headline/effective rates (" + TAX_AS_OF + ") — NOT a "
