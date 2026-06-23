@@ -30,3 +30,29 @@ def test_preflight_not_gated_but_real_request_is(monkeypatch):
                       files={"files": ("f.csv", b"Item,Amount\nRevenue,100\n", "text/csv")},
                       data={"company_name": "Gate Test", "consent": "true"})
         assert post.status_code == 401, post.status_code
+
+
+def test_gate_401_carries_cors_headers_so_browser_can_read_it(monkeypatch):
+    """Regression: the operator-gate's 401 short-circuits BEFORE CORSMiddleware, so it must
+    echo CORS headers itself. Without them the browser can't read the 401 and shows a
+    misleading 'Failed to fetch' (mistaken for a 503/outage) instead of the frontend's
+    'session expired, sign in again' message. (Diagnosed from Railway logs: every
+    POST /api/analyze was a 401, never a crash.)"""
+    import config
+    monkeypatch.setattr(config, "AUTH_ENABLED", True)
+    import main
+    with TestClient(main.app) as c:
+        # Allowed origin, no token -> 401 that the browser CAN read (CORS echoed)
+        r = c.post("/api/analyze", headers={"Origin": ORIGIN},
+                   files={"files": ("f.csv", b"Item,Amount\nRevenue,100\n", "text/csv")},
+                   data={"company_name": "Gate Test", "consent": "true"})
+        assert r.status_code == 401, r.status_code
+        assert r.headers.get("access-control-allow-origin") == ORIGIN
+        assert r.headers.get("access-control-allow-credentials") == "true"
+
+        # A non-allowed origin gets no CORS echo (still 401, just not readable cross-origin)
+        r2 = c.post("/api/analyze", headers={"Origin": "https://evil.example.com"},
+                    files={"files": ("f.csv", b"Item,Amount\nRevenue,100\n", "text/csv")},
+                    data={"company_name": "Gate Test", "consent": "true"})
+        assert r2.status_code == 401, r2.status_code
+        assert r2.headers.get("access-control-allow-origin") is None

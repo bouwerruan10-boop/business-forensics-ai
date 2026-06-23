@@ -17,6 +17,7 @@ import asyncio
 from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request, Depends
+import re
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
@@ -218,11 +219,31 @@ _default_origins = (
 )
 ALLOWED_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
 
+# Preview-deploy origin pattern — a named constant so the CORS middleware and the
+# operator-gate's manual CORS echo (below) can never drift apart.
+_PREVIEW_ORIGIN_REGEX = r"https://business-forensics-ai-[a-z0-9-]+\.vercel\.app"
+_preview_origin_re = re.compile(_PREVIEW_ORIGIN_REGEX)
+
+
+def _cors_echo_headers(request):
+    """CORS headers for responses that short-circuit BEFORE CORSMiddleware runs (the
+    operator-gate's 401). Without them the browser can't read the rejection and shows a
+    misleading 'Failed to fetch' instead of the real 401, so the frontend never reaches
+    its 'session expired, sign in again' handler. Mirrors the CORSMiddleware allow-list."""
+    origin = request.headers.get("origin", "")
+    if origin and (origin in ALLOWED_ORIGINS or _preview_origin_re.fullmatch(origin)):
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     # Only THIS project's Vercel preview deploys, not any *.vercel.app site.
-    allow_origin_regex=r"https://business-forensics-ai-[a-z0-9-]+\.vercel\.app",
+    allow_origin_regex=_PREVIEW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -328,7 +349,8 @@ async def _operator_gate(request: Request, call_next):
             h = request.headers.get("Authorization", "")
             tok = h[7:] if h.lower().startswith("bearer ") else ""
             if not verify_token(tok):
-                return SafeJSONResponse({"detail": "Authentication required"}, status_code=401)
+                return SafeJSONResponse({"detail": "Authentication required"}, status_code=401,
+                                       headers=_cors_echo_headers(request))
     return await call_next(request)
 
 
