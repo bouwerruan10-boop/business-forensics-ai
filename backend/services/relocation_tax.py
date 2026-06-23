@@ -131,6 +131,40 @@ DESTINATIONS = {
         "effective_rates": {"employment": 0.20, "business": 0.20, "dividends": 0.0, "interest": 0.0, "rental": 0.0, "capital_gains": 0.0, "pension": 0.35},
         "sources": ["Global Citizen Solutions (IFICI 2026)", "IBA overview", "immigrantinvest"],
     },
+    "MU": {
+        "name": "Mauritius",
+        "residency_test": "183 days in the tax year, OR 270 days across the current plus two preceding years.",
+        "headline": "Remittance basis on foreign income (taxed only if brought INTO Mauritius), NO capital gains / inheritance / wealth tax, and a simplified 0%-20% income tax scale (2025). Popular SA corridor with a SA double-tax treaty.",
+        "income_treatment": {
+            "employment": "Mauritius-source employment on the 2025 scale: 0% to MUR 500k, 10% to MUR 1m, 20% above MUR 1m.",
+            "business": "15% corporate tax; an 80% partial exemption can lower the effective rate on qualifying foreign-source company income.",
+            "dividends": "foreign dividends taxed ONLY if remitted to Mauritius; 0% if kept offshore.",
+            "interest": "foreign interest taxed only if remitted; 0% if kept offshore.",
+            "rental": "foreign rental taxed only if remitted; Mauritius-source rental on the scale.",
+            "capital_gains": "0% - Mauritius levies no capital gains tax.",
+            "pension": "foreign pension taxed only if remitted; 0% if kept offshore.",
+        },
+        "gotchas": ["Remittance basis means money you BRING IN is taxable up to 20% - plan cash-flow, not just headline residency.", "A solidarity levy can apply to high earners (income above ~MUR 3m) - confirm the current rate.", "SA double-tax treaty exists, but SA s9H exit tax, substance and CRS still apply."],
+        "effective_rates": {"employment": 0.20, "business": 0.15, "dividends": 0.0, "interest": 0.0, "rental": 0.0, "capital_gains": 0.0, "pension": 0.0},
+        "sources": ["PwC Tax Summaries (Mauritius)", "Mauritius Revenue Authority", "Mauritius Finance Act 2025"],
+    },
+    "MT": {
+        "name": "Malta (non-domiciled)",
+        "residency_test": "183 days, or otherwise making Malta your ordinary residence.",
+        "headline": "Non-dom remittance basis: foreign income taxed only if remitted to Malta, and foreign capital gains are NOT taxed even if remitted. A EUR 5,000 minimum tax applies if unremitted foreign income is >= EUR 35,000.",
+        "income_treatment": {
+            "employment": "Malta-source employment on the progressive scale (up to 35%).",
+            "business": "the full-imputation system can give a ~5% effective corporate rate via the 6/7 shareholder refund - needs proper structuring.",
+            "dividends": "foreign dividends taxed only if remitted to Malta; 0% if kept offshore.",
+            "interest": "foreign interest taxed only if remitted; 0% if kept offshore.",
+            "rental": "foreign rental taxed only if remitted to Malta.",
+            "capital_gains": "foreign capital gains are NOT taxed in Malta even if remitted (a key advantage).",
+            "pension": "foreign pension taxed only if remitted; the GRP/MRP programmes offer a flat 15% on remitted foreign income.",
+        },
+        "gotchas": ["EUR 5,000 minimum tax once unremitted foreign income reaches EUR 35,000 (per couple).", "The Global/Malta Residence Programmes give a flat 15% on remitted foreign income but carry a EUR 15,000 minimum tax.", "EU member - DAC6 applies; substance and CRS still apply."],
+        "effective_rates": {"employment": 0.35, "business": 0.05, "dividends": 0.0, "interest": 0.0, "rental": 0.0, "capital_gains": 0.0, "pension": 0.0},
+        "sources": ["PwC Tax Summaries (Malta)", "Malta Commissioner for Tax and Customs", "Trident Trust non-dom key facts"],
+    },
 }
 
 GUARDRAILS = [
@@ -174,6 +208,14 @@ def _fit(income, code):
         if pension and not (active or passive):
             return {"level": "weak", "reason": "IFICI EXCLUDES pensions — a pension-only profile gets little benefit (unlike the old NHR)."}
         return {"level": "possible", "reason": "Only strong IF you qualify for the narrow IFICI eligibility (qualifying innovation/high-value role + degree + no PT residence in 5 years); otherwise normal rates apply."}
+    if code == "MU":
+        if passive:
+            return {"level": "strong", "reason": "Remittance basis keeps un-remitted foreign dividends/interest/rental at 0%, and Mauritius has NO capital gains tax - strong for passive and capital-gains-heavy profiles."}
+        return {"level": "possible", "reason": "Local income hits the 0%-20% scale; the remittance basis and zero CGT help most when income is foreign and kept offshore."}
+    if code == "MT":
+        if passive:
+            return {"level": "strong", "reason": "Non-dom remittance basis keeps un-remitted foreign passive income at 0%, and foreign capital gains are untaxed even if remitted - strong for passive-heavy profiles."}
+        return {"level": "possible", "reason": "Malta-source salary hits the scale (up to 35%); the non-dom benefit mainly helps foreign passive income and gains."}
     return {"level": "unknown", "reason": "Not in the modelled corpus."}
 
 

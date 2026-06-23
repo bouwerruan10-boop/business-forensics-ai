@@ -159,3 +159,47 @@ def test_shared_sa_exit_not_mutated_by_cgt_estimate():
     import services.relocation_tax as rt
     relocation_first_pass({"income": {"employment": 1}, "assets": {"worldwide_market_value": 9, "base_cost": 1}})
     assert "exit_cgt_estimate" not in rt.SA_EXIT
+
+
+# ── Added corridors: Mauritius + Malta (v1.69) ─────────────────────────────────
+
+def test_mauritius_and_malta_present_and_complete():
+    from services.relocation_tax import DESTINATIONS, INCOME_TYPES
+    for code in ("MU", "MT"):
+        d = DESTINATIONS[code]
+        assert d["name"] and d["residency_test"] and d["headline"]
+        assert d["gotchas"] and d["sources"]
+        # effective_rates must cover every income type (quantification reads them)
+        for t in INCOME_TYPES:
+            assert t in d["effective_rates"]
+
+
+def test_new_corridors_appear_in_default_run():
+    r = relocation_first_pass({"income_types": ["dividends"]})
+    codes = {d["code"] for d in r["destinations"]}
+    assert {"MU", "MT"} <= codes
+
+
+def test_mauritius_malta_strong_for_passive():
+    r = relocation_first_pass({"income_types": ["dividends", "rental"]})
+    fit = {d["code"]: d["fit"]["level"] for d in r["destinations"]}
+    assert fit["MU"] == "strong"
+    assert fit["MT"] == "strong"
+
+
+def test_new_corridors_quantify():
+    r = relocation_first_pass({"income": {"employment": 1000000, "dividends": 500000}})
+    mu = next(d for d in r["destinations"] if d["code"] == "MU")
+    mt = next(d for d in r["destinations"] if d["code"] == "MT")
+    # foreign dividends sit at 0%; employment taxed at the corridor's effective rate
+    assert mu["indicative_destination_tax"] == round(1000000 * 0.20, 2)
+    assert mt["indicative_destination_tax"] == round(1000000 * 0.35, 2)
+    assert mu["indicative_annual_saving"] > 0
+
+
+def test_selecting_only_new_corridors():
+    r = relocation_first_pass({"destinations": ["MU", "MT"], "income_types": ["capital_gains"]})
+    assert [d["code"] for d in r["destinations"]] == ["MU", "MT"]
+    # Mauritius (no CGT) and Malta (foreign CGT untaxed) both keep capital_gains at 0%
+    for d in r["destinations"]:
+        assert d["income_treatment"].get("capital_gains")
