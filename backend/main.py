@@ -877,6 +877,21 @@ def report_owner_risk(analysis_id: str):
     return analyze_owner_risk(result)
 
 
+@app.get("/api/report/{analysis_id}/funder-gates")
+def report_funder_gates(analysis_id: str):
+    """Per-funder eligibility against named SA funders' PUBLISHED gates (SEDFA, IDC, NEF, Business
+    Partners) — turns the generic development-funding archetype into a concrete you-meet / you-don't.
+    Objective info on funding PROVIDERS (FAIS s1(3)(a)) — NOT a recommendation, NOT a credit decision,
+    NOT an Imara Score input."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("funder_gates"):
+        return result["funder_gates"]
+    from services.funder_gates import evaluate_funder_gates
+    return evaluate_funder_gates(result)
+
+
 @app.get("/api/report/{analysis_id}/audit")
 def report_audit(analysis_id: str):
     """The decision audit record(s) for this analysis: how the score was produced —
@@ -1213,6 +1228,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["funding_fit"] = recommend_funding(report)
             from services.owner_risk import analyze_owner_risk
             report["owner_risk"] = analyze_owner_risk(report, profile, getattr(memory, "uploaded_legal_text", ""), getattr(memory, "uploaded_financial_text", ""))
+            from services.funder_gates import evaluate_funder_gates
+            report["funder_gates"] = evaluate_funder_gates(report, profile)
             from services.credit_memo import build_credit_memo
             report["credit_memo"] = build_credit_memo(report)
             from services.working_capital import build_working_capital
@@ -1582,6 +1599,11 @@ def _enrich_demo():
         "The directors bind themselves as sureties and co-principal debtors, jointly and severally, "
         "under a deed of suretyship for the obligations of the company.",
         _demo_fin)
+    from services.funder_gates import evaluate_funder_gates
+    DEMO_REPORT["funder_gates"] = evaluate_funder_gates(
+        DEMO_REPORT, {"entity_type": DEMO_REPORT.get("entity_type"), "annual_revenue": DEMO_REPORT.get("annual_revenue"),
+                      "industry": DEMO_REPORT.get("industry"), "bbbee_level": DEMO_REPORT.get("bbbee_level"),
+                      "cipc_number": DEMO_REPORT.get("cipc_number"), "years_in_business": DEMO_REPORT.get("years_in_business")})
     DEMO_REPORT["decision_support"] = decision_support_notice()
     from services.audit_log import build_audit_record
     _arec = build_audit_record(DEMO_REPORT, "demo-inputs")
