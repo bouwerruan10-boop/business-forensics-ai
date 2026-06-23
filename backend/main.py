@@ -722,6 +722,21 @@ def report_distress(analysis_id: str):
     return result.get("distress_score") or altman_z_em(result.get("financial_figures") or {}, result.get("imara_band", ""))
 
 
+@app.get("/api/report/{analysis_id}/assurance")
+def report_assurance(analysis_id: str):
+    """Public Interest Score -> assurance tier (audit / independent review / compilation)
+    + CIPC standing awareness. Deterministic (Companies Act Reg 26/28); decision-support only."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("assurance"):
+        return result["assurance"]
+    from services.assurance import assess as assess_assurance
+    return assess_assurance(headcount=result.get("headcount") or 0, annual_revenue=result.get("annual_revenue") or 0,
+                            financial_figures=result.get("financial_figures") or {},
+                            entity_type=result.get("entity_type") or "", cipc_number=result.get("cipc_number") or "")
+
+
 @app.get("/api/report/{analysis_id}/cashflow")
 def report_cashflow(analysis_id: str):
     """Deterministic 13-week direct-method cash-flow projection - the short-term
@@ -1101,12 +1116,17 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["industry_key"] = profile.get("industry_key", "general")
             report["currency"] = profile.get("currency", "ZAR")
             report["annual_revenue"] = profile.get("annual_revenue", 0)
+            report["headcount"] = profile.get("headcount", 0)
+            report["entity_type"] = profile.get("entity_type", "")
+            report["cipc_number"] = profile.get("cipc_number", "")
             report["primary_concern"] = profile.get("primary_concern", "")
             report["llm_usage"] = _ledger.summary()
             from services.finding_quality import critique_report
             report["finding_quality"] = critique_report(report)  # deterministic per-finding critique
             from services.distress_score import altman_z_em
             report["distress_score"] = altman_z_em(report.get("financial_figures") or {}, report.get("imara_band", ""))
+            from services.assurance import assess as assess_assurance
+            report["assurance"] = assess_assurance(headcount=report.get("headcount") or 0, annual_revenue=report.get("annual_revenue") or 0, financial_figures=report.get("financial_figures") or {}, entity_type=report.get("entity_type") or "", cipc_number=report.get("cipc_number") or "")
             from services.bank_signals import analyze_bank_statement
             report["bank_signals"] = analyze_bank_statement(memory.uploaded_bank_text)
             from services.normalization import normalize_earnings
@@ -1421,6 +1441,8 @@ def _enrich_demo():
     })
 
     DEMO_REPORT["distress_score"] = altman_z_em(figs, "D")
+    from services.assurance import assess as _assess_assurance
+    DEMO_REPORT["assurance"] = _assess_assurance(headcount=DEMO_REPORT.get("headcount") or 0, annual_revenue=DEMO_REPORT.get("annual_revenue") or 0, financial_figures=figs, entity_type=DEMO_REPORT.get("entity_type") or "", cipc_number=DEMO_REPORT.get("cipc_number") or "")
     from services.cashflow_13week import project_13week as _proj13
     DEMO_REPORT["cashflow_13week"] = _proj13(figs, vat_registered=True)
     from services.agent_consistency import analyze_consistency as _consist

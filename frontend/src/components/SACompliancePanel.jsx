@@ -91,6 +91,7 @@ export default function SACompliancePanel({ report }) {
   const legalSummary  = report?.sa_legal_summary || ''
   const bbbeeAnalysis = report?.sa_bbbee_analysis || {}
   const bbbeeLevel    = report?.bbbee_level || ''
+  const assurance     = report?.assurance || null
 
   // Pull SA findings from all_findings_ranked
   const allFindings = report?.all_findings_ranked || []
@@ -139,6 +140,45 @@ export default function SACompliancePanel({ report }) {
           </div>
         </div>
       </div>
+
+      {assurance?.available && (
+        <div className="bg-[#161b27] border border-white/8 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[13px] font-bold text-white flex items-center gap-2">
+              📋 Assurance Requirement &amp; CIPC
+              <span className="text-[10px] text-slate-400 font-normal">Companies Act · Public Interest Score</span>
+            </div>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+              assurance.recommended_tier === 'audit' ? 'bg-red-500/15 text-red-400 border-red-500/30'
+              : assurance.recommended_tier === 'compilation' ? 'bg-green-500/15 text-green-400 border-green-500/30'
+              : 'bg-amber-500/15 text-amber-400 border-amber-500/30'}`}>
+              {assurance.recommended_tier?.toUpperCase()}{assurance.is_mandatory ? ' (required)' : ''}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-[#0f1117] border border-white/8 rounded-xl p-3 text-center">
+              <div className="text-[10px] text-slate-400 mb-1">Public Interest Score</div>
+              <div className="text-2xl font-black text-white">{assurance.public_interest_score}</div>
+              <div className="text-[9px] text-slate-500 mt-1">
+                emp {assurance.pis_breakdown?.employees} · turnover {assurance.pis_breakdown?.turnover_Rm} · liab {assurance.pis_breakdown?.third_party_liabilities_Rm}
+              </div>
+            </div>
+            <div className="col-span-2 space-y-2">
+              <p className="text-[11px] text-slate-300">{assurance.reasoning}</p>
+              {(assurance.notes || []).map((nt, i) => (
+                <p key={i} className="text-[10px] text-amber-300/90">• {nt}</p>
+              ))}
+              {assurance.potential_saving && (
+                <p className="text-[10px] text-green-400 font-semibold">💰 {assurance.potential_saving}</p>
+              )}
+            </div>
+          </div>
+          {assurance.cipc?.flag && (
+            <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-white/5">🏛 CIPC: {assurance.cipc.flag}</p>
+          )}
+          <p className="text-[9px] text-slate-600 mt-2">{assurance.disclaimer}</p>
+        </div>
+      )}
 
       {/* BBBEE card + finding columns */}
       <div className="grid grid-cols-3 gap-4">
