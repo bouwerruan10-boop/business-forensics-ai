@@ -46,6 +46,7 @@ from services.jsonsafe import finite_safe
 RATE_LIMIT = os.getenv("RATE_LIMIT", "3/hour")
 # Ask Imara is an open LLM endpoint (cost/abuse vector) -> its own per-IP limit.
 ASK_RATE_LIMIT = os.getenv("ASK_RATE_LIMIT", "20/hour")
+LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/minute")  # throttle password guessing
 
 
 def client_ip(request: Request) -> str:
@@ -156,6 +157,10 @@ def on_startup():
     init_db()
     if init_sentry():
         log.info("sentry_enabled")
+    from config import AUTH_SECRET_DERIVED
+    if AUTH_SECRET_DERIVED:
+        log.warning("auth_secret_derived_from_password",
+                    advice="Set an independent AUTH_SECRET env var to decouple token forgery from operator-password strength.")
     _interrupted = mark_interrupted_analyses()
     if _interrupted:
         log.info("interrupted_analyses_flagged", count=_interrupted)
@@ -302,7 +307,8 @@ class LoginRequest(BaseModel):
 
 
 @app.post("/api/login")
-def login(req: LoginRequest):
+@limiter.limit(LOGIN_RATE_LIMIT)
+def login(request: Request, req: LoginRequest):
     """Operator login. With OPERATOR_PASSWORD set, exchange it for a bearer token;
     unset = open (dev/operator), reports auth is not required."""
     from config import AUTH_ENABLED, OPERATOR_PASSWORD
@@ -332,6 +338,27 @@ def _auth_path_public(path: str) -> bool:
     return False
 
 
+def _path_analysis_id(path: str) -> str | None:
+    """Extract the {analysis_id} from a record-scoped path (/api/report/{id}[/...],
+    /api/status/{id}); None for paths that don't carry an id in the path."""
+    parts = path.split("/")
+    if len(parts) >= 4 and parts[1] == "api" and parts[2] in ("report", "status"):
+        return parts[3]
+    return None
+
+
+def require_owned(analysis_id: str, principal: Principal) -> None:
+    """Object-level authorization (OWASP API1 / BOLA): the principal must own the
+    record. Backward-compatible — a single operator owns all rows. Raises 404 (not
+    403) so the existence of another tenant's record isn't leaked. Used by endpoints
+    that carry the id in the BODY (the middleware covers path-id endpoints)."""
+    from config import AUTH_ENABLED
+    if not AUTH_ENABLED or analysis_id == "demo-001":
+        return
+    if db_get_analysis(analysis_id, owner=principal.id) is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+
 @app.middleware("http")
 async def _operator_gate(request: Request, call_next):
     """Gate the report/analyze/status surface behind the operator token when
@@ -348,8 +375,18 @@ async def _operator_gate(request: Request, call_next):
             from auth import verify_token
             h = request.headers.get("Authorization", "")
             tok = h[7:] if h.lower().startswith("bearer ") else ""
-            if not verify_token(tok):
+            payload = verify_token(tok)
+            if not payload:
                 return SafeJSONResponse({"detail": "Authentication required"}, status_code=401,
+                                       headers=_cors_echo_headers(request))
+            # OWASP API1 / BOLA: object-level authorization. For record-scoped paths the
+            # caller must own the record; 404 (not 403) so existence isn't leaked. Covers
+            # every GET /api/report/{id}[/...], /api/status/{id}, and the path-id POSTs
+            # (ask, share). Body-id POSTs (simulate) use require_owned() in-handler.
+            _aid = _path_analysis_id(path)
+            if _aid and _aid != "demo-001" and db_get_analysis(
+                    _aid, owner=payload.get("sub", "operator")) is None:
+                return SafeJSONResponse({"detail": "Analysis not found"}, status_code=404,
                                        headers=_cors_echo_headers(request))
     return await call_next(request)
 
@@ -550,7 +587,7 @@ def get_report_endpoint(analysis_id: str):
 @app.post("/api/report/{analysis_id}/share")
 def create_report_share(analysis_id: str, expires_in_days: int = 0, principal: Principal = Depends(get_principal)):
     """Create a public, optionally-expiring share link for a report."""
-    if not db_get_analysis(analysis_id):
+    if not db_get_analysis(analysis_id, owner=principal.id):
         raise HTTPException(status_code=404, detail="Analysis not found")
     expires_at = None
     if expires_in_days and expires_in_days > 0:
@@ -659,8 +696,9 @@ def list_simulation_actions(analysis_id: str):
 
 
 @app.post("/api/simulate/actions")
-def simulate_actions(req: ActionSimRequest):
+def simulate_actions(req: ActionSimRequest, principal: Principal = Depends(get_principal)):
     """Project the outcome of taking the selected actions (deterministic model)."""
+    require_owned(req.analysis_id, principal)
     result = analyses.get(req.analysis_id) or get_report(req.analysis_id)
     if not result:
         raise HTTPException(status_code=404, detail="Analysis not found")
@@ -968,8 +1006,9 @@ def report_supplier_savings(analysis_id: str, live: bool = False):
 
 
 @app.post("/api/simulate/montecarlo")
-def simulate_montecarlo(req: ActionSimRequest):
+def simulate_montecarlo(req: ActionSimRequest, principal: Principal = Depends(get_principal)):
     """Probabilistic outcome distribution + probability of reaching the next band."""
+    require_owned(req.analysis_id, principal)
     result = analyses.get(req.analysis_id) or get_report(req.analysis_id)
     if not result:
         raise HTTPException(status_code=404, detail="Analysis not found")

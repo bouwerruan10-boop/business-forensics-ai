@@ -70,6 +70,9 @@ AUTH_ENABLED = bool(OPERATOR_PASSWORD)
 # works with just OPERATOR_PASSWORD set (still secret + stable across restarts).
 AUTH_SECRET = os.getenv("AUTH_SECRET", "") or (
     _hashlib.sha256(("imara-auth::" + OPERATOR_PASSWORD).encode()).hexdigest() if OPERATOR_PASSWORD else "")
+# True when auth is on but AUTH_SECRET was DERIVED from the password (no independent secret set).
+# Logged as a warning at startup — set AUTH_SECRET explicitly in production.
+AUTH_SECRET_DERIVED = bool(OPERATOR_PASSWORD) and not os.getenv("AUTH_SECRET")
 AUTH_TTL_HOURS = int(os.getenv("AUTH_TTL_HOURS", "12"))
 
 # -- Database backups (Tier 1.5) --
