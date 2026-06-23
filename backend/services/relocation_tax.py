@@ -29,6 +29,14 @@ SA_BRACKETS = [(237100, 0.18), (370500, 0.26), (512800, 0.31), (673000, 0.36),
 SA_PRIMARY_REBATE = 17235     # 2025/26 primary rebate
 SA_DIV_WHT = 0.20             # dividends withholding (final)
 SA_CGT_EFFECTIVE = 0.18       # individual max effective CGT (40% inclusion x 45%)
+SA_SECONDARY_REBATE = 9444    # additional age-65+ rebate (2025/26, unchanged from 2024/25)
+SA_TERTIARY_REBATE = 3145     # additional age-75+ rebate
+SA_INTEREST_EXEMPT_U65 = 23800   # annual local-interest exemption, under 65
+SA_INTEREST_EXEMPT_65 = 34500    # annual local-interest exemption, 65+
+SA_CGT_ANNUAL_EXCL = 40000       # annual capital-gain exclusion
+SA_RA_CAP = 350000               # s11F retirement-contribution deduction cap
+MEDICAL_CREDIT_MAIN = 364        # s6A monthly credit, member + first dependant
+MEDICAL_CREDIT_ADDL = 246        # s6A monthly credit, each further dependant
 
 
 def _num(v):
@@ -53,10 +61,30 @@ def _sa_income_tax(taxable):
     return max(0.0, tax - SA_PRIMARY_REBATE)
 
 
-def _sa_current_tax(income):
-    """Indicative current SA personal tax on an income dict (type -> amount)."""
+def _sa_current_tax(income, age=0, deductions=None):
+    """Indicative current SA personal tax, refined by AGE (age rebates + age-tiered interest
+    exemption) and EXISTING deductions already claimed (retirement contribution, s18A donations,
+    medical-scheme members). Applies the annual interest + capital-gain exclusions so the
+    baseline is net rather than gross. Still indicative."""
+    age = int(_num(age))
+    d = deductions if isinstance(deductions, dict) else {}
+    interest = _num(income.get("interest"))
     ordinary = sum(_num(income.get(k)) for k in ("employment", "business", "interest", "rental", "pension"))
-    return _sa_income_tax(ordinary) + _num(income.get("dividends")) * SA_DIV_WHT + _num(income.get("capital_gains")) * SA_CGT_EFFECTIVE
+    int_exempt = min(interest, SA_INTEREST_EXEMPT_65 if age >= 65 else SA_INTEREST_EXEMPT_U65)
+    ra = min(_num(d.get("retirement_contribution")), SA_RA_CAP, 0.275 * ordinary)
+    don = min(_num(d.get("donations")), 0.10 * ordinary)
+    taxable_ordinary = max(0.0, ordinary - int_exempt - ra - don)
+    tax = _sa_income_tax(taxable_ordinary)           # already net of the primary rebate
+    if age >= 65:
+        tax = max(0.0, tax - SA_SECONDARY_REBATE)
+    if age >= 75:
+        tax = max(0.0, tax - SA_TERTIARY_REBATE)
+    members = int(_num(d.get("medical_members")))
+    if members > 0:
+        credit = (MEDICAL_CREDIT_MAIN * min(members, 2) + MEDICAL_CREDIT_ADDL * max(0, members - 2)) * 12
+        tax = max(0.0, tax - credit)
+    cg = max(0.0, _num(income.get("capital_gains")) - SA_CGT_ANNUAL_EXCL)
+    return tax + _num(income.get("dividends")) * SA_DIV_WHT + cg * SA_CGT_EFFECTIVE
 
 
 def _dest_tax(income, rates):
@@ -422,7 +450,23 @@ def relocation_first_pass(profile):
     if income_amounts and not income:
         income = {k for k, v in income_amounts.items() if v > 0}
     quantify = bool(income_amounts) and origin == "ZA" and sum(income_amounts.values()) > 0
-    current_sa_tax = round(_sa_current_tax(income_amounts), 2) if quantify else None
+    age = int(_num(profile.get("age")))
+    deductions = profile.get("deductions") if isinstance(profile.get("deductions"), dict) else {}
+    current_sa_tax = round(_sa_current_tax(income_amounts, age, deductions), 2) if quantify else None
+    goal = str(profile.get("goal") or "").strip().lower()
+    if goal not in ("stay", "relocate", "work_abroad"):
+        goal = ""
+    days_abroad = int(_num(profile.get("days_abroad")))
+    residency_note = None
+    if days_abroad:
+        if days_abroad > 183:
+            residency_note = ("You indicated ~{} days/yr outside SA. Working abroad >183 days (including a 60-day "
+                              "continuous block) in a 12-month period can make the first R1.25m of FOREIGN EMPLOYMENT "
+                              "income exempt (s10(1)(o)(ii)) WITHOUT emigrating; >330 continuous days also bears on "
+                              "ceasing residency. Confirm with an advisor.").format(days_abroad)
+        else:
+            residency_note = ("You indicated ~{} days/yr outside SA - below the 183-day (and 60-day continuous) "
+                              "threshold, so the s10(1)(o)(ii) foreign-employment exemption would NOT yet apply.").format(days_abroad)
 
     want = profile.get("destinations")
     if isinstance(want, str):
@@ -474,17 +518,23 @@ def relocation_first_pass(profile):
     }
     raw_assets = profile.get("assets")
     if origin == "ZA" and isinstance(raw_assets, dict):
-        mv = _num(raw_assets.get("worldwide_market_value"))
+        # s9H deems disposal of WORLDWIDE assets EXCLUDING SA immovable property, retirement-fund
+        # interests and personal-use assets. Charge only the "other worldwide" bucket.
+        other = _num(raw_assets.get("other_worldwide_market_value")) or _num(raw_assets.get("worldwide_market_value"))
         bc = _num(raw_assets.get("base_cost"))
-        if mv > 0:
-            gain = max(0.0, mv - bc)
+        excluded = {k: _num(raw_assets.get(k)) for k in ("sa_immovable_property", "retirement_funds", "primary_residence")}
+        excluded = {k: v for k, v in excluded.items() if v > 0}
+        if other > 0:
+            gain = max(0.0, other - bc)
             origin_exit = dict(origin_exit)
             origin_exit["exit_cgt_estimate"] = {
                 "deemed_gain": round(gain, 2),
                 "indicative_exit_cgt": round(gain * SA_CGT_EFFECTIVE, 2),
                 "rate_used": "18% individual max effective CGT (40% inclusion x 45% marginal)",
-                "basis": ("s9H deems a disposal of worldwide assets at market value the day before you cease SA tax residency. "
-                          "SA immovable property is EXCLUDED (stays in the SA net) — exclude it from market value above. Indicative only."),
+                "excluded_assets": excluded,
+                "basis": ("s9H deems a disposal of worldwide assets the day before you cease SA tax residency, EXCLUDING "
+                          "SA immovable property, retirement-fund interests and personal-use assets - only the 'other "
+                          "worldwide assets' bucket is charged here. Indicative."),
             }
 
     return {
@@ -493,6 +543,11 @@ def relocation_first_pass(profile):
         "income_types_considered": sorted(income) or list(INCOME_TYPES),
         "quantified": quantify,
         "indicative_current_sa_tax": current_sa_tax,
+        "age_considered": age or None,
+        "deductions_considered": deductions or None,
+        "goal": goal or None,
+        "days_abroad_considered": days_abroad or None,
+        "residency_note": residency_note,
         "origin_exit": origin_exit,
         "destinations": dests,
         "guardrails": GUARDRAILS,

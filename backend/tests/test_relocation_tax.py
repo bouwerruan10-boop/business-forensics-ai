@@ -326,3 +326,39 @@ def test_num_rejects_non_finite_and_output_stays_finite():
     for body in ({"assets": {"worldwide_market_value": "Infinity"}}, {"income": {"employment": "Infinity"}}):
         r = relocation_first_pass(body)
         _finite(r); _j.dumps(r)
+
+
+def test_age_and_deductions_lower_the_baseline():
+    from services.relocation_tax import _sa_current_tax
+    inc = {"employment": 1_000_000, "interest": 60_000, "capital_gains": 120_000}
+    gross = _sa_current_tax(inc)                       # default: net of std interest + CGT exclusions
+    refined = _sa_current_tax(inc, age=70, deductions={
+        "retirement_contribution": 200_000, "donations": 25_000, "medical_members": 2})
+    assert refined < gross and refined >= 0
+    # interest exemption + CGT annual exclusion are applied even with no age/deductions
+    assert _sa_current_tax({"interest": 20_000}) == 0.0          # under the R23,800 exemption -> no tax
+    assert _sa_current_tax({"capital_gains": 30_000}) == 0.0     # under the R40,000 CGT exclusion
+
+
+def test_exit_tax_excludes_sa_property_and_retirement():
+    r = relocation_first_pass({"origin": "ZA", "income_types": ["employment"], "assets": {
+        "other_worldwide_market_value": 3_000_000, "base_cost": 1_000_000,
+        "sa_immovable_property": 5_000_000, "retirement_funds": 2_000_000}})
+    est = r["origin_exit"]["exit_cgt_estimate"]
+    assert est["deemed_gain"] == 2_000_000.0                      # only the "other" bucket's gain
+    assert est["indicative_exit_cgt"] == round(2_000_000.0 * 0.18, 2)
+    assert est["excluded_assets"]["sa_immovable_property"] == 5_000_000.0
+    assert est["excluded_assets"]["retirement_funds"] == 2_000_000.0
+    # legacy single field still works (backward-compat)
+    r2 = relocation_first_pass({"origin": "ZA", "assets": {"worldwide_market_value": 5_000_000, "base_cost": 1_000_000}})
+    assert r2["origin_exit"]["exit_cgt_estimate"]["indicative_exit_cgt"] == round(4_000_000.0 * 0.18, 2)
+
+
+def test_days_abroad_and_goal_echoed():
+    r = relocation_first_pass({"income_types": ["employment"], "days_abroad": 200, "goal": "relocate", "age": 45})
+    assert r["goal"] == "relocate" and r["age_considered"] == 45
+    assert r["residency_note"] and "183" in r["residency_note"]
+    r2 = relocation_first_pass({"income_types": ["employment"], "days_abroad": 90})
+    assert "NOT yet apply" in r2["residency_note"]
+    # junk goal is dropped, hostile inputs don't crash
+    assert relocation_first_pass({"goal": 123, "age": "old", "days_abroad": "many"})["goal"] is None
