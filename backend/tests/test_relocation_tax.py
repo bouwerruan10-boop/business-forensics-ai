@@ -289,8 +289,9 @@ def test_levers_match_income_mix():
 
 
 def test_all_levers_when_no_income_specified():
-    from services.relocation_tax import stay_and_optimise
-    assert len(stay_and_optimise(set())) == 10  # the full corpus
+    from services.relocation_tax import stay_and_optimise, _LEVERS
+    # No income specified -> the full legislated corpus is shown (robust to future additions).
+    assert len(stay_and_optimise(set())) == len(_LEVERS) >= 18
 
 
 def test_universal_levers_always_appear():

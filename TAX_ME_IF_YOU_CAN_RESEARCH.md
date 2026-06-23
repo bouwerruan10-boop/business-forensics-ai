@@ -159,3 +159,16 @@ Extensive research refresh + build-out of `services/relocation_tax.py` from the 
 ## 12. 2026-06-23 — stay-and-optimise legal levers (v1.80)
 
 Added the "stay-and-optimise" half of the engine: a deterministic, factual set of LEGAL SA tax-efficiency levers (`stay_and_optimise(income)`), income-matched, with section references + indicative 2025/26 caps (sourced: SARS / Treasury / PwC). Levers: s11F retirement-fund deduction (27.5% / R350k), s12T TFSA (R36k/R500k), s10(1)(o)(ii) foreign-employment exemption (R1.25m), s10(1)(i) interest exemption (R23,800/R34,500), 8th-Schedule CGT exclusions (R40k annual + R2m primary residence; 40% inclusion), final 20% dividends WHT, s12E Small Business Corporation rates, s12H/s11D/s12BA business incentives, s18A donations (10%), s6A/s6B medical credits. **Framing is the point:** presented as FACTUAL legislated reliefs / decision-support, explicitly NOT advice and NOT a designed arrangement; substance + GAAR caveat; licensed-practitioner hand-off. This is "legal ways to pay less tax" done correctly - lawful efficiency, never avoidance-scheme design or evasion (which would cross the DAC6/MDR intermediary + GAAR + unlicensed-advice lines in section 5).
+
+## §13 — Stay-and-optimise lever set completed (2026-06-24, v1.90)
+
+User asked to "track down every tax loophole and build it in." Line held: NO loophole/avoidance-scheme engine (GAAR s80A-L, DAC6/MDR mandatory-disclosure, unlicensed-advice). Instead **completed the LEGISLATED tax-efficiency corpus** — every current statutory relief/incentive/allowance an SME or owner can lawfully use. Levers 10 -> 18, sourced 2025/26:
+- **ETI** (Employment Tax Incentive Act 26/2013) — up to R2,500/mo per qualifying young employee earning < R7,500/mo, from 1 Apr 2025.
+- **Capital allowances / wear-and-tear** (s11(e) / s12C 40:20:20:20 / s13quin 5% / s13sex).
+- **Assessed-loss carry-forward** (s20; company 80%/R1m cap).
+- **Foreign tax credit** (s6quat; full foreign-CGT cover from 1 Mar 2025, 6-yr carry-forward).
+- **Tax-free retirement lump sum** (R550,000, retirement lump-sum table) — distinct from the s11F contribution deduction.
+- **Travel allowance / reimbursive travel** (s8(1)).
+- **Home-office deduction** (s11(a)/s23(b); notes the CGT primary-residence interaction).
+- **Bona fide bursaries to staff & relatives** (s10(1)(q)/(qA); R20k/R60k limits, R600k remuneration cap).
+All income-matched via `applies_to`; the not-advice / GAAR-substance / licensed-practitioner framing is unchanged. Sources: SARS ETI pages; PwC/RSM/PKF SA Tax Guide 2025/26; SARS Budget 2026.
