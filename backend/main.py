@@ -737,6 +737,18 @@ def report_assurance(analysis_id: str):
                             entity_type=result.get("entity_type") or "", cipc_number=result.get("cipc_number") or "")
 
 
+@app.get("/api/report/{analysis_id}/credit-memo")
+def report_credit_memo(analysis_id: str):
+    """The 5 Cs of credit + DSCR, in a lender's language. Deterministic; decision-support only."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("credit_memo"):
+        return result["credit_memo"]
+    from services.credit_memo import build_credit_memo
+    return build_credit_memo(result)
+
+
 @app.get("/api/report/{analysis_id}/cashflow")
 def report_cashflow(analysis_id: str):
     """Deterministic 13-week direct-method cash-flow projection - the short-term
@@ -1135,6 +1147,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["lender_view"] = run_lender_view(report.get("financial_figures") or {}, report.get("bank_signals") or {}, report.get("normalization") or {}, report.get("annual_revenue") or 0)
             from services.funding_fit import recommend_funding
             report["funding_fit"] = recommend_funding(report)
+            from services.credit_memo import build_credit_memo
+            report["credit_memo"] = build_credit_memo(report)
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark
@@ -1443,6 +1457,8 @@ def _enrich_demo():
     DEMO_REPORT["distress_score"] = altman_z_em(figs, "D")
     from services.assurance import assess as _assess_assurance
     DEMO_REPORT["assurance"] = _assess_assurance(headcount=DEMO_REPORT.get("headcount") or 0, annual_revenue=DEMO_REPORT.get("annual_revenue") or 0, financial_figures=figs, entity_type=DEMO_REPORT.get("entity_type") or "", cipc_number=DEMO_REPORT.get("cipc_number") or "")
+    from services.credit_memo import build_credit_memo as _build_memo
+    DEMO_REPORT["credit_memo"] = _build_memo(DEMO_REPORT)
     from services.cashflow_13week import project_13week as _proj13
     DEMO_REPORT["cashflow_13week"] = _proj13(figs, vat_registered=True)
     from services.agent_consistency import analyze_consistency as _consist

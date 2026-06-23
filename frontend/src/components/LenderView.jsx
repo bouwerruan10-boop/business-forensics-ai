@@ -19,14 +19,16 @@ function money(n, cur = 'ZAR') {
 export default function LenderView({ analysisId, currency = 'ZAR' }) {
   const [lv, setLv] = useState(null)
   const [nm, setNm] = useState(null)
+  const [cm, setCm] = useState(null)
   const [error, setError] = useState(null)
   const [packUrl, setPackUrl] = useState(null)
 
   useEffect(() => {
     let on = true
-    import('../api/client').then(({ getLenderView, getNormalization, getBankReadyPackUrl }) => {
+    import('../api/client').then(({ getLenderView, getNormalization, getBankReadyPackUrl, getCreditMemo }) => {
       getLenderView(analysisId).then(d => { if (on) setLv(d) }).catch(e => { if (on) setError(e.message) })
       getNormalization(analysisId).then(d => { if (on) setNm(d) }).catch(() => {})
+      getCreditMemo(analysisId).then(d => { if (on) setCm(d) }).catch(() => {})
       if (on) setPackUrl(getBankReadyPackUrl(analysisId))
     })
     return () => { on = false }
@@ -63,6 +65,39 @@ export default function LenderView({ analysisId, currency = 'ZAR' }) {
           </a>
         )}
       </div>
+
+
+      {/* 5 Cs of credit + DSCR — how a credit committee reads the file */}
+      {cm?.available && (
+        <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+            How a credit committee reads this — the 5 Cs + DSCR
+            <InfoTip label="5 Cs of credit" text="Lenders assess Character, Capacity, Capital, Collateral and Conditions, with DSCR as the hard number (~1.25x target). Computed from your figures — decision-support, not a credit decision, not part of the Imara Score." />
+          </div>
+          <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+            <span className="text-slate-400 text-sm">DSCR</span>
+            <span className={`text-2xl font-bold ${cm.dscr.status === 'pass' ? 'text-emerald-400' : cm.dscr.status === 'watch' ? 'text-amber-400' : cm.dscr.status === 'fail' ? 'text-red-400' : 'text-slate-400'}`}>{cm.dscr.value != null ? `${cm.dscr.value}x` : '—'}</span>
+            <span className="text-slate-500 text-xs">target ~{cm.dscr.target}x</span>
+          </div>
+          <p className="text-slate-500 text-[11px] mb-3 leading-relaxed">{cm.dscr.basis}</p>
+          <div className="space-y-2">
+            {cm.five_cs.map((c, i) => {
+              const col = c.status === 'pass' ? 'text-emerald-400 border-emerald-500/30' : c.status === 'watch' ? 'text-amber-400 border-amber-500/30' : c.status === 'fail' ? 'text-red-400 border-red-500/30' : 'text-slate-400 border-white/15'
+              return (
+                <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-white text-sm font-semibold">{c.c}</span>
+                    <span className={`shrink-0 text-[10px] uppercase font-bold border rounded-full px-2 py-0.5 ${col}`}>{c.status}</span>
+                  </div>
+                  <div className="text-slate-400 text-xs mt-1 leading-relaxed">{c.evidence}</div>
+                  {c.fix && <div className="text-slate-500 text-xs mt-1"><span className="text-emerald-400/80 font-semibold">Fix: </span>{c.fix}</div>}
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-white text-sm font-medium mt-3">{cm.committee_read}</p>
+        </div>
+      )}
 
       {/* Reasons + fixes */}
       {Array.isArray(lv.reasons) && lv.reasons.length > 0 && (

@@ -161,6 +161,12 @@ export async function getNormalization(analysisId) {
   return res.json()
 }
 
+export async function getCreditMemo(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/credit-memo`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
 export function getBankReadyPackUrl(analysisId) {
   return `${BASE}/report/${analysisId}/bank-ready-pack`
 }
