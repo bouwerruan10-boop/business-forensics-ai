@@ -103,3 +103,13 @@ def test_no_record_endpoint_escapes_ownership_gate():
             if main._path_analysis_id(concrete) != dummy:
                 missed.append(path)
     assert not missed, "record routes not covered by ownership middleware: " + repr(missed)
+
+
+def test_admin_requires_operator_token(auth_on):
+    """Admin endpoints must NOT be world-open: with auth on, an operator token is
+    required (previously /api/admin/* was exempt from the gate -> open when ADMIN_API_KEY unset)."""
+    with TestClient(main.app) as c:
+        assert c.get("/api/admin/analyses").status_code == 401           # no token -> blocked
+        h = {"Authorization": "Bearer " + issue_token(sub="operator")}
+        assert c.get("/api/admin/analyses", headers=h).status_code != 401  # operator token -> allowed
+        assert c.get("/api/v1/model-card").status_code == 200             # public /v1 still open

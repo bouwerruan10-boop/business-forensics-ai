@@ -123,3 +123,51 @@ This is OWASP **API1:2023 Broken Object Level Authorization** — ~40% of API at
 - **P2 — DONE.** `npm audit` added to frontend CI (production deps near-gated; full audit advisory). `pip-audit` already gated the backend. **Vite major bump deferred** (the advisories are dev-toolchain only / no production impact — Vercel serves static assets; gating `--omit=dev` proves prod deps clean).
 - **P3 — DONE.** Upload-type allowlist rejects non-document files; `_add_owner_column` is injection-proof (table allowlist + quoted identifier + parameterised pragma).
 - **All 7 points are now addressed.** Remaining: optional Vite 5→8 bump (deferred by design, dev-only advisory).
+
+---
+
+# Addendum — login-layer review (the 5-point "your login screen is the easiest thing to hack" checklist)
+
+Audited 2026-06-23. **Key framing:** this checklist assumes a *public, multi-user, self-signup* app. Imara today is a **single operator-password gate** — no public signup, no per-user accounts, no email, no password-reset endpoint. So several points are **N/A today but become mandatory the day signup is added** (the multi-tenant pivot). One point surfaces a **real gap to fix now**.
+
+| # | Point | Imara today | Verdict |
+|---|---|---|---|
+| 1 | Token in localStorage → XSS | Uses **sessionStorage** (JS-readable, same XSS exposure) bearer token, 12h TTL | ⚠️ Real-but-mitigated — harden with CSP / httpOnly cookie |
+| 2 | Admin check client-side not server-side | Auth IS server-side, BUT `/api/admin/*` **fails OPEN when `ADMIN_API_KEY` unset** and is exempt from the operator gate | ⚠️ **Real gap — fix now** |
+| 3 | No 2FA / email verification → anyone signs up as anybody | **No signup exists** — single operator secret | N/A today; **mandatory at multi-user launch** |
+| 4 | Login + reset endpoints unthrottled | Login **rate-limited 5/min** (v1.83); **no reset endpoint exists** | ✅ Already addressed |
+| 5 | No password rules / leaked-password check | Operator password is a **deployment secret** (env var), not a user-chosen account password | N/A today; **mandatory at multi-user launch** |
+
+## 1 — Token storage (sessionStorage) ⚠️ mitigated
+Imara stores the operator bearer token in `sessionStorage` (`client.js`), not `localStorage`. Marginally better (cleared on tab close) but the OWASP concern still stands: *"Do not store session identifiers in local storage — the data is always accessible by JavaScript."* `sessionStorage` has the same XSS exposure. Mitigants in place: token is short-lived (12h), operator-scoped, React auto-escapes output, full secure-headers set. Gap: **no Content-Security-Policy** (it's deferred to Vercel), and the token is JS-reachable.
+**Fix options:** (a) add a strict CSP (cheap, high value — shrinks the XSS surface that could steal the token); (b) move the token to an `httpOnly; Secure; SameSite` cookie so JS can't read it (more work — needs the middleware to read the cookie + CSRF protection via SameSite). Recommend (a) now, (b) at the multi-user pivot.
+
+## 2 — Admin endpoints fail OPEN ⚠️ fix now
+Auth in Imara is enforced **server-side** (operator-gate middleware + `verify_admin_key` + the new BOLA ownership) — so the checklist's "client-side admin check" trap doesn't apply. **But** `/api/admin/*` (list all analyses, outcomes, calibration, db-status, delete) is in `_auth_path_public` (exempt from the operator gate) and protected **only** by `verify_admin_key`, which **returns without checking when `ADMIN_API_KEY` is unset**. Net effect: a deployment with `OPERATOR_PASSWORD` set but `ADMIN_API_KEY` unset has **world-open admin endpoints** — no operator token even required.
+**Fix:** fold `/api/admin/*` behind the operator gate (so a valid operator token is always required when auth is on), and/or fail-closed when `ADMIN_API_KEY` is unset in production. Highest-value real fix here.
+
+## 3 & 5 — Signup hardening (2FA, email verification, password policy, breached-password check) — N/A today, REQUIRED at multi-user launch
+Imara has no registration flow, so "anyone can sign up as anybody," password rulesets, and HaveIBeenPwned breached-password checks have nothing to attach to yet. When the B2C/lender pivot adds user accounts, these become mandatory and should ship *with* signup:
+- **Email verification** before an account is active.
+- **MFA/2FA** (TOTP) at least for privileged roles.
+- **Password policy per NIST 800-63B Rev.4:** ≥8 chars (support ≥64), no forced rotation, no composition gymnastics, **screen every new/changed password against a breach blocklist**.
+- **Breached-password check via HaveIBeenPwned k-anonymity** (only the first 5 chars of the SHA-1 hash leave the server — privacy-preserving).
+- **Rate-limit the reset endpoint** the same way login is.
+(Operator/infra 2FA for GitHub/Railway/Vercel is separately covered in `SECURITY_HARDENING_RUNBOOK.md`.)
+
+## 4 — Rate limiting ✅ done
+`/api/login` is rate-limited to 5/min per IP (v1.83, verified 429 on the 6th attempt). There is no password-reset endpoint to brute-force. No action.
+
+## Prioritised actions
+| Priority | Item | Note |
+|---|---|---|
+| **P0** | Close the admin fail-open (#2): fold `/api/admin/*` behind the operator gate + require `ADMIN_API_KEY` in prod | Real world-open-admin risk today |
+| P1 | Add a strict Content-Security-Policy (#1) | Shrinks XSS surface that could steal the sessionStorage token |
+| P2 (at multi-user launch) | Email verification, MFA, NIST password policy + HIBP breached-check, reset rate-limit (#3,#5) | Bundle with the signup flow when accounts are introduced |
+| P3 | Migrate token to httpOnly cookie (#1) | Stronger than CSP alone; needs CSRF/SameSite handling |
+
+## Update — login-layer P0/P1 shipped (2026-06-23, v1.85)
+
+- **P0 (#2 admin fail-open) — DONE.** `/api/admin/*` is now behind the operator gate (added to `_AUTH_GATED_PREFIXES`, removed from the public-exempt list): a valid operator token is now required, so admin is never world-open even when `ADMIN_API_KEY` is unset (that key remains an optional extra layer). Test: `test_admin_requires_operator_token` (401 without token, allowed with operator token, `/api/v1/*` stays public).
+- **P1 (#1 token XSS surface) — DONE (Report-Only).** Added a `Content-Security-Policy-Report-Only` + baseline headers (X-Frame-Options, nosniff, Referrer-Policy, HSTS, Permissions-Policy) to the Vercel-served SPA (`frontend/vercel.json`). Report-Only enforces nothing (cannot break the app) but surfaces violations. **Promotion path:** after a deploy, confirm the browser console shows no CSP violations, then rename the header to `Content-Security-Policy` to enforce. CSP is scoped: self + Google Fonts (style/font) + the Railway API origin (connect-src); `object-src 'none'`, `frame-ancestors 'none'`.
+- **P2/P3 (#3,#5 + httpOnly cookie) — deferred by design:** signup-flow controls (email verification, MFA, NIST password policy + HIBP breached-check, reset rate-limit) attach to user accounts Imara doesn't have yet — bundle them with the multi-user signup build. httpOnly-cookie token migration pairs with that work.

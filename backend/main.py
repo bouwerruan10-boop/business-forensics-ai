@@ -324,13 +324,13 @@ def login(request: Request, req: LoginRequest):
     return {"token": issue_token(), "token_type": "bearer", "auth_required": True}
 
 
-_AUTH_GATED_PREFIXES = ("/api/report/", "/api/analyze", "/api/status/", "/api/simulate")
+_AUTH_GATED_PREFIXES = ("/api/report/", "/api/analyze", "/api/status/", "/api/simulate", "/api/admin/")
 
 
 def _auth_path_public(path: str) -> bool:
     if path in ("/api/login", "/api/health", "/openapi.json", "/docs", "/redoc"):
         return True
-    if path.startswith(("/api/shared/", "/api/admin/", "/api/v1/")):
+    if path.startswith(("/api/shared/", "/api/v1/")):
         return True
     parts = path.split("/")   # /api/report/demo-001[/...] -> the public demo only
     if len(parts) >= 4 and parts[1] == "api" and parts[2] == "report" and parts[3] == "demo-001":
