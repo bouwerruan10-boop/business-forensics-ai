@@ -12,10 +12,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-# Database file location — resolved at startup:
+# Database file location — resolved at startup, first writable wins:
 # 1. BF_DB_PATH env var (explicit override)
-# 2. backend/data/analyses.db (default, works on Windows/Mac/Linux)
-# 3. /tmp/bf_analyses.db (fallback if backend dir isn't writable, e.g. network mount)
+# 2. RAILWAY_VOLUME_MOUNT_PATH/analyses.db (Railway persistent volume — survives redeploys)
+# 3. backend/data/analyses.db (default, works on Windows/Mac/Linux)
+# 4. /tmp/bf_analyses.db (ephemeral fallback if nothing above is writable)
 def _resolve_db_path() -> Path:
     # 1) Explicit override.
     if os.environ.get("BF_DB_PATH"):
@@ -52,6 +53,25 @@ def get_db_path():
     return _DB_PATH
 
 
+def db_persistence_status() -> dict:
+    """Where the DB lives and whether it survives a redeploy. Logged at startup and
+    exposed for ops verification — a thin /tmp DB means data is NOT persistent."""
+    path = str(_DB_PATH)
+    if os.environ.get("BF_DB_PATH"):
+        tier, persistent = "BF_DB_PATH override", True
+    elif os.environ.get("RAILWAY_VOLUME_MOUNT_PATH") and os.environ["RAILWAY_VOLUME_MOUNT_PATH"] in path:
+        tier, persistent = "Railway persistent volume", True
+    elif path.startswith("/tmp/"):
+        tier, persistent = "ephemeral /tmp fallback", False
+    else:
+        tier, persistent = "local data/ folder", True
+    return {"path": path, "tier": tier,
+            "persistent_across_redeploys": persistent,
+            "note": ("Data survives redeploys." if persistent else
+                     "WARNING: ephemeral filesystem — attach a Railway volume "
+                     "(or set BF_DB_PATH) or analyses are lost on redeploy.")}
+
+
 def _get_conn() -> sqlite3.Connection:
     """Return a connection with row_factory set for dict-like access."""
     conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
@@ -69,6 +89,9 @@ def _add_owner_column(conn, table):
 def init_db():
     """Create tables if they don't exist. Call once at startup."""
     _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _st = db_persistence_status()
+    print("[imara.db] " + _st["tier"] + " -> " + _st["path"]
+          + (" (persistent)" if _st["persistent_across_redeploys"] else " (EPHEMERAL)"), flush=True)
     with _lock:
         conn = _get_conn()
         try:

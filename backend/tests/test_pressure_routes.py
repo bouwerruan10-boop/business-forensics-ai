@@ -57,3 +57,50 @@ def test_simulation_post_endpoints_survive_nan_report():
             if r.status_code >= 500:
                 bad.append((ep, r.status_code))
     assert not bad, "5xx on: " + repr(bad)
+
+
+def test_db_persistence_status_classifies_tiers(monkeypatch, tmp_path):
+    import importlib, services.database as d
+    # explicit override
+    monkeypatch.setenv("BF_DB_PATH", str(tmp_path / "x.db"))
+    monkeypatch.delenv("RAILWAY_VOLUME_MOUNT_PATH", raising=False)
+    importlib.reload(d)
+    s = d.db_persistence_status()
+    assert s["tier"] == "BF_DB_PATH override" and s["persistent_across_redeploys"] is True
+    # railway volume
+    monkeypatch.delenv("BF_DB_PATH", raising=False)
+    vol = tmp_path / "vol"; vol.mkdir()
+    monkeypatch.setenv("RAILWAY_VOLUME_MOUNT_PATH", str(vol))
+    importlib.reload(d)
+    s = d.db_persistence_status()
+    assert s["tier"] == "Railway persistent volume" and s["persistent_across_redeploys"] is True
+    assert str(d.get_db_path()) == str(vol / "analyses.db")
+    # restore default module state for other tests
+    monkeypatch.delenv("RAILWAY_VOLUME_MOUNT_PATH", raising=False)
+    importlib.reload(d)
+
+
+def test_calibration_metrics_present_and_sane():
+    import math, random
+    from services.score_calibration import calibrate
+    random.seed(11)
+    pairs = []
+    for _ in range(300):
+        sc = random.randint(0, 100)
+        true_pd = 1 / (1 + math.exp(-(2 * (0.5 - sc / 100)) * 3))
+        pairs.append({"imara_score": sc, "label": 1 if random.random() < true_pd else 0})
+    r = calibrate(pairs, min_n=50)
+    assert r["calibrated"] is True and "calibration" in r
+    c = r["calibration"]
+    assert abs(c["calibration_in_the_large"]["difference"]) < 0.08
+    assert 0.6 < c["calibration_slope"] < 1.5
+    assert c["brier_skill_score"] > 0
+    assert len(c["reliability_curve"]) >= 2
+
+
+def test_calibration_hostile_inputs_no_crash():
+    import json
+    from services.score_calibration import calibrate, calibration_metrics
+    for p in ([], [{"imara_score": 50, "label": 1}] * 60, [{"imara_score": None, "label": 1}]):
+        json.dumps(calibrate(p, min_n=50))
+    json.dumps(calibration_metrics([0, 100] * 40, [1, 0] * 40, a=-5.0, b=2.0))

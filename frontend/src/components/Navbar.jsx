@@ -1,4 +1,4 @@
-export default function Navbar({ phase, onAdmin, onNewAnalysis, analysisId, showToast }) {
+export default function Navbar({ phase, onAdmin, onTax, onNewAnalysis, analysisId, showToast }) {
   const copyShareLink = () => {
     if (!analysisId) return
     const url = `${window.location.origin}${window.location.pathname}#/report/${analysisId}`
@@ -41,6 +41,19 @@ export default function Navbar({ phase, onAdmin, onNewAnalysis, analysisId, show
             className="text-xs text-slate-400 border border-white/10 rounded-lg px-3 py-1.5 hover:border-white/20 hover:text-white transition-colors"
           >
             New Analysis
+          </button>
+        )}
+        {onTax && (
+          <button
+            type="button"
+            onClick={onTax}
+            className={`text-xs rounded-lg px-3 py-1.5 border transition-colors ${
+              phase === 'tax'
+                ? 'border-gold/50 text-gold bg-gold/10'
+                : 'border-white/10 text-slate-400 hover:border-white/20 hover:text-white'
+            }`}
+          >
+            Tax
           </button>
         )}
         <button

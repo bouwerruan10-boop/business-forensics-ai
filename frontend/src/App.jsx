@@ -5,6 +5,7 @@ import AnalysisProgress from './components/AnalysisProgress'
 import Dashboard from './components/Dashboard'
 import AdminDashboard from './components/AdminDashboard'
 import SharedReport from './components/SharedReport'
+import TaxPlanner from './components/TaxPlanner'
 import Login from './components/Login'
 import Toast from './components/Toast'
 import { uploadFiles, pollStatus, getReport, getHealth, getToken } from './api/client'
@@ -35,6 +36,8 @@ export default function App() {
         setSharedId(match[1]); setSharedToken(null)
       } else if (tokenMatch) {
         setSharedToken(tokenMatch[1]); setSharedId(null)
+      } else if (hash === '#/tax') {
+        setSharedId(null); setSharedToken(null); setPhase('tax')
       } else {
         setSharedId(null); setSharedToken(null)
       }
@@ -193,6 +196,7 @@ export default function App() {
       <Navbar
         phase={phase}
         onAdmin={() => setPhase(phase === 'admin' ? 'profile' : 'admin')}
+        onTax={() => { window.location.hash = '#/tax'; setPhase('tax') }}
         onNewAnalysis={resetAll}
         analysisId={analysisId}
         showToast={showToast}
@@ -225,6 +229,12 @@ export default function App() {
         {phase === 'admin' && (
           <div className="fade-in">
             <AdminDashboard onViewReport={viewReportFromAdmin} />
+          </div>
+        )}
+
+        {phase === 'tax' && (
+          <div className="fade-in">
+            <TaxPlanner />
           </div>
         )}
       </main>

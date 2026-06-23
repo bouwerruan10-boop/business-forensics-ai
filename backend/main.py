@@ -1106,6 +1106,13 @@ def admin_validation(limit: int = 200, _admin: None = Depends(verify_admin_key))
     return validation_report(outcomes_with_scores(), recent_reports(limit))
 
 
+@app.get("/api/admin/db-status")
+def admin_db_status(_admin: None = Depends(verify_admin_key)):
+    """Where the DB lives + whether it survives redeploys (ops verification of volume persistence)."""
+    from services.database import db_persistence_status
+    return db_persistence_status()
+
+
 @app.get("/api/admin/calibration")
 def admin_calibration(min_n: int = 50, _admin: None = Depends(verify_admin_key)):
     """Platt calibration of the Imara Score -> probability-of-distress from recorded

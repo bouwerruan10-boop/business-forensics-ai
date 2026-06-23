@@ -217,3 +217,15 @@ export async function askImara(analysisId, question) {
   if (!res.ok) throw new Error('ask failed')
   return res.json()
 }
+
+// Tax Me If You Can — relocation / tax-efficiency first pass. Public POST endpoint;
+// returns destinations, stay_and_optimise levers, sequencing, guardrails + disclaimers.
+export async function getTaxRelocation(payload) {
+  const res = await fetch(`${BASE}/tax/relocation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
