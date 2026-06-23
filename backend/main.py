@@ -166,6 +166,14 @@ def on_startup():
     init_db()
     if init_sentry():
         log.info("sentry_enabled")
+    try:
+        from services.corpus_currency import corpus_status
+        _cc = corpus_status()
+        if _cc["any_stale"]:
+            log.warning("corpus_stale", stale_count=_cc["stale_count"],
+                        corpora=[c["module"] for c in _cc["corpora"] if c["stale"]])
+    except Exception:
+        pass
     from config import AUTH_SECRET_DERIVED
     if AUTH_SECRET_DERIVED:
         log.warning("auth_secret_derived_from_password",
@@ -1199,6 +1207,14 @@ def admin_db_status(_admin: None = Depends(verify_admin_key)):
     """Where the DB lives + whether it survives redeploys (ops verification of volume persistence)."""
     from services.database import db_persistence_status
     return db_persistence_status()
+
+
+@app.get("/api/admin/corpus-currency")
+def admin_corpus_currency(_admin: None = Depends(verify_admin_key)):
+    """Freshness of the dated rule corpora (tax/DFI/rates/catalog) - flags what is stale.
+    Deterministic; never edits a figure. See RESEARCH_CYCLE_ENGINE_FEASIBILITY.md."""
+    from services.corpus_currency import corpus_status
+    return corpus_status()
 
 
 @app.get("/api/admin/calibration")

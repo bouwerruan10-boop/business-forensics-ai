@@ -137,7 +137,7 @@ def retrieve_grounding(memory, domain: str, k: int = 8) -> str:
     if not hits:
         return ""
     lines = [
-        "AUTHORITATIVE SA PROVISIONS (current as of 2024 — cite these by Act and section; "
+        "AUTHORITATIVE SA PROVISIONS (current as of 2025/26 — cite these by Act and section; "
         "do not state law that contradicts them, and flag where a provision may have changed):"
     ]
     for e in hits:
