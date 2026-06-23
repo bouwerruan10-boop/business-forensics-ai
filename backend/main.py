@@ -19,6 +19,7 @@ from typing import Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request, Depends
 import re
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response, JSONResponse
 from pydantic import BaseModel
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -125,6 +126,13 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Response compression — added FIRST so it is the INNERMOST middleware: it wraps the app
+# directly and sees the route response WITH its Content-Length, so minimum_size is honoured
+# (the BaseHTTPMiddleware layers below strip Content-Length, which would otherwise force
+# compression of every response). JSON report payloads (~150-500 KB) shrink ~80-90% over the
+# wire; only engages when the client sends Accept-Encoding: gzip and the body exceeds minimum_size.
+app.add_middleware(GZipMiddleware, minimum_size=500, compresslevel=6)
 
 # ── Observability (Tier 1.4): structured logging + optional Sentry ──
 from services.obs import configure_logging, get_logger, init_sentry, bind_context, clear_context

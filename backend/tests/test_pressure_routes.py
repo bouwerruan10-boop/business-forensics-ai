@@ -127,3 +127,24 @@ def test_add_owner_column_rejects_unknown_table():
             _add_owner_column(conn, "analyses; DROP TABLE analyses")
     finally:
         conn.close()
+
+
+def test_gzip_compression_large_json_not_tiny():
+    """Large JSON report is gzipped (the win); tiny responses + non-gzip clients are not
+    (minimum_size honoured because GZip is the innermost middleware). Body integrity preserved."""
+    import main
+    from fastapi.testclient import TestClient
+    big = {"analysis_id": "gztest", "imara_score": 55,
+           "findings": [{"i": i, "d": "x" * 400} for i in range(120)]}
+    main.analyses["gztest"] = big
+    try:
+        with TestClient(main.app) as c:
+            r = c.get("/api/report/gztest", headers={"Accept-Encoding": "gzip"})
+            assert r.headers.get("content-encoding") == "gzip"
+            assert r.json()["imara_score"] == 55 and len(r.json()["findings"]) == 120
+            h = c.get("/api/health", headers={"Accept-Encoding": "gzip"})
+            assert h.headers.get("content-encoding") is None  # tiny -> not compressed
+            n = c.get("/api/report/gztest", headers={"Accept-Encoding": "identity"})
+            assert n.headers.get("content-encoding") is None  # client opted out
+    finally:
+        main.analyses.pop("gztest", None)
