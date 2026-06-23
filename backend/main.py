@@ -1331,7 +1331,7 @@ DEMO_REPORT = {
     "tax_year_end": "28 February",
     "primary_concern": "Cash flow is tight — we struggle to pay suppliers on time.",
     "situation": "Mzansi Retail Group is a 47-person retail operation generating ZAR 24.5M in annual revenue across three locations in Gauteng.",
-    "complication": "Gross margin has compressed to 18% against a sector benchmark of 32%, driven by uncontrolled COGS and a supplier payment cycle causing late-payment penalties.",
+    "complication": "Gross margin has compressed to 18% against a sector benchmark of 33%, driven by uncontrolled COGS and a supplier payment cycle causing late-payment penalties.",
     "resolution": "Immediate margin recovery through supplier renegotiation and stock rationalisation can unlock an estimated ZAR 1.4M within 60 days.",
     "executive_summary": "Mzansi Retail Group shows strong top-line revenue but critical margin compression and working-capital stress. Three departments — procurement, inventory, and finance — require immediate intervention. The 15-agent analysis identified 11 findings, 3 of which are critical. Implementing the 90-day roadmap could recover ZAR 2.1M in margin and reduce debtor days from 54 to 30.",
     "scores": {
@@ -1369,12 +1369,12 @@ DEMO_REPORT = {
     ],
     "all_findings_ranked": [
         {
-            "title": "Gross Margin 14pp Below Benchmark",
+            "title": "Gross Margin 15pp Below Benchmark",
             "severity": "critical",
             "agent": "Finance Agent",
             "department": "Finance",
             "financial_impact": "ZAR 3.4M annual margin leakage",
-            "benchmark_reference": "SA Retail benchmark: 32% gross margin",
+            "benchmark_reference": "SA retail benchmark (retail_general): 33% gross margin",
             "recommendation": "Audit top-20 SKUs for margin dilution; renegotiate top-5 supplier contracts within 30 days.",
             "quick_win": True,
         },

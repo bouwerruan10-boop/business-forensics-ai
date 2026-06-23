@@ -69,11 +69,46 @@ def detect_industry(business_name: str = '', industry_hint: str = '',
     return best_key
 
 
+# Frontend dropdown values + common synonyms -> benchmark profile keys.
+# Without this, keys like "retail" (frontend) silently miss "retail_general"
+# (the actual profile) and fall back to the generic "general" benchmark.
+_KEY_ALIASES = {
+    "retail": "retail_general", "ecommerce": "retail_general", "e-commerce": "retail_general",
+    "professional": "professional_services", "services": "professional_services",
+    "consulting": "professional_services",
+    "hospitality": "hospitality_restaurant", "tourism": "hospitality_restaurant",
+    "hotel": "hotel_accommodation", "accommodation": "hotel_accommodation",
+    "transport": "logistics_trucking", "logistics": "logistics_trucking",
+    "technology": "technology_software", "tech": "technology_software", "software": "technology_software",
+    "financial": "financial_services", "finance": "financial_services",
+    "wholesale": "wholesale_distribution", "distribution": "wholesale_distribution",
+    "property": "real_estate",
+}
+
+
+def resolve_benchmark_key(industry_key: str) -> str:
+    """Map a raw industry key (frontend dropdown value, LLM hint, free text) to the best
+    benchmark profile key. Fixes the silent 'general' fallback for keys that DO have a
+    proper profile under a different name (e.g. 'retail' -> 'retail_general')."""
+    industries = _load()['industries']
+    key = str(industry_key or "").strip().lower()
+    if not key:
+        return "general"
+    if key in industries:
+        return key
+    alias = _KEY_ALIASES.get(key)
+    if alias and alias in industries:
+        return alias
+    detected = detect_industry(industry_hint=key)  # keyword scan for free-text / LLM keys
+    if detected in industries and detected != "general":
+        return detected
+    return "general"
+
+
 def get_benchmarks(industry_key: str) -> dict:
-    """Return the full benchmark profile for an industry."""
-    data = _load()
-    industries = data['industries']
-    return industries.get(industry_key, industries['general'])
+    """Return the full benchmark profile for an industry (resolving aliases / keywords)."""
+    industries = _load()['industries']
+    return industries.get(resolve_benchmark_key(industry_key), industries['general'])
 
 
 def get_thresholds() -> dict:
