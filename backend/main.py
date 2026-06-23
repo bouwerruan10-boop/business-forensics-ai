@@ -862,6 +862,21 @@ def report_funding_fit(analysis_id: str):
     return recommend_funding(result)
 
 
+@app.get("/api/report/{analysis_id}/owner-risk")
+def report_owner_risk(analysis_id: str):
+    """Owner-level (personal) risk dimension: the SA SME reality that the owner personally guarantees
+    business debt (surety, sole-prop liability, key-person, director's-loan, blended distress) + the
+    personal-credit data gaps a lender still needs. Decision-support — NOT an NCA credit decision, NOT a
+    personal credit assessment, NOT advice, NOT an Imara Score input."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("owner_risk"):
+        return result["owner_risk"]
+    from services.owner_risk import analyze_owner_risk
+    return analyze_owner_risk(result)
+
+
 @app.get("/api/report/{analysis_id}/audit")
 def report_audit(analysis_id: str):
     """The decision audit record(s) for this analysis: how the score was produced —
@@ -1196,6 +1211,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["lender_view"] = run_lender_view(report.get("financial_figures") or {}, report.get("bank_signals") or {}, report.get("normalization") or {}, report.get("annual_revenue") or 0)
             from services.funding_fit import recommend_funding
             report["funding_fit"] = recommend_funding(report)
+            from services.owner_risk import analyze_owner_risk
+            report["owner_risk"] = analyze_owner_risk(report, profile, getattr(memory, "uploaded_legal_text", ""), getattr(memory, "uploaded_financial_text", ""))
             from services.credit_memo import build_credit_memo
             report["credit_memo"] = build_credit_memo(report)
             from services.working_capital import build_working_capital
@@ -1558,6 +1575,13 @@ def _enrich_demo():
     DEMO_REPORT["lender_view"] = run_lender_view(figs, DEMO_REPORT["bank_signals"], DEMO_REPORT["normalization"], 24_500_000)
     from services.funding_fit import recommend_funding
     DEMO_REPORT["funding_fit"] = recommend_funding(DEMO_REPORT)
+    from services.owner_risk import analyze_owner_risk
+    DEMO_REPORT["owner_risk"] = analyze_owner_risk(
+        DEMO_REPORT,
+        {"entity_type": DEMO_REPORT.get("entity_type"), "headcount": DEMO_REPORT.get("headcount")},
+        "The directors bind themselves as sureties and co-principal debtors, jointly and severally, "
+        "under a deed of suretyship for the obligations of the company.",
+        _demo_fin)
     DEMO_REPORT["decision_support"] = decision_support_notice()
     from services.audit_log import build_audit_record
     _arec = build_audit_record(DEMO_REPORT, "demo-inputs")
