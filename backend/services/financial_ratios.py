@@ -131,7 +131,7 @@ def compute_ratios(figures: dict, industry_key: str = "general", annual_revenue:
             return x if _math.isfinite(x) else None
         except (ValueError, TypeError):
             return None
-    f = {k: _fnum(v) for k, v in (figures or {}).items()}
+    f = {k: _fnum(v) for k, v in ((figures if isinstance(figures, dict) else {}).items())}
     f = {k: v for k, v in f.items() if v is not None}  # only keep finite numeric figures
     if annual_revenue and "revenue" not in f:
         f["revenue"] = float(annual_revenue)

@@ -48,10 +48,13 @@ def _n(v):
     """Defensive numeric coercion (handles '1,000', 'R 1 000', None, junk)."""
     if v is None:
         return None
+    import math as _m
     if isinstance(v, (int, float)):
-        return float(v)
+        f = float(v)
+        return f if _m.isfinite(f) else None
     try:
-        return float(str(v).replace(",", "").replace(" ", "").replace("R", "").replace("$", ""))
+        f = float(str(v).replace(",", "").replace(" ", "").replace("R", "").replace("$", ""))
+        return f if _m.isfinite(f) else None
     except (ValueError, TypeError):
         return None
 

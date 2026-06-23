@@ -180,8 +180,10 @@ def _norm_income(income_types):
     """Coerce arbitrary input into a clean set of known income types."""
     if isinstance(income_types, str):
         income_types = [income_types]
+    if not isinstance(income_types, (list, tuple, set)):
+        return set()
     out = set()
-    for t in (income_types or []):
+    for t in income_types:
         try:
             t = str(t).strip().lower().replace(" ", "_").replace("-", "_")
         except Exception:

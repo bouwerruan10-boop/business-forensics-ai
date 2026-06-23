@@ -50,8 +50,12 @@ TAX_RATE = 0.27
 
 
 def _num(d, k, default=0.0):
-    v = (d or {}).get(k)
-    return float(v) if isinstance(v, (int, float)) else default
+    v = (d if isinstance(d, dict) else {}).get(k)
+    if isinstance(v, (int, float)):
+        import math as _m
+        f = float(v)
+        return f if _m.isfinite(f) else default
+    return default
 
 
 def _level(impact_abs, operating_profit, revenue):

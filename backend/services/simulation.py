@@ -48,8 +48,12 @@ def _sim_assumptions(extra=None):
 
 
 def _num(d, k, default=0.0):
-    v = (d or {}).get(k)
-    return float(v) if isinstance(v, (int, float)) else default
+    v = (d if isinstance(d, dict) else {}).get(k)
+    if isinstance(v, (int, float)):
+        import math as _m
+        f = float(v)
+        return f if _m.isfinite(f) else default
+    return default
 
 
 def _baseline_figs(report: dict) -> dict:
@@ -264,9 +268,9 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
     proj_figs["net_profit"] = actual_net + (delta_op * (1 - TAX_RATE) if delta_op > 0 else delta_op)
     base_ratios = compute_ratios(base_figs, industry, rev)
     proj_ratios = compute_ratios(proj_figs, industry, rev)
-    base_fund = float(report.get("financial_fundamentals_score")
-                      or (fundamentals_score(base_ratios, industry).get("score") or 0))
-    proj_fund = fundamentals_score(proj_ratios, industry).get("score") or 0
+    base_fund = _fin_or_none(report.get("financial_fundamentals_score")) \
+        or _fin_or_none(fundamentals_score(base_ratios, industry).get("score")) or 0
+    proj_fund = _fin_or_none(fundamentals_score(proj_ratios, industry).get("score")) or 0
 
     def snap(f, ratios):
         def rv(k):
@@ -283,8 +287,8 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
 
     # Imara Score: apply the MODELLED delta to the canonical baseline so "no actions"
     # yields exactly zero change (re-normalisation rounding can't leak a phantom delta).
-    model_base = _estimate_imara(report, base_fund) or 0
-    model_proj = _estimate_imara(report, proj_fund) or 0
+    model_base = _fin_or_none(_estimate_imara(report, base_fund)) or 0
+    model_proj = _fin_or_none(_estimate_imara(report, proj_fund)) or 0
     score_delta = model_proj - model_base
     canonical = _fin_or_none(report.get("imara_score"))
     base_score = canonical if canonical is not None else model_base
@@ -293,7 +297,10 @@ def apply_actions(report: dict, selected: list, scenario: str = "expected") -> d
     baseline["imara_score"] = base_score
     projected = snap(proj_figs, proj_ratios)
     projected["fundamentals_score"] = int(round(proj_fund))
-    projected["imara_score"] = int(max(0, min(100, round(base_score + score_delta))))
+    _proj_score = base_score + score_delta
+    import math as _ms
+    _proj_score = _proj_score if isinstance(_proj_score, (int, float)) and _ms.isfinite(_proj_score) else 0
+    projected["imara_score"] = int(max(0, min(100, round(_proj_score))))
 
     return {
         "scenario": scenario, "capture_factor": capture,
@@ -349,10 +356,10 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
     base_figs, _ = _project(figs, {}, 1.0)
     base_operating = _num(base_figs, "operating_profit")
     _num(figs, "net_profit") or _num(base_figs, "net_profit")
-    base_fund = float(report.get("financial_fundamentals_score")
-                      or (fundamentals_score(compute_ratios(base_figs, industry, rev), industry).get("score") or 0))
-    canonical = report.get("imara_score")
-    model_base = _estimate_imara(report, base_fund) or 0
+    base_fund = _fin_or_none(report.get("financial_fundamentals_score")) \
+        or _fin_or_none(fundamentals_score(compute_ratios(base_figs, industry, rev), industry).get("score")) or 0
+    canonical = _fin_or_none(report.get("imara_score"))
+    model_base = _fin_or_none(_estimate_imara(report, base_fund)) or 0
     base_score = canonical if canonical is not None else model_base
 
     net_deltas = []
@@ -378,8 +385,10 @@ def monte_carlo(report: dict, selected: list, n: int = 1000, seed: int = 42) -> 
         delta_op = _num(pf, "operating_profit") - base_operating
         net_deltas.append((delta_op * (1 - TAX_RATE) if delta_op > 0 else delta_op))
         fund = fundamentals_score(compute_ratios(pf, industry, rev), industry).get("score") or 0
-        sc = base_score + ((_estimate_imara(report, fund) or 0) - model_base)
-        scores.append(max(0.0, min(100.0, sc)))
+        sc = base_score + ((_fin_or_none(_estimate_imara(report, fund)) or 0) - model_base)
+        import math as _msc
+        if isinstance(sc, (int, float)) and _msc.isfinite(sc):
+            scores.append(max(0.0, min(100.0, sc)))
 
     def pcts(xs):
         xs = sorted(xs)

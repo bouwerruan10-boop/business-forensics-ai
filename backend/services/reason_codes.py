@@ -56,6 +56,9 @@ def _driver_for(label, report):
 def reason_codes(report: dict, top_n: int = 4) -> dict:
     """Ordered principal reasons the score isn't higher, plus top strengths."""
     comps = report.get("imara_components") or []
+    if not isinstance(comps, list):
+        comps = []
+    comps = [c for c in comps if isinstance(c, dict)]
     score = report.get("imara_score")
     if not comps:
         return {"score": score, "band": report.get("imara_band"), "reasons": [], "strengths": [],

@@ -138,7 +138,7 @@ def normalize_earnings(figures, financial_text, legal_text=""):
     figures: the deterministic financial_figures dict (revenue, operating_profit, ebitda, ...).
     Returns a decision-support dict; never an Imara Score input.
     """
-    figures = figures or {}
+    figures = figures if isinstance(figures, dict) else {}
     candidates = _scan_addbacks(financial_text)
     loan_flag = detect_loan_account(financial_text, legal_text)
 

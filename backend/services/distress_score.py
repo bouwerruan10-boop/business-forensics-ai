@@ -48,7 +48,7 @@ def altman_z_em(figures: dict, imara_band: str = "") -> dict:
     Returns {available: False, reason} when the balance sheet is incomplete
     (e.g. only a P&L was uploaded) — Imara never fabricates the missing items.
     """
-    f = figures or {}
+    f = figures if isinstance(figures, dict) else {}
 
     def _n(v):
         """Coerce to float defensively (handles strings like '1,000', None, junk)."""
