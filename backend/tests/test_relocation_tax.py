@@ -262,3 +262,50 @@ def test_flat_fee_corridors_survive_no_amounts_and_adversarial():
     for bad in [None, {"income": "x"}, {"income": {"employment": float("nan")}}, {"destinations": ["GR", "ZZ"]}]:
         out = relocation_first_pass(bad)
         assert out["available"] and out["destinations"]
+
+
+# ── v1.80: stay-and-optimise legal tax-efficiency levers ───────────────────────
+
+def test_stay_and_optimise_present_and_framed():
+    r = relocation_first_pass({"income_types": ["employment"]})
+    assert isinstance(r["stay_and_optimise"], list) and r["stay_and_optimise"]
+    note = r["stay_and_optimise_note"].lower()
+    assert "legal" in note and "not advice" in note and "gaar" in note  # legal-efficiency, not a scheme
+    for lv in r["stay_and_optimise"]:
+        assert lv["section"] and lv["lever"] and lv["what"] and lv["indicative"]
+
+
+def test_levers_match_income_mix():
+    from services.relocation_tax import stay_and_optimise
+    # business profile surfaces the SBC + business-incentive levers
+    biz = {l["section"] for l in stay_and_optimise({"business"})}
+    assert "s12E" in biz and "s12H / s11D / s12BA" in biz
+    # interest profile surfaces the interest exemption; employment surfaces the foreign-employment exemption
+    assert any(l["section"] == "s10(1)(i)" for l in stay_and_optimise({"interest"}))
+    assert any(l["section"] == "s10(1)(o)(ii)" for l in stay_and_optimise({"employment"}))
+    # capital_gains profile does NOT pull the business-only SBC lever
+    cg = {l["section"] for l in stay_and_optimise({"capital_gains"})}
+    assert "s12E" not in cg
+
+
+def test_all_levers_when_no_income_specified():
+    from services.relocation_tax import stay_and_optimise
+    assert len(stay_and_optimise(set())) == 10  # the full corpus
+
+
+def test_universal_levers_always_appear():
+    from services.relocation_tax import stay_and_optimise
+    # TFSA, donations and medical credits are "all"-profile levers -> always present
+    for prof in ({"interest"}, {"pension"}, {"dividends"}, {"employment"}, set()):
+        secs = {l["section"] for l in stay_and_optimise(prof)}
+        assert "s12T" in secs and "s18A" in secs and "s6A / s6B" in secs
+    # RA applies to earned/most income but NOT to a dividends-only earner
+    assert "s11F" in {l["section"] for l in stay_and_optimise({"employment"})}
+    assert "s11F" not in {l["section"] for l in stay_and_optimise({"dividends"})}
+
+
+def test_stay_and_optimise_adversarial():
+    from services.relocation_tax import stay_and_optimise
+    for bad in [None, "x", 123, [], {"a": 1}, {"employment"}]:
+        out = stay_and_optimise(bad)
+        assert isinstance(out, list) and out  # never crashes, always returns levers

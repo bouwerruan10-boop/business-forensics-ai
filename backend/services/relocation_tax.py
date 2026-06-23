@@ -23,6 +23,7 @@ INCOME_TYPES = ("employment", "business", "dividends", "interest", "rental", "ca
 # ── Indicative tax quantification (SA 2025/26; sourced) ────────────────────────
 # INDICATIVE ONLY — headline/effective rates, NOT a computation of actual liability.
 TAX_AS_OF = "SA 2025/26 tax year"
+SA_EFFICIENCY_AS_OF = "SA 2025/26"
 SA_BRACKETS = [(237100, 0.18), (370500, 0.26), (512800, 0.31), (673000, 0.36),
                (857900, 0.39), (1817000, 0.41), (float("inf"), 0.45)]
 SA_PRIMARY_REBATE = 17235     # 2025/26 primary rebate
@@ -280,6 +281,54 @@ COST_CONSIDERATIONS = [
     "Double-tax-treaty relief: SA has a DTA with every corridor here, which governs the residence tie-breaker + withholding relief.",
 ]
 
+# ── Stay-and-optimise: LEGAL SA tax-efficiency levers (legislated reliefs) ──────
+# Factual information only - NOT advice and NOT a designed scheme. Each lever is a
+# real statutory relief with its own conditions; SARS GAAR strikes down artificial,
+# no-substance arrangements. A registered tax practitioner must confirm + implement.
+_LEVERS = [
+    {"lever": "Retirement-fund contributions", "section": "s11F", "applies_to": {"employment", "business", "rental", "interest", "pension"},
+     "what": "Contributions to a pension / provident / retirement-annuity fund are DEDUCTIBLE from taxable income - the single biggest legal lever for most earners; the fund's growth is tax-free.",
+     "indicative": "Deduct up to 27.5% of the greater of remuneration or taxable income, capped at R350,000/yr (R430,000 from 2027)."},
+    {"lever": "Tax-free savings account (TFSA)", "section": "s12T", "applies_to": "all",
+     "what": "All interest, dividends, capital growth and withdrawals inside a TFSA are completely tax-free.",
+     "indicative": "R36,000/yr, R500,000 lifetime."},
+    {"lever": "Foreign-employment income exemption", "section": "s10(1)(o)(ii)", "applies_to": {"employment"},
+     "what": "If you work abroad >183 days (including 60 continuous) in a 12-month period while still SA-resident, the first R1.25m of that foreign employment income is EXEMPT - a 'work-abroad' route that does NOT require full emigration.",
+     "indicative": "First R1,250,000/yr of qualifying foreign employment income exempt."},
+    {"lever": "Annual interest exemption", "section": "s10(1)(i)", "applies_to": {"interest"},
+     "what": "A slice of local interest income is tax-free every year.",
+     "indicative": "R23,800/yr (under 65) or R34,500/yr (65+)."},
+    {"lever": "Capital-gains exclusions + timing", "section": "8th Schedule", "applies_to": {"capital_gains"},
+     "what": "Only 40% of a net capital gain is taxed (max ~18% effective); the first R40,000/yr is excluded and the first R2,000,000 of gain on your PRIMARY RESIDENCE is excluded. Spreading disposals across tax years uses multiple annual exclusions.",
+     "indicative": "R40,000/yr annual exclusion (R50k from 2027) + R2,000,000 primary-residence exclusion (R3m from 2027); 40% inclusion."},
+    {"lever": "Local dividends are already lightly taxed", "section": "Dividends Withholding Tax", "applies_to": {"dividends"},
+     "what": "Local dividends bear a final 20% withholding tax and NO further income tax - already efficient. (Artificially converting salary into dividends to dodge PAYE invites GAAR - keep it genuine.)",
+     "indicative": "20% final; no additional personal income tax."},
+    {"lever": "Small Business Corporation rates", "section": "s12E", "applies_to": {"business"},
+     "what": "A qualifying SBC pays REDUCED graduated rates instead of the flat 27% company rate, plus accelerated asset write-offs.",
+     "indicative": "0% up to R95,750, then 7% / 21% / 27%; 100% (manufacturing) or 50:30:20 asset write-offs."},
+    {"lever": "Business incentives (learnerships, R&D, renewables)", "section": "s12H / s11D / s12BA", "applies_to": {"business"},
+     "what": "Registered learnership allowances (s12H), approved R&D (150%, s11D) and renewable-energy assets (s12BA) give extra deductions for genuine qualifying activity. (Imara's tax_optimizer models these in the business report.)",
+     "indicative": "Per-learner allowances; 150% R&D deduction; enhanced renewable-energy write-off."},
+    {"lever": "Section 18A donations", "section": "s18A", "applies_to": "all",
+     "what": "Donations to approved public-benefit organisations are deductible (you also do good); excess carries forward.",
+     "indicative": "Up to 10% of taxable income, with a valid s18A receipt."},
+    {"lever": "Medical tax credits", "section": "s6A / s6B", "applies_to": "all",
+     "what": "Fixed monthly credits for medical-scheme membership, plus an additional credit for high out-of-pocket costs, reduce tax directly.",
+     "indicative": "~R364/month main member + first dependant, ~R246 each further (2025/26)."},
+]
+
+
+def stay_and_optimise(income):
+    """Legal SA tax-efficiency levers relevant to the income mix (factual, not advice)."""
+    income = income if isinstance(income, set) else set()
+    out = []
+    for lv in _LEVERS:
+        a = lv["applies_to"]
+        if a == "all" or not income or (isinstance(a, set) and bool(income & a)):
+            out.append({k: lv[k] for k in ("lever", "section", "what", "indicative")})
+    return out
+
 
 def _norm_income(income_types):
     """Coerce arbitrary input into a clean set of known income types."""
@@ -424,6 +473,11 @@ def relocation_first_pass(profile):
         "guardrails": GUARDRAILS,
         "sequencing": SEQUENCING,
         "cost_considerations": COST_CONSIDERATIONS,
+        "stay_and_optimise": stay_and_optimise(income),
+        "stay_and_optimise_note": ("LEGAL tax-efficiency levers that lawfully reduce your SA tax WITHOUT relocating - the 'stay-and-optimise' "
+                       "alternative to the corridors above (" + SA_EFFICIENCY_AS_OF + "). These are legislated reliefs shown as FACTUAL information - "
+                       "NOT advice and NOT a designed scheme. You must genuinely meet each lever's conditions; SARS GAAR strikes down artificial, "
+                       "no-substance arrangements. A registered tax practitioner must confirm and implement."),
         "fx_assumption": ("Flat-fee regimes (Greece/Italy/Switzerland) converted at ~R" + str(ZAR_PER_EUR) + "/EUR and ~R" + str(ZAR_PER_CHF) + "/CHF (" + FX_AS_OF + ") - indicative."),
         "classification": "decision-support / factual landscape",
         "is_not": "tax, legal, or financial advice, and not a recommendation to adopt any particular arrangement or move to any particular country",
