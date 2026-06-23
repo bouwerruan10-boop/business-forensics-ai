@@ -32,12 +32,13 @@ SA_CGT_EFFECTIVE = 0.18       # individual max effective CGT (40% inclusion x 45
 
 
 def _num(v):
-    """Coerce arbitrary input to a non-negative float; junk -> 0.0."""
+    """Coerce arbitrary input to a non-negative, FINITE float; junk/nan/inf -> 0.0."""
     try:
         f = float(v)
-        return f if f > 0 else 0.0
     except (TypeError, ValueError):
         return 0.0
+    import math as _m
+    return f if (f > 0 and _m.isfinite(f)) else 0.0
 
 
 def _sa_income_tax(taxable):

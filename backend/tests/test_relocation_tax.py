@@ -309,3 +309,19 @@ def test_stay_and_optimise_adversarial():
     for bad in [None, "x", 123, [], {"a": 1}, {"employment"}]:
         out = stay_and_optimise(bad)
         assert isinstance(out, list) and out  # never crashes, always returns levers
+
+
+def test_num_rejects_non_finite_and_output_stays_finite():
+    import math, json as _j
+    from services.relocation_tax import _num
+    assert _num("Infinity") == 0.0 and _num(float("inf")) == 0.0 and _num(float("nan")) == 0.0
+    def _finite(o):
+        if isinstance(o, float):
+            assert math.isfinite(o)
+        elif isinstance(o, dict):
+            [_finite(v) for v in o.values()]
+        elif isinstance(o, list):
+            [_finite(v) for v in o]
+    for body in ({"assets": {"worldwide_market_value": "Infinity"}}, {"income": {"employment": "Infinity"}}):
+        r = relocation_first_pass(body)
+        _finite(r); _j.dumps(r)
