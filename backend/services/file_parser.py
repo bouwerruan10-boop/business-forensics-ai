@@ -345,7 +345,7 @@ def _df_to_summary(df: pd.DataFrame, sheet_name: str = "") -> dict:
         records = (
             sample
             .fillna("")
-            .applymap(_cap)
+            .map(_cap)   # DataFrame.map = non-deprecated applymap (pandas>=2.1; pinned >=2.2.2)
             .to_dict(orient="records")
         )
     except Exception:
