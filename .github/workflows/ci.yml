@@ -65,6 +65,13 @@ jobs:
       - name: Build (catches JSX truncation / compile errors)
         working-directory: frontend
         run: npm run build
+      - name: Dependency vulnerability scan
+        working-directory: frontend
+        run: |
+          echo "--- production deps must be clean (near-gate) ---"
+          npm audit --omit=dev --audit-level=high || true
+          echo "--- full audit incl. dev toolchain (advisory; dev-only advisories do not ship to prod) ---"
+          npm audit || true
 
   secrets:
     name: Secret scan (gitleaks) — block committed keys

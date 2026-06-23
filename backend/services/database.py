@@ -79,11 +79,18 @@ def _get_conn() -> sqlite3.Connection:
     return conn
 
 
+_KNOWN_TABLES = {"analyses", "shares", "outcomes", "decision_audit"}
+
+
 def _add_owner_column(conn, table):
-    """Idempotent: add the multi-tenancy 'owner' column to an existing table."""
-    cols = [r[1] for r in conn.execute("PRAGMA table_info({})".format(table)).fetchall()]
+    """Idempotent: add the multi-tenancy 'owner' column to an existing table.
+    `table` is validated against a fixed allowlist so the identifier can never be
+    attacker-influenced (defence-in-depth; today it's only ever a hardcoded constant)."""
+    if table not in _KNOWN_TABLES:
+        raise ValueError("unknown table: {!r}".format(table))
+    cols = [r[0] for r in conn.execute("SELECT name FROM pragma_table_info(?)", (table,)).fetchall()]
     if "owner" not in cols:
-        conn.execute("ALTER TABLE {} ADD COLUMN owner TEXT NOT NULL DEFAULT 'operator'".format(table))
+        conn.execute('ALTER TABLE "{}" ADD COLUMN owner TEXT NOT NULL DEFAULT \'operator\''.format(table))
 
 
 def init_db():

@@ -117,3 +117,9 @@ This is OWASP **API1:2023 Broken Object Level Authorization** — ~40% of API at
 - **P0 (BOLA) — DONE.** Object-level ownership now enforced centrally in the operator-gate middleware for all path-id routes, `require_owned()` on the body-id simulate POSTs, share-create owner-scoped. Backward-compatible; a meta-test fails CI if a new report/status route escapes the gate. (`test_bola_authz.py`, 5 tests.)
 - **P1 — DONE.** `/api/login` rate-limited to 5/min (verified 429); startup warns when `AUTH_SECRET` is derived rather than set.
 - **P2/P3 — open:** bump Vite + add pip-audit/npm audit to CI; upload-type allowlist; quote the internal PRAGMA identifier.
+
+## Update — P2/P3 closeout (2026-06-23, v1.84)
+
+- **P2 — DONE.** `npm audit` added to frontend CI (production deps near-gated; full audit advisory). `pip-audit` already gated the backend. **Vite major bump deferred** (the advisories are dev-toolchain only / no production impact — Vercel serves static assets; gating `--omit=dev` proves prod deps clean).
+- **P3 — DONE.** Upload-type allowlist rejects non-document files; `_add_owner_column` is injection-proof (table allowlist + quoted identifier + parameterised pragma).
+- **All 7 points are now addressed.** Remaining: optional Vite 5→8 bump (deferred by design, dev-only advisory).

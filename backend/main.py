@@ -408,6 +408,19 @@ MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024     # per-file cap (aligns with the par
 MAX_UPLOAD_TOTAL_BYTES = 150 * 1024 * 1024   # aggregate cap across all files in one request
 ANALYSIS_TIMEOUT_SECONDS = int(os.getenv("ANALYSIS_TIMEOUT_SECONDS", "1800"))  # wall-clock cap on a single run
 
+# Accepted upload types — Imara ingests financial documents only. An allowlist (not a
+# denylist) is the safer default: anything not a known document type is rejected up front.
+ALLOWED_UPLOAD_EXTS = {".pdf", ".csv", ".tsv", ".xlsx", ".xls", ".xlsm", ".xlsb", ".txt", ".json"}
+
+
+def _check_upload_type(filename: str) -> None:
+    """Reject non-document uploads (executables, archives, etc.) before they're read."""
+    ext = os.path.splitext(filename or "")[1].lower()
+    if ext not in ALLOWED_UPLOAD_EXTS:
+        raise HTTPException(status_code=400, detail=(
+            "File '{}' has an unsupported type. Accepted: PDF, CSV/TSV, Excel (xls/xlsx), TXT, JSON.".format(
+                filename or "?")))
+
 
 def _coerce_categories(raw_json, n):
     """Turn the file_categories form field into EXACTLY n category strings.
@@ -504,6 +517,11 @@ async def analyze(
         if not content:
             analysis_status.pop(analysis_id, None)
             raise HTTPException(status_code=400, detail="File '{}' is empty.".format(f.filename or "?"))
+        try:
+            _check_upload_type(f.filename)
+        except HTTPException:
+            analysis_status.pop(analysis_id, None)
+            raise
         if len(content) > MAX_UPLOAD_FILE_BYTES:
             analysis_status.pop(analysis_id, None)
             raise HTTPException(status_code=413, detail="File '{}' exceeds the {}MB per-file limit.".format(

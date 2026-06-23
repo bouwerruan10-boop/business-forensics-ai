@@ -104,3 +104,26 @@ def test_calibration_hostile_inputs_no_crash():
     for p in ([], [{"imara_score": 50, "label": 1}] * 60, [{"imara_score": None, "label": 1}]):
         json.dumps(calibrate(p, min_n=50))
     json.dumps(calibration_metrics([0, 100] * 40, [1, 0] * 40, a=-5.0, b=2.0))
+
+
+def test_upload_type_allowlist():
+    import pytest
+    from fastapi import HTTPException
+    import main
+    main._check_upload_type("statement.pdf")      # ok
+    main._check_upload_type("books.XLSX")          # case-insensitive ok
+    for bad in ("malware.exe", "archive.zip", "script.sh", "noext", ""):
+        with pytest.raises(HTTPException) as ei:
+            main._check_upload_type(bad)
+        assert ei.value.status_code == 400
+
+
+def test_add_owner_column_rejects_unknown_table():
+    import pytest
+    from services.database import _add_owner_column, _get_conn
+    conn = _get_conn()
+    try:
+        with pytest.raises(ValueError):
+            _add_owner_column(conn, "analyses; DROP TABLE analyses")
+    finally:
+        conn.close()
