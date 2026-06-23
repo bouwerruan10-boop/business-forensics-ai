@@ -111,6 +111,12 @@ def get_benchmarks(industry_key: str) -> dict:
     return industries.get(resolve_benchmark_key(industry_key), industries['general'])
 
 
+def industry_display_name(industry_key: str) -> str:
+    """Human-readable label for an industry key, from the resolved benchmark profile.
+    Lets the report show 'Retail & E-commerce' instead of a raw key like 'retail_general'."""
+    return get_benchmarks(industry_key).get("display_name") or "General Business"
+
+
 def get_thresholds() -> dict:
     return _load().get('universal_thresholds', {})
 

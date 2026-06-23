@@ -1217,6 +1217,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
 
             # 5. Attach metadata
             report["industry_key"] = profile.get("industry_key", "general")
+            from services.benchmark_service import industry_display_name as _idn
+            report["industry"] = _idn(report.get("industry_key")) or report.get("industry")
             report["currency"] = profile.get("currency", "ZAR")
             report["annual_revenue"] = profile.get("annual_revenue", 0)
             report["headcount"] = profile.get("headcount", 0)
