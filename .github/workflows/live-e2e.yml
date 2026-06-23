@@ -1,0 +1,32 @@
+name: Imara live e2e
+
+# Autonomous live test against the DEPLOYED instance.
+#  - smoke (default): FREE - health + demo (every report section asserted). No secret needed.
+#  - full:            PAID (~$0.29) - logs in + runs a real analysis end-to-end. Needs the
+#                     OPERATOR_PASSWORD repo secret.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "smoke (free) or full (runs a paid ~$0.29 analysis)"
+        type: choice
+        options: [smoke, full]
+        default: smoke
+  # Free daily smoke check - uncomment to enable continuous monitoring:
+  # schedule:
+  #   - cron: "0 5 * * *"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Imara live e2e
+        env:
+          IMARA_API: https://web-production-87ff5c.up.railway.app
+          OPERATOR_PASSWORD: ${{ secrets.OPERATOR_PASSWORD }}
+        run: python scripts/live_e2e.py --mode=${{ github.event.inputs.mode || 'smoke' }}

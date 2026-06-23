@@ -1516,6 +1516,24 @@ def _enrich_demo():
     DEMO_REPORT["working_capital"] = _build_wc(DEMO_REPORT)
     from services.compliance_calendar import build_compliance_calendar as _build_cal
     DEMO_REPORT["compliance_calendar"] = _build_cal(DEMO_REPORT)
+
+    # SA Compliance panel — demo renders the full panel (incl. the Assurance & Compliance
+    # Calendar cards) by setting the performed flags + realistic SA fields for Mzansi Retail.
+    DEMO_REPORT["sa_tax_performed"] = True
+    DEMO_REPORT["sa_legal_performed"] = True
+    DEMO_REPORT["sa_tax_risk_score"] = 38
+    DEMO_REPORT["sa_legal_risk_score"] = 30
+    DEMO_REPORT["sa_vat_status"] = "compliant"
+    DEMO_REPORT["sa_tax_clearance_status"] = "valid"
+    DEMO_REPORT["sa_cipc_status"] = "compliant"
+    DEMO_REPORT["sa_tax_summary"] = ("VAT201 and EMP201 filings are up to date and provisional tax (IRP6) is on "
+                                     "track; the main watch-item is the input-VAT documentation gap on 3 supplier invoices.")
+    DEMO_REPORT["sa_legal_summary"] = ("CIPC annual return and beneficial-ownership register are filed and in good "
+                                       "standing; the open item is POPIA Information Officer registration (free, ~30 min).")
+    DEMO_REPORT["sa_bbbee_analysis"] = {"declared_level": "QSE (Level 4)",
+                                        "risk_flags": ["No verified B-BBEE affidavit on file yet"],
+                                        "finding_count": 1}
+    DEMO_REPORT["bbbee_level"] = "QSE (Level 4)"
     from services.cashflow_13week import project_13week as _proj13
     DEMO_REPORT["cashflow_13week"] = _proj13(figs, vat_registered=True)
     from services.agent_consistency import analyze_consistency as _consist
