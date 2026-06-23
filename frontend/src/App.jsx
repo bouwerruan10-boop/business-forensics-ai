@@ -46,7 +46,23 @@ export default function App() {
 
   // Operator-auth status (whether a login is required for this deployment)
   useEffect(() => {
-    getHealth().then(h => setAuthRequired(!!h.auth_required)).catch(() => {}).finally(() => setAuthChecked(true))
+    let cancelled = false
+    ;(async () => {
+      // Retry the health check; its answer decides whether the operator login gate shows.
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+        try {
+          const h = await getHealth()
+          if (!cancelled) { setAuthRequired(!!h.auth_required); setAuthChecked(true) }
+          return
+        } catch {
+          await new Promise(r => setTimeout(r, 700 * (attempt + 1)))
+        }
+      }
+      // All attempts failed -> fail CLOSED. Never silently expose the intake form to an
+      // unauthenticated user; assume a login is required so the gate still appears.
+      if (!cancelled) { setAuthRequired(true); setAuthChecked(true) }
+    })()
+    return () => { cancelled = true }
   }, [])
 
   const showToast = (message, type = 'success') => {
