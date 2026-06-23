@@ -749,6 +749,30 @@ def report_credit_memo(analysis_id: str):
     return build_credit_memo(result)
 
 
+@app.get("/api/report/{analysis_id}/working-capital")
+def report_working_capital(analysis_id: str):
+    """Cash-conversion cycle + cash trapped in working capital above sector norms. Deterministic."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("working_capital"):
+        return result["working_capital"]
+    from services.working_capital import build_working_capital
+    return build_working_capital(result)
+
+
+@app.get("/api/report/{analysis_id}/compliance-calendar")
+def report_compliance_calendar(analysis_id: str):
+    """Applicable SA statutory obligations + free on-ramps. Deterministic; awareness/decision-support."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("compliance_calendar"):
+        return result["compliance_calendar"]
+    from services.compliance_calendar import build_compliance_calendar
+    return build_compliance_calendar(result)
+
+
 @app.get("/api/report/{analysis_id}/cashflow")
 def report_cashflow(analysis_id: str):
     """Deterministic 13-week direct-method cash-flow projection - the short-term
@@ -1131,6 +1155,9 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["headcount"] = profile.get("headcount", 0)
             report["entity_type"] = profile.get("entity_type", "")
             report["cipc_number"] = profile.get("cipc_number", "")
+            report["vat_registered"] = profile.get("vat_registered", "unknown")
+            report["tax_year_end"] = profile.get("tax_year_end", "")
+            report["bbbee_level"] = profile.get("bbbee_level", "")
             report["primary_concern"] = profile.get("primary_concern", "")
             report["llm_usage"] = _ledger.summary()
             from services.finding_quality import critique_report
@@ -1149,6 +1176,10 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["funding_fit"] = recommend_funding(report)
             from services.credit_memo import build_credit_memo
             report["credit_memo"] = build_credit_memo(report)
+            from services.working_capital import build_working_capital
+            report["working_capital"] = build_working_capital(report)
+            from services.compliance_calendar import build_compliance_calendar
+            report["compliance_calendar"] = build_compliance_calendar(report)
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark
@@ -1459,6 +1490,10 @@ def _enrich_demo():
     DEMO_REPORT["assurance"] = _assess_assurance(headcount=DEMO_REPORT.get("headcount") or 0, annual_revenue=DEMO_REPORT.get("annual_revenue") or 0, financial_figures=figs, entity_type=DEMO_REPORT.get("entity_type") or "", cipc_number=DEMO_REPORT.get("cipc_number") or "")
     from services.credit_memo import build_credit_memo as _build_memo
     DEMO_REPORT["credit_memo"] = _build_memo(DEMO_REPORT)
+    from services.working_capital import build_working_capital as _build_wc
+    DEMO_REPORT["working_capital"] = _build_wc(DEMO_REPORT)
+    from services.compliance_calendar import build_compliance_calendar as _build_cal
+    DEMO_REPORT["compliance_calendar"] = _build_cal(DEMO_REPORT)
     from services.cashflow_13week import project_13week as _proj13
     DEMO_REPORT["cashflow_13week"] = _proj13(figs, vat_registered=True)
     from services.agent_consistency import analyze_consistency as _consist

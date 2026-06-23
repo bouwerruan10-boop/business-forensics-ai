@@ -20,15 +20,17 @@ export default function LenderView({ analysisId, currency = 'ZAR' }) {
   const [lv, setLv] = useState(null)
   const [nm, setNm] = useState(null)
   const [cm, setCm] = useState(null)
+  const [wcap, setWcap] = useState(null)
   const [error, setError] = useState(null)
   const [packUrl, setPackUrl] = useState(null)
 
   useEffect(() => {
     let on = true
-    import('../api/client').then(({ getLenderView, getNormalization, getBankReadyPackUrl, getCreditMemo }) => {
+    import('../api/client').then(({ getLenderView, getNormalization, getBankReadyPackUrl, getCreditMemo, getWorkingCapital }) => {
       getLenderView(analysisId).then(d => { if (on) setLv(d) }).catch(e => { if (on) setError(e.message) })
       getNormalization(analysisId).then(d => { if (on) setNm(d) }).catch(() => {})
       getCreditMemo(analysisId).then(d => { if (on) setCm(d) }).catch(() => {})
+      getWorkingCapital(analysisId).then(d => { if (on) setWcap(d) }).catch(() => {})
       if (on) setPackUrl(getBankReadyPackUrl(analysisId))
     })
     return () => { on = false }
@@ -170,6 +172,34 @@ export default function LenderView({ analysisId, currency = 'ZAR' }) {
             )}
           </div>
           {bc.assumptions && <p className="text-slate-600 text-[11px] mt-3 italic">{bc.assumptions}</p>}
+        </div>
+      )}
+
+
+      {/* Working-capital cycle & trapped cash */}
+      {wcap?.available && (
+        <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5">
+          <div className="text-[11px] uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+            Working-capital cycle & trapped cash
+            <InfoTip label="Cash conversion cycle" text="Days from paying for stock to collecting cash — lower is better. We also estimate the cash freed by reaching sector-benchmark inventory/debtor days: the working capital a facility provides, without the debt." />
+          </div>
+          <div className="flex items-baseline gap-3 mb-3 flex-wrap">
+            <span className="text-slate-400 text-sm">Cash conversion cycle</span>
+            <span className={`text-2xl font-bold ${wcap.cash_conversion_cycle.status === 'good' ? 'text-emerald-400' : wcap.cash_conversion_cycle.status === 'warning' ? 'text-amber-400' : wcap.cash_conversion_cycle.status === 'critical' ? 'text-red-400' : 'text-slate-400'}`}>{wcap.cash_conversion_cycle.value} days</span>
+            {wcap.cash_conversion_cycle.benchmark != null && <span className="text-slate-500 text-xs">sector ~{wcap.cash_conversion_cycle.benchmark} days</span>}
+          </div>
+          {wcap.working_capital_release.total > 0 ? (
+            <div className="bg-emerald-500/5 border border-emerald-500/25 rounded-xl p-3">
+              <div className="text-emerald-400 font-bold text-lg">≈ {money(wcap.working_capital_release.total, currency)} trapped above sector norms</div>
+              <div className="text-slate-400 text-xs mt-1 mb-2">{wcap.working_capital_release.basis}</div>
+              {wcap.working_capital_release.items.map((it, i) => (
+                <div key={i} className="text-xs text-slate-300 mt-1.5">
+                  <span className="text-white font-semibold">{it.driver}:</span> {it.excess_days} days over benchmark → {money(it.amount, currency)}
+                  <div className="text-slate-500"><span className="text-emerald-400/80 font-semibold">Fix: </span>{it.fix}</div>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-slate-400 text-xs">{wcap.working_capital_release.basis}</p>}
         </div>
       )}
 

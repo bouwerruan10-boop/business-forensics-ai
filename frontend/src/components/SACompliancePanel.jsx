@@ -92,6 +92,7 @@ export default function SACompliancePanel({ report }) {
   const bbbeeAnalysis = report?.sa_bbbee_analysis || {}
   const bbbeeLevel    = report?.bbbee_level || ''
   const assurance     = report?.assurance || null
+  const calendar      = report?.compliance_calendar || null
 
   // Pull SA findings from all_findings_ranked
   const allFindings = report?.all_findings_ranked || []
@@ -177,6 +178,39 @@ export default function SACompliancePanel({ report }) {
             <p className="text-[10px] text-slate-400 mt-3 pt-2 border-t border-white/5">🏛 CIPC: {assurance.cipc.flag}</p>
           )}
           <p className="text-[9px] text-slate-600 mt-2">{assurance.disclaimer}</p>
+        </div>
+      )}
+
+      {calendar?.available && (
+        <div className="bg-[#161b27] border border-white/8 rounded-2xl p-5">
+          <div className="text-[13px] font-bold text-white flex items-center gap-2 mb-3">
+            📅 Compliance Calendar
+            <span className="text-[10px] text-slate-400 font-normal">{calendar.count} obligations · SARS · CIPC · POPIA · B-BBEE</span>
+          </div>
+          {calendar.free_quick_wins?.length > 0 && (
+            <div className="mb-3 bg-green-500/5 border border-green-500/25 rounded-xl p-3">
+              <div className="text-[10px] uppercase tracking-wider text-green-400 mb-1">Free quick wins most SMEs miss</div>
+              {calendar.free_quick_wins.map((w, i) => (
+                <div key={i} className="text-[11px] text-slate-300"><span className="text-green-400 font-semibold">{w.title}:</span> {w.action}</div>
+              ))}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            {calendar.obligations.map((o, i) => {
+              const col = o.priority === 'critical' ? 'text-red-400 border-red-500/30' : o.priority === 'high' ? 'text-orange-400 border-orange-500/30' : o.priority === 'medium' ? 'text-amber-400 border-amber-500/30' : 'text-slate-400 border-white/15'
+              return (
+                <div key={i} className="flex items-start justify-between gap-3 border-b border-white/5 pb-1.5 last:border-0">
+                  <div className="flex-1">
+                    <span className="text-[12px] text-white font-medium">{o.title}</span>
+                    {o.free && <span className="ml-1.5 text-[9px] text-green-400 font-bold">FREE</span>}
+                    <div className="text-[10px] text-slate-500">{o.authority} · {o.cadence} · {o.timing}</div>
+                  </div>
+                  <span className={`shrink-0 text-[9px] uppercase font-bold border rounded-full px-2 py-0.5 ${col}`}>{o.priority}</span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-[9px] text-slate-600 mt-2">{calendar.note}</p>
         </div>
       )}
 
