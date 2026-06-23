@@ -183,6 +183,24 @@ export async function getFundingFit(analysisId) {
   return res.json()
 }
 
+export async function getOwnerRisk(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/owner-risk`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
+export async function getFunderGates(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/funder-gates`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
+export async function getInsuranceCession(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/insurance-cession`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
 export async function getOptimize(analysisId, scenario = 'expected', maxActions = 3, objective = 'imara') {
   const q = `scenario=${scenario}&max_actions=${maxActions}&objective=${objective}`
   const res = await fetch(`${BASE}/report/${analysisId}/optimize?${q}`, { headers: authHeaders() })

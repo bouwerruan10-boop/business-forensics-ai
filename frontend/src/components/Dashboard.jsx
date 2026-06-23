@@ -12,6 +12,9 @@ import BankabilityEvidence from './BankabilityEvidence'
 import CashFlow13Week from './CashFlow13Week'
 import LenderView from './LenderView'
 import FundingFit from './FundingFit'
+import OwnerRisk from './OwnerRisk'
+import FunderGates from './FunderGates'
+import InsuranceCession from './InsuranceCession'
 import SupplierSavings from './SupplierSavings'
 import TaxOptimisation from './TaxOptimisation'
 import TaxRiskFlags from './TaxRiskFlags'
@@ -176,6 +179,9 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...((report.distress_score?.available || report.bank_signals?.available) ? [{ id: 'evidence', label: 'Bankability Evidence' }] : []),
     ...(report.lender_view?.available ? [{ id: 'lender-view', label: "Lender's-Eye View" }] : []),
     ...(report.funding_fit?.available ? [{ id: 'funding-fit', label: 'Funding Fit' }] : []),
+    ...(report.owner_risk?.available ? [{ id: 'owner-risk', label: 'Owner Risk' }] : []),
+    ...(report.funder_gates?.available ? [{ id: 'funder-gates', label: 'Funder Gates' }] : []),
+    ...(report.insurance_cession?.available ? [{ id: 'insurance-cession', label: 'Insurance & Cession' }] : []),
     ...(report.supplier_benchmark?.available ? [{ id: 'suppliers', label: 'Supplier Savings' }] : []),
     ...(report.tax_optimization?.available ? [{ id: 'tax-optimisation', label: 'Tax Me If You Can' }] : []),
     ...(report.tax_risk_flags?.available ? [{ id: 'tax-risk', label: 'GAAR & SARS Scrutiny' }] : []),
@@ -354,6 +360,39 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Which TYPE of funding fits this profile — with what is needed and what to strengthen first"
         >
           <FundingFit analysisId={analysisId} />
+        </Section>
+      )}
+
+      {/* Owner-level (personal) risk — the blended owner+business exposure SA lenders price in */}
+      {report.owner_risk?.available && (
+        <Section
+          id="owner-risk"
+          title="Owner Risk"
+          subtitle="The personal exposure a lender sees — surety, key-person dependence, commingling — plus the personal-credit gaps it still needs"
+        >
+          <OwnerRisk analysisId={analysisId} />
+        </Section>
+      )}
+
+      {/* Funder gates — named SA funders' published eligibility, you-meet / you-don't */}
+      {report.funder_gates?.available && (
+        <Section
+          id="funder-gates"
+          title="Funder Gates"
+          subtitle="Which named SA funders (SEDFA, IDC, NEF, Business Partners) your profile fits — gate by gate, with what each still needs"
+        >
+          <FunderGates analysisId={analysisId} />
+        </Section>
+      )}
+
+      {/* Insurance + cession — which covers a lender expects ceded as security */}
+      {report.insurance_cession?.available && (
+        <Section
+          id="insurance-cession"
+          title="Insurance & Cession"
+          subtitle="The cover a lender expects in place and CEDED as security — with the evidence in your documents and the gaps to close"
+        >
+          <InsuranceCession analysisId={analysisId} />
         </Section>
       )}
 
