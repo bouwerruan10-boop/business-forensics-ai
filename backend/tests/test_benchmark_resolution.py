@@ -111,3 +111,15 @@ def test_keyword_scan_maps_free_text_to_new_sectors():
     assert resolve_benchmark_key("private security guarding") == "security_services"
     assert resolve_benchmark_key("hair salon and spa") == "personal_services"
     assert resolve_benchmark_key("panel beater workshop") == "motor_trade"
+
+
+def test_new_profiles_are_enriched_to_match_established():
+    ind = _json.load(open("data/benchmarks.json", encoding="utf-8"))["industries"]
+    for k in _NEW_PROFILES:
+        p = ind[k]
+        tq = p.get("top_quartile", {})
+        assert "net_margin" in tq, f"{k} top_quartile missing net_margin"
+        assert tq["gross_margin"] >= tq["operating_margin"] >= tq["net_margin"]
+        # at least one sector-specific KPI beyond the three margins
+        assert len(set(tq) - {"gross_margin", "operating_margin", "net_margin"}) >= 1, k
+        assert p.get("_source"), f"{k} missing _source provenance"

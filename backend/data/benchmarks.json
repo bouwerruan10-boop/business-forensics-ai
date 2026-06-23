@@ -933,7 +933,9 @@
         "inventory_turnover_days": 10,
         "debtor_days": 15,
         "creditor_days": 25,
-        "asset_turnover": 1.6
+        "asset_turnover": 1.6,
+        "revenue_per_employee": 250000,
+        "utilisation_rate": 0.65
       },
       "cost_ratios": {
         "cogs_pct_revenue": 0.45,
@@ -950,9 +952,13 @@
       },
       "top_quartile": {
         "gross_margin": 0.65,
-        "operating_margin": 0.25
+        "operating_margin": 0.25,
+        "net_margin": 0.2,
+        "revenue_per_employee": 350000,
+        "utilisation_rate": 0.8
       },
-      "industry_notes": "Labour-intensive, low-capital, largely cash/card. Strong gross margin but wages are the main cost; net 10-25% typical. Watch wage cost as a share of revenue and owner drawings."
+      "industry_notes": "Labour-intensive, low-capital, largely cash/card. Strong gross margin but wages are the main cost; net 10-25% typical. Watch wage cost as a share of revenue and owner drawings.",
+      "_source": "Cleaning/salon/fitness SME margins (HouseCall Pro, CleanerHQ, BusinessDojo 2026): GM 50-70%, net 10-25% (top solo operators higher). Indicative."
     },
     "motor_trade": {
       "display_name": "Motor Trade & Automotive",
@@ -982,7 +988,9 @@
         "inventory_turnover_days": 60,
         "debtor_days": 25,
         "creditor_days": 35,
-        "asset_turnover": 1.8
+        "asset_turnover": 1.8,
+        "revenue_per_employee": 900000,
+        "service_parts_gross_margin": 0.45
       },
       "cost_ratios": {
         "cogs_pct_revenue": 0.8,
@@ -999,9 +1007,13 @@
       },
       "top_quartile": {
         "gross_margin": 0.3,
-        "operating_margin": 0.1
+        "operating_margin": 0.1,
+        "net_margin": 0.05,
+        "service_parts_gross_margin": 0.5,
+        "revenue_per_employee": 1200000
       },
-      "industry_notes": "Blended motor trade: vehicle sales carry thin margins (2-5% new), but service & parts are far higher (45-55%). High stock + floorplan finance push gearing and inventory days up. Net 1-5% blended; repair-led shops reach 10-20%."
+      "industry_notes": "Blended motor trade: vehicle sales carry thin margins (2-5% new), but service & parts are far higher (45-55%). High stock + floorplan finance push gearing and inventory days up. Net 1-5% blended; repair-led shops reach 10-20%.",
+      "_source": "Dealership/repair benchmarks (MotorLot, ACV Auctions, AutoLeap 2026): new-car GM 2-5%, used higher, service/parts 45-55%; net 1-5% blended, repair-led 10-20%. Indicative."
     },
     "security_services": {
       "display_name": "Security Services",
@@ -1027,7 +1039,9 @@
         "inventory_turnover_days": 0,
         "debtor_days": 50,
         "creditor_days": 25,
-        "asset_turnover": 1.5
+        "asset_turnover": 1.5,
+        "revenue_per_employee": 280000,
+        "guard_utilisation_pct": 0.85
       },
       "cost_ratios": {
         "cogs_pct_revenue": 0.72,
@@ -1044,9 +1058,12 @@
       },
       "top_quartile": {
         "gross_margin": 0.38,
-        "operating_margin": 0.16
+        "operating_margin": 0.16,
+        "net_margin": 0.13,
+        "revenue_per_employee": 320000
       },
-      "industry_notes": "Labour-dominated (wages are 60%+ of revenue); PSIRA-regulated. Net 6-15%. Slow-paying contract clients push debtor days to 45-60. Wage/levy compliance and contract retention are the key risks."
+      "industry_notes": "Labour-dominated (wages are 60%+ of revenue); PSIRA-regulated. Net 6-15%. Slow-paying contract clients push debtor days to 45-60. Wage/levy compliance and contract retention are the key risks.",
+      "_source": "Private-security margins (EasyRoster, BusinessDojo 2026; SA ~9,500 PSIRA firms): GM 20-40%, net 6-15%. Indicative."
     },
     "education": {
       "display_name": "Education & Training",
@@ -1074,7 +1091,9 @@
         "inventory_turnover_days": 5,
         "debtor_days": 30,
         "creditor_days": 20,
-        "asset_turnover": 1.0
+        "asset_turnover": 1.0,
+        "revenue_per_employee": 220000,
+        "enrolment_utilisation": 0.75
       },
       "cost_ratios": {
         "cogs_pct_revenue": 0.55,
@@ -1091,9 +1110,13 @@
       },
       "top_quartile": {
         "gross_margin": 0.55,
-        "operating_margin": 0.22
+        "operating_margin": 0.22,
+        "net_margin": 0.18,
+        "utilisation_rate": 0.85,
+        "revenue_per_employee": 260000
       },
-      "industry_notes": "Fee-based; teaching staff are the main cost. Private schools/training providers net 5-20%. Enrolment/utilisation and fee-collection (debtor days) drive profitability; SETA accreditation can unlock funding."
+      "industry_notes": "Fee-based; teaching staff are the main cost. Private schools/training providers net 5-20%. Enrolment/utilisation and fee-collection (debtor days) drive profitability; SETA accreditation can unlock funding.",
+      "_source": "Private-school/training margins (BusinessDojo, TrainingZone 2026): GM 35-50%, net 5-20%. Indicative."
     },
     "media_creative": {
       "display_name": "Media & Creative",
@@ -1122,7 +1145,9 @@
         "inventory_turnover_days": 0,
         "debtor_days": 50,
         "creditor_days": 30,
-        "asset_turnover": 1.3
+        "asset_turnover": 1.3,
+        "revenue_per_employee": 700000,
+        "utilisation_rate": 0.65
       },
       "cost_ratios": {
         "cogs_pct_revenue": 0.5,
@@ -1139,9 +1164,13 @@
       },
       "top_quartile": {
         "gross_margin": 0.6,
-        "operating_margin": 0.25
+        "operating_margin": 0.25,
+        "net_margin": 0.2,
+        "utilisation_rate": 0.8,
+        "revenue_per_employee": 950000
       },
-      "industry_notes": "Project/retainer services; people are the cost. Net 10-20%. Client payment terms (debtor days 45-60) and staff utilisation are the main profit levers; revenue can be lumpy between projects."
+      "industry_notes": "Project/retainer services; people are the cost. Net 10-20%. Client payment terms (debtor days 45-60) and staff utilisation are the main profit levers; revenue can be lumpy between projects.",
+      "_source": "Agency margins (NetSuite, Resource Guru, iota-finance 2026): GM 40-60%, net 10-20%; billable utilisation is the key lever. Indicative."
     },
     "npo_social": {
       "display_name": "NPO & Social Enterprise",
@@ -1169,7 +1198,9 @@
         "inventory_turnover_days": 0,
         "debtor_days": 60,
         "creditor_days": 30,
-        "asset_turnover": 1.0
+        "asset_turnover": 1.0,
+        "programme_expense_ratio": 0.75,
+        "admin_overhead_pct": 0.15
       },
       "cost_ratios": {
         "cogs_pct_revenue": 0.85,
@@ -1186,9 +1217,12 @@
       },
       "top_quartile": {
         "gross_margin": 0.25,
-        "operating_margin": 0.08
+        "operating_margin": 0.08,
+        "net_margin": 0.05,
+        "programme_expense_ratio": 0.85
       },
-      "industry_notes": "Mission-led, not profit-maximising — read 'surplus', not profit. The key metric is the admin/overhead-to-programme ratio (lower is better), not margin. Funded by grants/donations (debtor days high on grant receivables); many lenders (e.g. Business Partners) exclude NPOs. Treat margin benchmarks as indicative only."
+      "industry_notes": "Mission-led, not profit-maximising — read 'surplus', not profit. The key metric is the admin/overhead-to-programme ratio (lower is better), not margin. Funded by grants/donations (debtor days high on grant receivables); many lenders (e.g. Business Partners) exclude NPOs. Treat margin benchmarks as indicative only.",
+      "_source": "NPO benchmarks: programme-expense ratio target >=75-80% (lower admin overhead is better); read 'surplus' not profit. Indicative."
     }
   },
   "universal_thresholds": {
