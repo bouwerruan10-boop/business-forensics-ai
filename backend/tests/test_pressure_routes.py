@@ -148,3 +148,34 @@ def test_gzip_compression_large_json_not_tiny():
             assert n.headers.get("content-encoding") is None  # client opted out
     finally:
         main.analyses.pop("gztest", None)
+
+
+def test_request_body_size_cap():
+    """Oversized JSON body to a public endpoint is rejected (413) before parsing —
+    closes the unauthenticated huge-body memory-exhaustion vector."""
+    import main
+    from fastapi.testclient import TestClient
+    try:
+        with TestClient(main.app) as c:
+            big = {"income_types": ["employment"], "junk": "A" * (2 * 1024 * 1024 + 1000)}
+            assert c.post("/api/tax/relocation", json=big).status_code == 413
+            assert c.post("/api/tax/relocation", json={"income_types": ["employment"]}).status_code != 413
+    finally:
+        main.limiter.reset()
+
+
+def test_public_tax_endpoint_rate_limited():
+    """The public, unauthenticated /api/tax/relocation is rate-limited (default 30/hour)."""
+    import main
+    from fastapi.testclient import TestClient
+    prev = getattr(main.limiter, "enabled", True)
+    main.limiter.enabled = True   # conftest disables it globally for tests; need it ON here
+    main.limiter.reset()
+    try:
+        with TestClient(main.app) as c:
+            codes = [c.post("/api/tax/relocation", json={}).status_code for _ in range(34)]
+        assert 429 in codes, "expected a 429 once the per-IP limit is exceeded"
+        assert codes.count(200) <= 31
+    finally:
+        main.limiter.reset()
+        main.limiter.enabled = prev

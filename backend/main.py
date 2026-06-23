@@ -48,6 +48,7 @@ RATE_LIMIT = os.getenv("RATE_LIMIT", "3/hour")
 # Ask Imara is an open LLM endpoint (cost/abuse vector) -> its own per-IP limit.
 ASK_RATE_LIMIT = os.getenv("ASK_RATE_LIMIT", "20/hour")
 LOGIN_RATE_LIMIT = os.getenv("LOGIN_RATE_LIMIT", "5/minute")  # throttle password guessing
+TAX_RATE_LIMIT = os.getenv("TAX_RATE_LIMIT", "30/hour")  # public unauth compute endpoint
 
 
 def client_ip(request: Request) -> str:
@@ -368,6 +369,25 @@ def require_owned(analysis_id: str, principal: Principal) -> None:
 
 
 @app.middleware("http")
+async def _limit_body_size(request: Request, call_next):
+    """Reject oversized request bodies early (Content-Length check) — a cheap guard against
+    unauthenticated memory-exhaustion via huge JSON POSTs. The multipart upload endpoint keeps
+    its own (larger) per-file/total caps; every other endpoint is held to MAX_JSON_BODY_BYTES."""
+    if request.method in ("POST", "PUT", "PATCH"):
+        cl = request.headers.get("content-length")
+        if cl:
+            try:
+                n = int(cl)
+            except ValueError:
+                n = 0
+            limit = MAX_UPLOAD_TOTAL_BYTES if request.url.path == "/api/analyze" else MAX_JSON_BODY_BYTES
+            if n > limit:
+                return SafeJSONResponse({"detail": "Request body too large."}, status_code=413,
+                                       headers=_cors_echo_headers(request))
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def _operator_gate(request: Request, call_next):
     """Gate the report/analyze/status surface behind the operator token when
     OPERATOR_PASSWORD is set. Public share links, the demo, admin (own key), /v1 and
@@ -415,6 +435,9 @@ MAX_UPLOAD_FILES = 40   # generous for the 6 upload zones; bounds memory/time on
 MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024     # per-file cap (aligns with the parser's content cap)
 MAX_UPLOAD_TOTAL_BYTES = 150 * 1024 * 1024   # aggregate cap across all files in one request
 ANALYSIS_TIMEOUT_SECONDS = int(os.getenv("ANALYSIS_TIMEOUT_SECONDS", "1800"))  # wall-clock cap on a single run
+# Max request body for NON-upload (JSON) endpoints — stops an unauthenticated huge-body DoS
+# (e.g. a 50 MB POST to the public /api/tax/relocation). Uploads use the larger upload caps.
+MAX_JSON_BODY_BYTES = int(os.getenv("MAX_JSON_BODY_BYTES", str(2 * 1024 * 1024)))  # 2 MB
 
 # Accepted upload types — Imara ingests financial documents only. An allowlist (not a
 # denylist) is the safer default: anything not a known document type is rejected up front.
@@ -1764,6 +1787,7 @@ def demo_report():
 
 
 @app.post("/api/tax/relocation")
+@limiter.limit(TAX_RATE_LIMIT)
 async def tax_relocation(request: Request):
     """'Tax Me If You Can' first-pass: a deterministic, decision-support cross-border
     relocation/tax-residency landscape (origin exit position + destination regime cards +
