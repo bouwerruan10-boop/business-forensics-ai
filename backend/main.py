@@ -1621,6 +1621,20 @@ def demo_report():
     return DEMO_REPORT
 
 
+@app.post("/api/tax/relocation")
+async def tax_relocation(request: Request):
+    """'Tax Me If You Can' first-pass: a deterministic, decision-support cross-border
+    relocation/tax-residency landscape (origin exit position + destination regime cards +
+    legal guardrails). Public, no client data; NOT advice — factual landscape + a
+    licensed-advisor hand-off (see services/relocation_tax.py for the invariants)."""
+    from services.relocation_tax import relocation_first_pass
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    return relocation_first_pass(body if isinstance(body, dict) else {})
+
+
 @app.get("/api/demo/pdf")
 def demo_pdf(audience: str = "owner"):
     """Generate a PDF from the demo report."""
