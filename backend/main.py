@@ -1217,6 +1217,13 @@ def admin_corpus_currency(_admin: None = Depends(verify_admin_key)):
     return corpus_status()
 
 
+@app.get("/api/admin/corpus-refresh")
+def admin_corpus_refresh(_admin: None = Depends(verify_admin_key)):
+    """Audited changelog of dated-corpus refreshes (what changed, from->to, sourced)."""
+    from services.corpus_refresh import corpus_refresh_log
+    return corpus_refresh_log()
+
+
 @app.get("/api/admin/calibration")
 def admin_calibration(min_n: int = 50, _admin: None = Depends(verify_admin_key)):
     """Platt calibration of the Imara Score -> probability-of-distress from recorded

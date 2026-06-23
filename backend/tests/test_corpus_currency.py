@@ -20,15 +20,33 @@ def test_corpus_status_structure_and_json_safe():
     assert isinstance(st["any_stale"], bool) and isinstance(st["stale_count"], int)
 
 
-def test_flags_tax_corpus_when_year_behind():
-    # In June 2026 the SA tax year is 2026/27, but the corpus is labelled 2025/26 -> stale.
+def test_tax_corpus_staleness_tracks_label_vs_current_year():
+    """Stale is flagged exactly when the corpus's labelled tax year differs from the current
+    SA tax year - robust to whatever year the corpus currently holds (so it survives refreshes)."""
+    import re
+    from services import relocation_tax
+    from services.corpus_currency import current_sa_tax_year
+    label = re.search(r"20\d\d/\d\d", relocation_tax.TAX_AS_OF).group(0)
+    for d in (date(2026, 6, 24), date(2026, 1, 15), date(2027, 4, 1)):
+        st = corpus_status(d)
+        tax = next(c for c in st["corpora"] if "tax rates" in c["corpus"])
+        assert tax["stale"] == (label != current_sa_tax_year(d))
+
+
+def test_refresh_log_present_and_sourced():
+    import json
+    from services.corpus_refresh import corpus_refresh_log
+    log = corpus_refresh_log()
+    assert log["count"] >= 1
+    r0 = log["refreshes"][0]
+    assert r0["to_tax_year"] == "2026/27" and r0["applied"] is True and r0["sources"]
+    assert any(c["field"] == "primary_rebate" and c["to"] == 17820 for c in r0["changes"])
+    json.dumps(log)
+
+
+def test_tax_corpus_now_current_after_refresh():
+    from datetime import date
+    from services.corpus_currency import corpus_status
     st = corpus_status(date(2026, 6, 24))
     tax = next(c for c in st["corpora"] if "tax rates" in c["corpus"])
-    assert tax["stale"] is True and "2026/27" in tax["note"]
-
-
-def test_not_stale_inside_the_tax_year():
-    # Within the 2025/26 tax year (e.g. Jan 2026) the 2025/26 corpus is current.
-    st = corpus_status(date(2026, 1, 15))
-    tax = next(c for c in st["corpora"] if "tax rates" in c["corpus"])
-    assert tax["stale"] is False
+    assert tax["stale"] is False   # refreshed to 2026/27

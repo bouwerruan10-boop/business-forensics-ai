@@ -22,21 +22,21 @@ INCOME_TYPES = ("employment", "business", "dividends", "interest", "rental", "ca
 
 # ── Indicative tax quantification (SA 2025/26; sourced) ────────────────────────
 # INDICATIVE ONLY — headline/effective rates, NOT a computation of actual liability.
-TAX_AS_OF = "SA 2025/26 tax year"
-SA_EFFICIENCY_AS_OF = "SA 2025/26"
-SA_BRACKETS = [(237100, 0.18), (370500, 0.26), (512800, 0.31), (673000, 0.36),
-               (857900, 0.39), (1817000, 0.41), (float("inf"), 0.45)]
-SA_PRIMARY_REBATE = 17235     # 2025/26 primary rebate
+TAX_AS_OF = "SA 2026/27 tax year"
+SA_EFFICIENCY_AS_OF = "SA 2026/27"
+SA_BRACKETS = [(245100, 0.18), (383100, 0.26), (530200, 0.31), (695800, 0.36),
+               (887000, 0.39), (1878600, 0.41), (float("inf"), 0.45)]  # 2026/27
+SA_PRIMARY_REBATE = 17820     # 2026/27 primary rebate
 SA_DIV_WHT = 0.20             # dividends withholding (final)
 SA_CGT_EFFECTIVE = 0.18       # individual max effective CGT (40% inclusion x 45%)
-SA_SECONDARY_REBATE = 9444    # additional age-65+ rebate (2025/26, unchanged from 2024/25)
-SA_TERTIARY_REBATE = 3145     # additional age-75+ rebate
+SA_SECONDARY_REBATE = 9765    # additional age-65+ rebate (2026/27)
+SA_TERTIARY_REBATE = 3249     # additional age-75+ rebate (2026/27)
 SA_INTEREST_EXEMPT_U65 = 23800   # annual local-interest exemption, under 65
 SA_INTEREST_EXEMPT_65 = 34500    # annual local-interest exemption, 65+
-SA_CGT_ANNUAL_EXCL = 40000       # annual capital-gain exclusion
-SA_RA_CAP = 350000               # s11F retirement-contribution deduction cap
-MEDICAL_CREDIT_MAIN = 364        # s6A monthly credit, member + first dependant
-MEDICAL_CREDIT_ADDL = 246        # s6A monthly credit, each further dependant
+SA_CGT_ANNUAL_EXCL = 50000       # annual capital-gain exclusion (2026/27)
+SA_RA_CAP = 430000               # s11F retirement-contribution deduction cap (2026/27)
+MEDICAL_CREDIT_MAIN = 376        # s6A monthly credit, member + first dependant (2026/27)
+MEDICAL_CREDIT_ADDL = 254        # s6A monthly credit, each further dependant (2026/27)
 
 
 def _num(v):
@@ -317,7 +317,7 @@ COST_CONSIDERATIONS = [
 _LEVERS = [
     {"lever": "Retirement-fund contributions", "section": "s11F", "applies_to": {"employment", "business", "rental", "interest", "pension"},
      "what": "Contributions to a pension / provident / retirement-annuity fund are DEDUCTIBLE from taxable income - the single biggest legal lever for most earners; the fund's growth is tax-free.",
-     "indicative": "Deduct up to 27.5% of the greater of remuneration or taxable income, capped at R350,000/yr (R430,000 from 2027)."},
+     "indicative": "Deduct up to 27.5% of the greater of remuneration or taxable income, capped at R430,000/yr (2026/27)."},
     {"lever": "Tax-free savings account (TFSA)", "section": "s12T", "applies_to": "all",
      "what": "All interest, dividends, capital growth and withdrawals inside a TFSA are completely tax-free.",
      "indicative": "R36,000/yr, R500,000 lifetime."},
@@ -328,14 +328,14 @@ _LEVERS = [
      "what": "A slice of local interest income is tax-free every year.",
      "indicative": "R23,800/yr (under 65) or R34,500/yr (65+)."},
     {"lever": "Capital-gains exclusions + timing", "section": "8th Schedule", "applies_to": {"capital_gains"},
-     "what": "Only 40% of a net capital gain is taxed (max ~18% effective); the first R40,000/yr is excluded and the first R2,000,000 of gain on your PRIMARY RESIDENCE is excluded. Spreading disposals across tax years uses multiple annual exclusions.",
-     "indicative": "R40,000/yr annual exclusion (R50k from 2027) + R2,000,000 primary-residence exclusion (R3m from 2027); 40% inclusion."},
+     "what": "Only 40% of a net capital gain is taxed (max ~18% effective); the first R50,000/yr is excluded and the first R3,000,000 of gain on your PRIMARY RESIDENCE is excluded. Spreading disposals across tax years uses multiple annual exclusions.",
+     "indicative": "R50,000/yr annual exclusion + R3,000,000 primary-residence exclusion (2026/27); 40% inclusion."},
     {"lever": "Local dividends are already lightly taxed", "section": "Dividends Withholding Tax", "applies_to": {"dividends"},
      "what": "Local dividends bear a final 20% withholding tax and NO further income tax - already efficient. (Artificially converting salary into dividends to dodge PAYE invites GAAR - keep it genuine.)",
      "indicative": "20% final; no additional personal income tax."},
     {"lever": "Small Business Corporation rates", "section": "s12E", "applies_to": {"business"},
      "what": "A qualifying SBC pays REDUCED graduated rates instead of the flat 27% company rate, plus accelerated asset write-offs.",
-     "indicative": "0% up to R95,750, then 7% / 21% / 27%; 100% (manufacturing) or 50:30:20 asset write-offs."},
+     "indicative": "0% up to R99,000, then 7% / 21% / 27%; 100% (manufacturing) or 50:30:20 asset write-offs."},
     {"lever": "Business incentives (learnerships, R&D, renewables)", "section": "s12H / s11D / s12BA", "applies_to": {"business"},
      "what": "Registered learnership allowances (s12H), approved R&D (150%, s11D) and renewable-energy assets (s12BA) give extra deductions for genuine qualifying activity. (Imara's tax_optimizer models these in the business report.)",
      "indicative": "Per-learner allowances; 150% R&D deduction; enhanced renewable-energy write-off."},
@@ -344,7 +344,7 @@ _LEVERS = [
      "indicative": "Up to 10% of taxable income, with a valid s18A receipt."},
     {"lever": "Medical tax credits", "section": "s6A / s6B", "applies_to": "all",
      "what": "Fixed monthly credits for medical-scheme membership, plus an additional credit for high out-of-pocket costs, reduce tax directly.",
-     "indicative": "~R364/month main member + first dependant, ~R246 each further (2025/26)."},
+     "indicative": "~R376/month member + first dependant, ~R254 each further (2026/27)."},
     {"lever": "Employment Tax Incentive (ETI)", "section": "ETI Act 26/2013", "applies_to": {"business"},
      "what": "An employer hiring qualifying young workers (18-29) or staff in a special economic zone reduces the PAYE it pays to SARS - a direct cash subsidy for GENUINE employment, claimed via EMP201.",
      "indicative": "Up to R2,500/month per qualifying employee earning < R7,500/month (from 1 Apr 2025); full for the first 12 months, half for months 13-24."},
