@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import AdminDashboard from './components/AdminDashboard'
 import SharedReport from './components/SharedReport'
 import TaxPlanner from './components/TaxPlanner'
+import NotFound from './components/NotFound'
 import Login from './components/Login'
 import Toast from './components/Toast'
 import { uploadFiles, pollStatus, getReport, getHealth, getToken } from './api/client'
@@ -22,6 +23,7 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [sharedId, setSharedId] = useState(null)
   const [sharedToken, setSharedToken] = useState(null)
+  const [notFound, setNotFound] = useState(false)
   const [authRequired, setAuthRequired] = useState(false)
   const [authed, setAuthed] = useState(() => !!getToken())
   const [authChecked, setAuthChecked] = useState(false)
@@ -33,13 +35,15 @@ export default function App() {
       const match = hash.match(/^#\/report\/([a-f0-9-]{36})$/)
       const tokenMatch = hash.match(/^#\/shared\/([A-Za-z0-9_-]+)$/)
       if (match) {
-        setSharedId(match[1]); setSharedToken(null)
+        setSharedId(match[1]); setSharedToken(null); setNotFound(false)
       } else if (tokenMatch) {
-        setSharedToken(tokenMatch[1]); setSharedId(null)
+        setSharedToken(tokenMatch[1]); setSharedId(null); setNotFound(false)
       } else if (hash === '#/tax') {
-        setSharedId(null); setSharedToken(null); setPhase('tax')
+        setSharedId(null); setSharedToken(null); setNotFound(false); setPhase('tax')
+      } else if (hash && hash !== '#/' && hash !== '#') {
+        setSharedId(null); setSharedToken(null); setNotFound(true)   // unknown route -> 404
       } else {
-        setSharedId(null); setSharedToken(null)
+        setSharedId(null); setSharedToken(null); setNotFound(false)
       }
     }
     checkHash()
@@ -164,6 +168,11 @@ export default function App() {
     } catch (e) {
       showToast('Could not load report: ' + e.message, 'error')
     }
+  }
+
+  // Custom 404 for unrecognised routes (reveals nothing; shown regardless of auth).
+  if (notFound) {
+    return <NotFound onHome={() => { window.location.hash = ''; setNotFound(false); resetAll() }} />
   }
 
   // Operator login gate. Public #/shared/{token} links are exempt (clients never sign in).

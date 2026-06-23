@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import InfoTip from './InfoTip'
+import Skeleton from './Skeleton'
 
 const FIT = {
   good:       { c: 'text-emerald-400', b: 'bg-emerald-500/10 border-emerald-500/25', label: 'Good fit' },
@@ -17,16 +18,22 @@ const STATUS = {
 export default function FunderGates({ analysisId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [tries, setTries] = useState(0)
 
   useEffect(() => {
     let on = true
+    setError(null); setData(null)
     import('../api/client').then(({ getFunderGates }) => getFunderGates(analysisId)
       .then(d => { if (on) setData(d) }).catch(e => { if (on) setError(e.message) }))
     return () => { on = false }
-  }, [analysisId])
+  }, [analysisId, tries])
 
-  if (error) return <div className="text-slate-600 text-sm">Funder gates unavailable: {error}</div>
-  if (!data) return <div className="text-slate-500 text-sm">Checking named-funder eligibility…</div>
+  if (error) return (
+    <div className="text-slate-500 text-sm">Funder gates unavailable: {error}{" "}
+      <button type="button" onClick={() => setTries((t) => t + 1)} className="text-gold hover:underline">Try again</button>
+    </div>
+  )
+  if (!data) return <Skeleton lines={4} />
   if (!data.available) return <div className="text-slate-500 text-sm">{data.reason || 'Not computed for this analysis.'}</div>
 
   return (

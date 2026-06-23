@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import InfoTip from './InfoTip'
+import Skeleton from './Skeleton'
 
 const LEVEL = {
   high:     { c: 'text-rose-400',    b: 'bg-rose-500/10 border-rose-500/25',    label: 'High' },
@@ -16,16 +17,22 @@ const SEV = {
 export default function OwnerRisk({ analysisId }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [tries, setTries] = useState(0)
 
   useEffect(() => {
     let on = true
+    setError(null); setData(null)
     import('../api/client').then(({ getOwnerRisk }) => getOwnerRisk(analysisId)
       .then(d => { if (on) setData(d) }).catch(e => { if (on) setError(e.message) }))
     return () => { on = false }
-  }, [analysisId])
+  }, [analysisId, tries])
 
-  if (error) return <div className="text-slate-600 text-sm">Owner-risk unavailable: {error}</div>
-  if (!data) return <div className="text-slate-500 text-sm">Assessing owner-level exposure…</div>
+  if (error) return (
+    <div className="text-slate-500 text-sm">Owner-risk unavailable: {error}{" "}
+      <button type="button" onClick={() => setTries((t) => t + 1)} className="text-gold hover:underline">Try again</button>
+    </div>
+  )
+  if (!data) return <Skeleton lines={4} />
   if (!data.available) return <div className="text-slate-500 text-sm">{data.reason || 'Not computed for this analysis.'}</div>
 
   const lvl = LEVEL[data.owner_risk_level] || LEVEL.moderate
