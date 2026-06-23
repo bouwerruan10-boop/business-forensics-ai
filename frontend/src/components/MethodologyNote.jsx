@@ -34,6 +34,9 @@ export default function MethodologyNote({ report }) {
   const confirmed = Number(f.confirmed || 0)
   const conflicts = Number(f.conflicts || 0)
   const conflictTitles = Array.isArray(f.conflict_titles) ? f.conflict_titles : []
+  const benchChecked = Number(f.benchmark_checked || 0)
+  const benchConflicts = Number(f.benchmark_conflicts || 0)
+  const benchConflictTitles = Array.isArray(f.benchmark_conflict_titles) ? f.benchmark_conflict_titles : []
   const completeness = typeof report.imara_completeness === 'number' ? report.imara_completeness : null
   const confidence = report.imara_confidence || null
   const runtime = report.total_runtime_seconds
@@ -61,6 +64,7 @@ export default function MethodologyNote({ report }) {
         {checked > 0 && <Stat Icon={ShieldCheck} label="Figures checked" value={`${checked}`} tone="slate" />}
         {checked > 0 && <Stat Icon={ShieldCheck} label="Confirmed" value={`${confirmed}`} tone="emerald" />}
         {checked > 0 && <Stat Icon={AlertTriangle} label="Conflicts" value={`${conflicts}`} tone={conflicts > 0 ? 'amber' : 'emerald'} />}
+        {benchChecked > 0 && <Stat Icon={AlertTriangle} label="Benchmarks checked" value={`${benchChecked - benchConflicts}/${benchChecked} ok`} tone={benchConflicts > 0 ? 'amber' : 'emerald'} />}
         {runtimeLabel && <Stat Icon={Clock} label="Analysis time" value={runtimeLabel} tone="slate" />}
         {aiCost != null && <Stat Icon={Coins} label="AI cost (est.)" value={`$${aiCost.toFixed(2)}${usage.calls ? ` \u00b7 ${usage.calls} calls` : ''}`} tone="slate" />}
       </div>
@@ -72,6 +76,17 @@ export default function MethodologyNote({ report }) {
           </div>
           <ul className="text-slate-300 text-xs space-y-0.5 list-disc list-inside">
             {conflictTitles.slice(0, 6).map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {benchConflicts > 0 && benchConflictTitles.length > 0 && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 mb-4">
+          <div className="text-amber-300 text-xs font-medium mb-1 flex items-center gap-1.5">
+            <AlertTriangle size={13} aria-hidden="true" /> Findings citing a sector benchmark that differs from the engine
+          </div>
+          <ul className="text-slate-300 text-xs space-y-0.5 list-disc list-inside">
+            {benchConflictTitles.slice(0, 6).map((t, i) => <li key={i}>{t}</li>)}
           </ul>
         </div>
       )}

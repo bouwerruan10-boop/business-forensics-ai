@@ -54,6 +54,33 @@ def _first_number_after(text_low: str, start: int, window: int = 36):
         return None
 
 
+# Words that introduce a SECTOR/INDUSTRY benchmark figure in a finding.
+_BENCH_ANCHORS = ("benchmark", "sector", "industry", "norm", "median",
+                  "average", "peer", "versus", " vs ", "against")
+
+
+def _benchmark_claim(text_low: str, firm_value):
+    """Extract a cited sector-benchmark number from a finding, if present.
+
+    Anchors on benchmark words and takes the first nearby number that isn't just
+    the firm's own value (so 'gross margin 18% vs sector 33%' yields 33, not 18)."""
+    cands = []
+    for kw in _BENCH_ANCHORS:
+        start = 0
+        while True:
+            i = text_low.find(kw, start)
+            if i == -1:
+                break
+            n = _first_number_after(text_low, i + len(kw), window=24)
+            if n is not None:
+                cands.append(n)
+            start = i + len(kw)
+    for n in cands:
+        if firm_value is None or abs(n - firm_value) > 1e-9:
+            return n
+    return cands[0] if cands else None
+
+
 def _conflicts(claimed: float, computed: float, unit: str) -> bool:
     """Tolerance per metric type. True if the two values materially disagree."""
     if computed is None or claimed is None:
@@ -73,11 +100,13 @@ def verify_findings(findings, ratios: dict) -> dict:
     ratios = ratios or {}
     checked = confirmed = conflict = 0
     conflict_titles = []
+    bench_checked = bench_confirmed = bench_conflict = 0
+    bench_conflict_titles = []
 
     for f in findings:
-        text = " ".join([getattr(f, "title", "") or "",
-                         getattr(f, "detail", "") or "",
-                         getattr(f, "benchmark_reference", "") or ""])
+        text = " ".join([str(getattr(f, "title", "") or ""),
+                         str(getattr(f, "detail", "") or ""),
+                         str(getattr(f, "benchmark_reference", "") or "")])
         low = text.lower()
         best = None  # (metric_key, unit, claimed, computed)
         for phrase, key, unit in _METRICS:
@@ -112,11 +141,35 @@ def verify_findings(findings, ratios: dict) -> dict:
             f.verification = "confirmed"
             f.verification_note = "Matches computed {} ({}{}).".format(label, _fmt(computed), u)
 
+        # Benchmark cross-check: does the finding's cited SECTOR benchmark match
+        # the engine's resolved benchmark for the same metric?
+        eng_bench = ratios[key].get("benchmark")
+        bclaim = _benchmark_claim(low, claimed)
+        if eng_bench is not None and bclaim is not None:
+            bench_checked += 1
+            if _conflicts(bclaim, eng_bench, unit):
+                bench_conflict += 1
+                f.benchmark_verification = "conflict"
+                f.benchmark_verification_note = (
+                    "Cited {} benchmark ~{}{} differs from the engine's sector benchmark "
+                    "({}{}).".format(label, _fmt(bclaim), u, _fmt(eng_bench), u))
+                bench_conflict_titles.append(getattr(f, "title", ""))
+            else:
+                bench_confirmed += 1
+                f.benchmark_verification = "confirmed"
+                f.benchmark_verification_note = (
+                    "Cited benchmark matches the engine's {} benchmark ({}{}).".format(
+                        label, _fmt(eng_bench), u))
+
     return {
         "checked": checked,
         "confirmed": confirmed,
         "conflicts": conflict,
         "conflict_titles": conflict_titles[:10],
+        "benchmark_checked": bench_checked,
+        "benchmark_confirmed": bench_confirmed,
+        "benchmark_conflicts": bench_conflict,
+        "benchmark_conflict_titles": bench_conflict_titles[:10],
     }
 
 
