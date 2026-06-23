@@ -471,6 +471,19 @@ def record_outcome(analysis_id, outcome_type, label=None, value=None, note="", s
     return True
 
 
+def list_outcomes(limit=100):
+    """Recent recorded outcomes (newest first) - the raw calibration material, for the admin UI."""
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT id, analysis_id, outcome_type, label, value, note, source, recorded_at "
+                "FROM outcomes ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
+        finally:
+            conn.close()
+    return [dict(r) for r in rows]
+
+
 def outcomes_with_scores():
     """Join binary-labelled outcomes to their analysis's stored Imara Score —
     [(analysis_id, imara_score, label)] — the input to discrimination/calibration."""

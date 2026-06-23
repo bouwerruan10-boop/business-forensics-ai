@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getToken } from '../api/client'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const KEY_STORE = 'imara_admin_key'
@@ -66,6 +67,102 @@ function FleetPanel({ fleet }) {
   )
 }
 
+function ScoreValidationPanel({ headers, analyses }) {
+  const [val, setVal] = useState(null)
+  const [cal, setCal] = useState(null)
+  const [outcomes, setOutcomes] = useState([])
+  const [form, setForm] = useState({ analysis_id: '', outcome_type: 'funded', label: '', value: '', note: '', source: '' })
+  const [msg, setMsg] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const reload = async () => {
+    try {
+      const [v, c, o] = await Promise.all([
+        fetch(`${API_BASE}/api/admin/validation`, { headers: headers() }).then(r => r.ok ? r.json() : null),
+        fetch(`${API_BASE}/api/admin/calibration`, { headers: headers() }).then(r => r.ok ? r.json() : null),
+        fetch(`${API_BASE}/api/admin/outcomes?limit=100`, { headers: headers() }).then(r => r.ok ? r.json() : null),
+      ])
+      setVal(v); setCal(c); setOutcomes((o && o.outcomes) || [])
+    } catch { /* best-effort */ }
+  }
+  useEffect(() => { reload() }, [])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!form.analysis_id) { setMsg('Pick an analysis first.'); return }
+    setBusy(true); setMsg(null)
+    try {
+      const body = { analysis_id: form.analysis_id, outcome_type: form.outcome_type, note: form.note, source: form.source }
+      if (form.label !== '') body.label = Number(form.label)
+      if (form.value !== '') body.value = Number(form.value)
+      const r = await fetch(`${API_BASE}/api/admin/outcomes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...headers() }, body: JSON.stringify(body),
+      })
+      if (!r.ok) throw new Error(((await r.json().catch(() => ({}))).detail) || 'Record failed')
+      setMsg('Recorded ✓'); setForm({ ...form, label: '', value: '', note: '', source: '' })
+      reload()
+    } catch (err) { setMsg(err.message) } finally { setBusy(false) }
+  }
+
+  const real = (val && val.real_outcomes) || {}
+  const proxy = (val && val.zscore_proxy) || {}
+  const calm = (cal && cal.calibration) || null
+
+  return (
+    <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-5 mb-6">
+      <h3 className="text-white font-bold text-base mb-1">Score validation <span className="text-slate-500 font-normal text-sm">· calibration evidence ({outcomes.length} outcomes recorded)</span></h3>
+      <p className="text-slate-400 text-xs mb-3">Record real funding / repayment outcomes to calibrate the Imara Score. Discrimination on REAL outcomes is the goal; the Z&#39;&#39; proxy is interim convergent-validity evidence until the pilot accrues data.</p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+        {real.available ? (
+          <>
+            <Metric label="Real-outcome AUC" value={real.auc ?? '—'} tone={real.auc >= 0.7 ? 'emerald' : 'amber'} />
+            <Metric label="Gini" value={real.gini ?? '—'} />
+            <Metric label="KS" value={real.ks ?? '—'} />
+            <Metric label="Labelled n" value={`${real.n} (${real.n_bad} bad)`} />
+          </>
+        ) : (
+          <div className="col-span-2 sm:col-span-4 text-amber-300 text-xs bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">{real.reason || 'Not enough labelled outcomes yet — record some below.'}</div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <Metric label="Z'' proxy AUC" value={proxy.auc ?? '—'} tone={proxy.auc >= 0.7 ? 'emerald' : 'slate'} />
+        <Metric label="Proxy n" value={proxy.n ?? proxy.analyses_with_zscore ?? '—'} />
+        <Metric label="PD calibration" value={calm ? `slope ${calm.calibration_slope}` : (cal && cal.calibrated === false ? 'need ≥ 50' : '—')} />
+        <Metric label="Outcomes recorded" value={outcomes.length} />
+      </div>
+
+      <form onSubmit={submit} className="grid sm:grid-cols-7 gap-2 items-end bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+        <label className="text-[11px] text-slate-400 sm:col-span-2">Analysis
+          <select value={form.analysis_id} onChange={e => setForm({ ...form, analysis_id: e.target.value })} className="mt-1 w-full bg-navy border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white">
+            <option value="">Select…</option>
+            {analyses.filter(a => a.status === 'complete').map(a => <option key={a.id} value={a.id}>{a.company_name || a.id.slice(0, 8)}</option>)}
+          </select>
+        </label>
+        <label className="text-[11px] text-slate-400">Outcome
+          <select value={form.outcome_type} onChange={e => setForm({ ...form, outcome_type: e.target.value })} className="mt-1 w-full bg-navy border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white">
+            {['funded', 'declined', 'repaid', 'default', 'external_score'].map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label className="text-[11px] text-slate-400">Label
+          <select value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} className="mt-1 w-full bg-navy border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white">
+            <option value="">—</option><option value="0">0 good</option><option value="1">1 bad/default</option>
+          </select>
+        </label>
+        <label className="text-[11px] text-slate-400">Value
+          <input type="number" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} placeholder="bureau score" className="mt-1 w-full bg-navy border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+        </label>
+        <label className="text-[11px] text-slate-400">Source
+          <input type="text" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} placeholder="e.g. bank" className="mt-1 w-full bg-navy border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white" />
+        </label>
+        <button type="submit" disabled={busy} className="bg-gold text-navy font-bold text-sm px-3 py-1.5 rounded-lg hover:bg-amber-400 disabled:opacity-50 transition-colors">{busy ? '…' : 'Record'}</button>
+      </form>
+      {msg && <div className="text-xs text-slate-300 mt-2">{msg}</div>}
+    </div>
+  )
+}
+
 export default function AdminDashboard({ onViewReport }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -74,11 +171,19 @@ export default function AdminDashboard({ onViewReport }) {
   const [keyInput, setKeyInput] = useState('')
   const [fleet, setFleet] = useState(null)
 
+  const adminHeaders = () => {
+    const h = {}
+    const k = sessionStorage.getItem(KEY_STORE)
+    if (k) h['X-Admin-Key'] = k
+    const t = getToken()              // operator bearer token (admin is behind the operator gate)
+    if (t) h['Authorization'] = 'Bearer ' + t
+    return h
+  }
+
   const load = async () => {
     setLoading(true); setError(null)
     try {
-      const adminKey = sessionStorage.getItem(KEY_STORE) || ''
-      const headers = adminKey ? { 'X-Admin-Key': adminKey } : {}
+      const headers = adminHeaders()
       const res = await fetch(`${API_BASE}/api/admin/analyses?limit=50`, { headers })
       if (res.status === 401) {
         setNeedsKey(true)
@@ -139,6 +244,7 @@ export default function AdminDashboard({ onViewReport }) {
   return (
     <div>
       <FleetPanel fleet={fleet} />
+      {!needsKey && <ScoreValidationPanel headers={adminHeaders} analyses={analyses} />}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-white font-bold text-lg">Analysis History</h2>

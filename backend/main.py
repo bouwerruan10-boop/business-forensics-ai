@@ -1193,6 +1193,13 @@ def admin_record_outcome(body: OutcomeIn, _admin: None = Depends(verify_admin_ke
     return {"recorded": True, "analysis_id": body.analysis_id, "outcome_type": body.outcome_type}
 
 
+@app.get("/api/admin/outcomes")
+def admin_list_outcomes(limit: int = 100, _admin: None = Depends(verify_admin_key)):
+    """List recorded real-world outcomes (the raw material for Score calibration)."""
+    from services.database import list_outcomes
+    return {"outcomes": list_outcomes(limit)}
+
+
 @app.get("/api/admin/validation")
 def admin_validation(limit: int = 200, _admin: None = Depends(verify_admin_key)):
     """Model validation evidence: discrimination (AUC/Gini/KS + reliability) on REAL
