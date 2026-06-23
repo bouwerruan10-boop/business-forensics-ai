@@ -17,6 +17,47 @@ AS_OF = "2026-06"  # corpus date — rules change yearly; re-verify before relyi
 
 INCOME_TYPES = ("employment", "business", "dividends", "interest", "rental", "capital_gains", "pension")
 
+# ── Indicative tax quantification (SA 2025/26; sourced) ────────────────────────
+# INDICATIVE ONLY — headline/effective rates, NOT a computation of actual liability.
+TAX_AS_OF = "SA 2025/26 tax year"
+SA_BRACKETS = [(237100, 0.18), (370500, 0.26), (512800, 0.31), (673000, 0.36),
+               (857900, 0.39), (1817000, 0.41), (float("inf"), 0.45)]
+SA_PRIMARY_REBATE = 17235     # 2025/26 primary rebate
+SA_DIV_WHT = 0.20             # dividends withholding (final)
+SA_CGT_EFFECTIVE = 0.18       # individual max effective CGT (40% inclusion x 45%)
+
+
+def _num(v):
+    """Coerce arbitrary input to a non-negative float; junk -> 0.0."""
+    try:
+        f = float(v)
+        return f if f > 0 else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _sa_income_tax(taxable):
+    """SA progressive PIT on ordinary income (2025/26 brackets, less primary rebate)."""
+    taxable = _num(taxable)
+    tax, lower = 0.0, 0.0
+    for upper, rate in SA_BRACKETS:
+        if taxable <= lower:
+            break
+        tax += (min(taxable, upper) - lower) * rate
+        lower = upper
+    return max(0.0, tax - SA_PRIMARY_REBATE)
+
+
+def _sa_current_tax(income):
+    """Indicative current SA personal tax on an income dict (type -> amount)."""
+    ordinary = sum(_num(income.get(k)) for k in ("employment", "business", "interest", "rental", "pension"))
+    return _sa_income_tax(ordinary) + _num(income.get("dividends")) * SA_DIV_WHT + _num(income.get("capital_gains")) * SA_CGT_EFFECTIVE
+
+
+def _dest_tax(income, rates):
+    """Indicative destination personal tax = sum(amount x per-type effective rate)."""
+    return sum(_num(income.get(k)) * rates.get(k, 0.0) for k in INCOME_TYPES)
+
 # ── Origin: South Africa — cessation of tax residence ──────────────────────────
 SA_EXIT = {
     "jurisdiction": "South Africa",
@@ -53,6 +94,7 @@ DESTINATIONS = {
             "pension": "0% personal tax.",
         },
         "gotchas": ["Real substance required for a TRC (a mailbox won't pass).", "9% corporate tax applies to active UAE business profit.", "Your HOME country's exit/CFC rules still apply on the way out."],
+        "effective_rates": {"employment": 0.0, "business": 0.0, "dividends": 0.0, "interest": 0.0, "rental": 0.0, "capital_gains": 0.0, "pension": 0.0},
         "sources": ["PwC Tax Summaries (UAE)", "Chambers Corporate Tax 2025 (UAE)"],
     },
     "CY": {
@@ -69,6 +111,7 @@ DESTINATIONS = {
             "pension": "foreign pensions: choose 5% flat above a small exemption, or the normal scale.",
         },
         "gotchas": ["The big win is for PASSIVE income (dividends/interest); salaries still hit the PIT scale.", "Non-dom lasts 17 years (extendable from 2026 at €250k per 5-year block).", "EU member — DAC6 applies to any reportable arrangement."],
+        "effective_rates": {"employment": 0.20, "business": 0.125, "dividends": 0.0, "interest": 0.0, "rental": 0.0, "capital_gains": 0.0, "pension": 0.05},
         "sources": ["Cyprus Tax Life 2026", "Mondaq (60-day rule)", "Harneys"],
     },
     "PT": {
@@ -85,6 +128,7 @@ DESTINATIONS = {
             "pension": "EXCLUDED — foreign pensions are NOT covered by IFICI (a key change from old NHR).",
         },
         "gotchas": ["Eligibility is NARROW: highly-qualified innovation/R&D/science/tech/health roles, a degree (EQF level 6+), and no PT residence in the prior 5 years.", "Pensions are excluded entirely.", "10-year validity. EU member — DAC6 applies."],
+        "effective_rates": {"employment": 0.20, "business": 0.20, "dividends": 0.0, "interest": 0.0, "rental": 0.0, "capital_gains": 0.0, "pension": 0.35},
         "sources": ["Global Citizen Solutions (IFICI 2026)", "IBA overview", "immigrantinvest"],
     },
 }
@@ -142,6 +186,19 @@ def relocation_first_pass(profile):
     income = _norm_income(profile.get("income_types"))
     origin = str(profile.get("origin") or "ZA").upper()
 
+    # Optional income amounts -> indicative quantification (SA-origin only; corpus holds SA rates).
+    raw_amounts = profile.get("income")
+    income_amounts = {}
+    if isinstance(raw_amounts, dict):
+        for k, v in raw_amounts.items():
+            key = str(k).strip().lower()
+            if key in INCOME_TYPES:
+                income_amounts[key] = _num(v)
+    if income_amounts and not income:
+        income = {k for k, v in income_amounts.items() if v > 0}
+    quantify = bool(income_amounts) and origin == "ZA" and sum(income_amounts.values()) > 0
+    current_sa_tax = round(_sa_current_tax(income_amounts), 2) if quantify else None
+
     want = profile.get("destinations")
     if isinstance(want, str):
         want = [want]
@@ -154,30 +211,55 @@ def relocation_first_pass(profile):
         treatment = d["income_treatment"]
         # show only the income types the user actually has (or all, if none specified)
         shown = {k: treatment[k] for k in (income or set(INCOME_TYPES)) if k in treatment}
-        dests.append({
+        card = {
             "code": c, "name": d["name"], "residency_test": d["residency_test"],
             "headline": d["headline"], "income_treatment": shown, "gotchas": d["gotchas"],
             "fit": _fit(income, c), "sources": d["sources"],
-        })
+        }
+        if quantify:
+            dt = round(_dest_tax(income_amounts, d.get("effective_rates", {})), 2)
+            card["indicative_destination_tax"] = dt
+            card["indicative_annual_saving"] = round(current_sa_tax - dt, 2)
+            card["saving_pct"] = round((current_sa_tax - dt) / current_sa_tax * 100, 1) if current_sa_tax > 0 else 0.0
+        dests.append(card)
     # rank: strong > possible > weak > unknown
     order = {"strong": 0, "possible": 1, "weak": 2, "unknown": 3}
     dests.sort(key=lambda x: order.get(x["fit"]["level"], 9))
 
-    origin_exit = SA_EXIT if origin == "ZA" else {
+    origin_exit = dict(SA_EXIT) if origin == "ZA" else {
         "jurisdiction": origin, "code": origin, "residency_tests": [],
         "exit_charge": "Your origin country's exit/deemed-disposal rules are not in the corpus yet — confirm them with a local advisor before you move.",
         "process": [], "sources": [],
     }
+    raw_assets = profile.get("assets")
+    if origin == "ZA" and isinstance(raw_assets, dict):
+        mv = _num(raw_assets.get("worldwide_market_value"))
+        bc = _num(raw_assets.get("base_cost"))
+        if mv > 0:
+            gain = max(0.0, mv - bc)
+            origin_exit = dict(origin_exit)
+            origin_exit["exit_cgt_estimate"] = {
+                "deemed_gain": round(gain, 2),
+                "indicative_exit_cgt": round(gain * SA_CGT_EFFECTIVE, 2),
+                "rate_used": "18% individual max effective CGT (40% inclusion x 45% marginal)",
+                "basis": ("s9H deems a disposal of worldwide assets at market value the day before you cease SA tax residency. "
+                          "SA immovable property is EXCLUDED (stays in the SA net) — exclude it from market value above. Indicative only."),
+            }
 
     return {
         "available": True,
         "as_of": AS_OF,
         "income_types_considered": sorted(income) or list(INCOME_TYPES),
+        "quantified": quantify,
+        "indicative_current_sa_tax": current_sa_tax,
         "origin_exit": origin_exit,
         "destinations": dests,
         "guardrails": GUARDRAILS,
         "classification": "decision-support / factual landscape",
         "is_not": "tax, legal, or financial advice, and not a recommendation to adopt any particular arrangement or move to any particular country",
+        "estimates_disclaimer": ("All Rand figures are INDICATIVE estimates from headline/effective rates (" + TAX_AS_OF + ") — NOT a "
+                       "computation of your actual liability. They ignore most deductions, exemptions, double-tax treaties, timing, regime "
+                       "eligibility, and your full facts. Use them only to gauge rough magnitude; a licensed advisor must compute the real numbers."),
         "disclaimer": ("Indicative factual landscape from a dated rule corpus (as of " + AS_OF + "); tax law changes yearly. "
                        "LEGAL relocation + tax efficiency only — never evasion. This first-pass does NOT design or market a "
                        "cross-border arrangement; only a licensed cross-border tax advisor/attorney (with PI insurance) may advise. "

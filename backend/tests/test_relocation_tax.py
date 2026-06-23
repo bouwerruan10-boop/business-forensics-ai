@@ -93,3 +93,69 @@ def test_endpoint_is_public_even_with_auth_enabled(monkeypatch):
         # malformed / empty body still returns a valid default
         resp2 = c.post("/api/tax/relocation", content=b"not json")
         assert resp2.status_code == 200
+
+
+# ── Quantification layer (v1.68) ───────────────────────────────────────────────
+
+def test_quantification_present_with_amounts():
+    r = relocation_first_pass({"income": {"employment": 1500000, "dividends": 800000}})
+    assert r["quantified"] is True
+    assert isinstance(r["indicative_current_sa_tax"], float) and r["indicative_current_sa_tax"] > 0
+    assert "estimates_disclaimer" in r
+    for d in r["destinations"]:
+        assert "indicative_destination_tax" in d
+        assert "indicative_annual_saving" in d
+        assert "saving_pct" in d
+
+
+def test_uae_zero_tax_max_saving():
+    r = relocation_first_pass({"income": {"employment": 1000000, "dividends": 500000}})
+    ae = next(d for d in r["destinations"] if d["code"] == "AE")
+    assert ae["indicative_destination_tax"] == 0.0
+    assert ae["saving_pct"] == 100.0
+
+
+def test_amounts_derive_income_set_and_quantify_only_for_za():
+    r = relocation_first_pass({"income": {"dividends": 600000}})
+    assert "dividends" in r["income_types_considered"]
+    # non-ZA origin: corpus lacks local rates -> no quantification
+    r2 = relocation_first_pass({"origin": "GB", "income": {"dividends": 600000}})
+    assert r2["quantified"] is False
+    assert r2["indicative_current_sa_tax"] is None
+
+
+def test_exit_cgt_estimate():
+    r = relocation_first_pass({
+        "income": {"employment": 500000},
+        "assets": {"worldwide_market_value": 10000000, "base_cost": 4000000},
+    })
+    est = r["origin_exit"]["exit_cgt_estimate"]
+    assert est["deemed_gain"] == 6000000.0
+    assert est["indicative_exit_cgt"] == round(6000000.0 * 0.18, 2)
+
+
+def test_no_amounts_means_no_quantification():
+    r = relocation_first_pass({"income_types": ["dividends"]})
+    assert r["quantified"] is False
+    assert r["indicative_current_sa_tax"] is None
+    assert all("indicative_destination_tax" not in d for d in r["destinations"])
+
+
+def test_quantification_adversarial_never_crashes():
+    for bad in [
+        {"income": {"employment": "1500000", "dividends": -99, "interest": None, "junk": 9}},
+        {"income": {"employment": "abc"}},
+        {"income": "not-a-dict"},
+        {"income": {}, "assets": "nope"},
+        {"income": {"dividends": 1e12}},
+        {"income": {"employment": float("nan")}},
+        {"assets": {"worldwide_market_value": "5m", "base_cost": None}},
+    ]:
+        out = relocation_first_pass(bad)
+        assert out["available"] is True and "estimates_disclaimer" in out
+
+
+def test_shared_sa_exit_not_mutated_by_cgt_estimate():
+    import services.relocation_tax as rt
+    relocation_first_pass({"income": {"employment": 1}, "assets": {"worldwide_market_value": 9, "base_cost": 1}})
+    assert "exit_cgt_estimate" not in rt.SA_EXIT
