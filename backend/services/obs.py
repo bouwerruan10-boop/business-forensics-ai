@@ -89,6 +89,9 @@ def init_sentry():
             environment=os.getenv("SENTRY_ENV", os.getenv("RAILWAY_ENVIRONMENT", "production")),
             traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.0")),
             send_default_pii=False,
+            # Imara processes confidential SME financial documents (POPIA). Never let
+            # Sentry capture request/response bodies — only the exception + stack.
+            max_request_body_size="never",
         )
         return True
     except Exception:

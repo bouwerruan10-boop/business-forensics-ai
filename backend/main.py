@@ -1290,7 +1290,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
     def _sync_run():
         try:
             from services.tracing import new_ledger
-            _ledger = new_ledger()  # per-analysis token/cost ledger (contextvars)
+            _ledger = new_ledger(analysis_id)  # per-analysis token/cost ledger (contextvars); id groups Langfuse traces
             clear_context(); bind_context(analysis_id=analysis_id)  # correlate all logs for this analysis
             get_logger("imara.pipeline").info("analysis_started", files=len(file_data))
             # 1. Parse uploaded files — route by category
@@ -1443,6 +1443,11 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             except Exception as _se:
                 get_logger("imara.pipeline").warning("save_error_failed", error=str(_se))
         finally:
+            try:
+                from services.tracing import flush_tracing
+                flush_tracing()  # best-effort: push buffered Langfuse events before the worker exits
+            except Exception:
+                pass
             clear_context()
 
     loop = asyncio.get_event_loop()
