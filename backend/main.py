@@ -317,6 +317,10 @@ class OutcomeIn(BaseModel):
     source: str = ""
 
 
+class OutcomeBulkIn(BaseModel):
+    rows: list[OutcomeIn] = []
+
+
 # -- Routes --------------------------------------------------------
 
 class LoginRequest(BaseModel):
@@ -1191,6 +1195,25 @@ def admin_record_outcome(body: OutcomeIn, _admin: None = Depends(verify_admin_ke
         raise HTTPException(status_code=404, detail="Analysis not found")
     record_outcome(body.analysis_id, body.outcome_type, body.label, body.value, body.note, body.source)
     return {"recorded": True, "analysis_id": body.analysis_id, "outcome_type": body.outcome_type}
+
+
+@app.post("/api/admin/outcomes/bulk")
+def admin_record_outcomes_bulk(body: OutcomeBulkIn, _admin: None = Depends(verify_admin_key)):
+    """Bulk-record pilot outcomes (one row per outcome). Skips unknown analyses and reports
+    per-row errors so a partial batch still lands - lets the operator load a pilot at once."""
+    from services.database import record_outcome, get_report
+    rows = body.rows[:1000]
+    recorded, errors = 0, []
+    for i, row in enumerate(rows):
+        try:
+            if not get_report(row.analysis_id):
+                errors.append({"row": i, "analysis_id": row.analysis_id, "error": "analysis not found"})
+                continue
+            record_outcome(row.analysis_id, row.outcome_type, row.label, row.value, row.note, row.source)
+            recorded += 1
+        except Exception as e:
+            errors.append({"row": i, "error": str(e)[:120]})
+    return {"recorded": recorded, "skipped": len(errors), "total": len(rows), "errors": errors}
 
 
 @app.get("/api/admin/outcomes")

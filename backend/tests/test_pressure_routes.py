@@ -179,3 +179,23 @@ def test_public_tax_endpoint_rate_limited():
     finally:
         main.limiter.reset()
         main.limiter.enabled = prev
+
+
+def test_bulk_outcomes_partial_tolerant():
+    """Bulk outcome import records valid rows and skips unknown analyses (partial batch still lands)."""
+    import uuid, main
+    from fastapi.testclient import TestClient
+    from services.database import create_analysis, save_report
+    aid = str(uuid.uuid4())
+    create_analysis(aid, {"company_name": "BulkCo"}, owner="operator")
+    save_report(aid, {"imara_score": 50})
+    with TestClient(main.app) as c:
+        body = {"rows": [
+            {"analysis_id": aid, "outcome_type": "funded", "label": 0, "value": 600},
+            {"analysis_id": aid, "outcome_type": "repaid", "label": 0},
+            {"analysis_id": "nope", "outcome_type": "default", "label": 1},
+        ]}
+        r = c.post("/api/admin/outcomes/bulk", json=body)  # auth disabled in tests (conftest)
+        assert r.status_code == 200
+        j = r.json()
+        assert j["recorded"] == 2 and j["skipped"] == 1 and j["total"] == 3

@@ -74,6 +74,9 @@ function ScoreValidationPanel({ headers, analyses }) {
   const [form, setForm] = useState({ analysis_id: '', outcome_type: 'funded', label: '', value: '', note: '', source: '' })
   const [msg, setMsg] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [bulk, setBulk] = useState('')
+  const [bmsg, setBmsg] = useState(null)
+  const [bbusy, setBbusy] = useState(false)
 
   const reload = async () => {
     try {
@@ -102,6 +105,28 @@ function ScoreValidationPanel({ headers, analyses }) {
       setMsg('Recorded ✓'); setForm({ ...form, label: '', value: '', note: '', source: '' })
       reload()
     } catch (err) { setMsg(err.message) } finally { setBusy(false) }
+  }
+
+  const submitBulk = async () => {
+    const rows = bulk.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+      const [analysis_id, outcome_type, label, value, source] = l.split(',').map(x => (x || '').trim())
+      const r = { analysis_id, outcome_type: outcome_type || 'external_score' }
+      if (label !== '' && label != null && !isNaN(Number(label))) r.label = Number(label)
+      if (value !== '' && value != null && !isNaN(Number(value))) r.value = Number(value)
+      if (source) r.source = source
+      return r
+    }).filter(r => r.analysis_id && r.analysis_id.toLowerCase() !== 'analysis_id')
+    if (!rows.length) { setBmsg('Paste rows: analysis_id,outcome_type,label,value,source'); return }
+    setBbusy(true); setBmsg(null)
+    try {
+      const r = await fetch(`${API_BASE}/api/admin/outcomes/bulk`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...headers() }, body: JSON.stringify({ rows }),
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j.detail || 'Bulk import failed')
+      setBmsg(`Imported ${j.recorded} of ${j.total}${j.skipped ? ` (${j.skipped} skipped)` : ''}.`)
+      setBulk(''); reload()
+    } catch (err) { setBmsg(err.message) } finally { setBbusy(false) }
   }
 
   const real = (val && val.real_outcomes) || {}
@@ -159,6 +184,19 @@ function ScoreValidationPanel({ headers, analyses }) {
         <button type="submit" disabled={busy} className="bg-gold text-navy font-bold text-sm px-3 py-1.5 rounded-lg hover:bg-amber-400 disabled:opacity-50 transition-colors">{busy ? '…' : 'Record'}</button>
       </form>
       {msg && <div className="text-xs text-slate-300 mt-2">{msg}</div>}
+      <details className="mt-3">
+        <summary className="text-[11px] text-slate-400 cursor-pointer hover:text-slate-200 select-none">Bulk import (CSV) — load a whole pilot at once</summary>
+        <div className="mt-2 space-y-2">
+          <textarea value={bulk} onChange={e => setBulk(e.target.value)} rows={4}
+            placeholder="analysis_id,outcome_type,label,value,source   (one per line)"
+            className="w-full bg-navy border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white font-mono outline-none focus:border-gold/40" />
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={submitBulk} disabled={bbusy}
+              className="text-xs border border-white/15 text-slate-200 hover:text-white hover:border-white/30 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors">{bbusy ? '…' : 'Import CSV'}</button>
+            {bmsg && <span className="text-[11px] text-slate-400">{bmsg}</span>}
+          </div>
+        </div>
+      </details>
     </div>
   )
 }
