@@ -24,6 +24,14 @@ An AI business-intelligence / bankability platform for South African SMEs. A cli
 - **Backend** → Railway (FastAPI, Docker, healthcheck `/api/health`). **Frontend** → Vercel (React/Vite), auto-deploys from `main`.
 - **Shipped through v1.96 (per carried-over memory — the most current truth; the roadmap doc is dated 21 Jun and lags this):** Imara Score™; deterministic financial-ratios anchor + **faithfulness & prose verifiers** (anti-hallucination); **parallelised Phase-2 pipeline (~11 min, down from ~46)**; full UI overhaul; shareable report links; admin gate; AI-extraction fallback for summary-statement CSVs; **Action Simulator v2** (Monte Carlo); **operator login** (built, dormant until `OPERATOR_PASSWORD` is set); **observability** (Sentry + Langfuse) wired but **dormant until env keys are set**.
 
+
+### Uncommitted working-tree changes (this session, 2026-06-26) — not yet committed/pushed
+Maintenance + docs, on top of the 2-commits-ahead state above. Review with `git diff`, then commit/push via `push_imara.bat`. Tracked changes: `CLAUDE.md`, `frontend/package-lock.json`, `frontend/src/App.jsx`, and the two deleted components.
+- **Frontend build repaired (was broken locally).** `frontend/node_modules` had been installed in a Linux sandbox (its leftover `vite.config.js.timestamp-*.mjs` files carried `/sessions/.../mnt` paths) and failed on Windows/Node 24 with *"Dynamic require of workbox-build is not supported."* Underlying cause: a **stale `frontend/package-lock.json`** out of sync with `package.json` (missing `@sentry/react`, `vite-plugin-pwa@0.20.5`, `workbox-build@7.4.1`, ...), so `npm ci` was impossible. Fix: `npm install` regenerated the lockfile + reinstalled for this OS — **`npm run build` now passes**, incl. PWA `generateSW`. The regenerated `package-lock.json` is the tracked change to commit (deploy-safe; Vercel installs fresh). Also deleted 53 stale `timestamp-*.mjs` junk files (already gitignored).
+- **App.jsx phase bug** (`src/App.jsx:207`). The admin toggle set `setPhase('profile')` — a phase with no render branch — so leaving admin showed a blank page. Changed to `'intake'`. (This is the current incarnation of the old `setPhase('upload')` item from the 2026-06-19 handoff, which had since migrated.)
+- **Removed dead components** `BusinessProfile.jsx` + `FileUpload.jsx` (zero references anywhere; superseded by `SmartIntake`).
+- **`CLAUDE.md`** gained an *Operating Model -- The WAT Framework* section (Workflows = the CEO pipeline/SOPs, Agents = `backend/agents/`, Tools = `backend/services/`), adapted to Imara's real structure. The **parent-folder duplicate** `...\Consulting Firm\CLAUDE.md` was collapsed to a short pointer to this canonical file -- partial progress on the §6 dedup item (the bare-`.git` orphan at `Desktop\Consulting Firm` still remains).
+
 ---
 
 ## 3. Open items — what to do next

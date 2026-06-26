@@ -204,7 +204,7 @@ export default function App() {
     <div className="min-h-screen bg-navy font-sans">
       <Navbar
         phase={phase}
-        onAdmin={() => setPhase(phase === 'admin' ? 'profile' : 'admin')}
+        onAdmin={() => setPhase(phase === 'admin' ? 'intake' : 'admin')}
         onTax={() => { window.location.hash = '#/tax'; setPhase('tax') }}
         onNewAnalysis={resetAll}
         analysisId={analysisId}

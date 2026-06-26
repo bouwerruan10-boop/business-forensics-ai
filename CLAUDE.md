@@ -13,6 +13,53 @@ This file is the authoritative guide to the codebase. Read it fully before touch
 - Frontend → Vercel (React/Vite)
 - Repo → GitHub (`bouwerruan10-boop/business-forensics-ai`)
 
+## Operating Model — The WAT Framework (Workflows · Agents · Tools)
+
+Imara is a **WAT system**: probabilistic AI handles reasoning, deterministic code handles execution. That separation is the source of its reliability — it is the same "deterministic-first" DNA enforced in the *Coding Disciplines* and *Extending the engine* sections of the codebase guide (`business-forensics-ai/CLAUDE.md`). Read this as the mental model; the sections that follow are the detail.
+
+**Layer 1 — Workflows (the instructions / SOPs)**
+- The analysis "SOP" is the CEO pipeline itself: `agents/ceo_agent.py::run_full_analysis()` defines the ordered phases (1 → 5), required inputs, which agents run, and how outputs assemble into the report dict.
+- Process SOPs live as markdown under `docs/plans/`, `docs/runbooks/`, and `IMARA_IMPROVEMENT_ROADMAP.md`. The canonical "how to add an agent or feature" SOP is **Extending the engine — the build pattern** in the codebase guide.
+- Written in plain language — the way you'd brief a teammate.
+
+**Layer 2 — Agents (the decision-makers)**
+- The Python agents in `backend/agents/` — `ceo_agent.py` orchestrates; `specialist_agents.py` (the 11 `ALL_AGENTS`), `market_research_agent.py`, and `economics_agent.py` reason over computed inputs. They **narrate and prioritise; they never invent a number.**
+- **You (Claude Code) are also an agent**, at the development layer: read the relevant SOP, run the right tool/service in the correct order, recover from failures, and ask when inputs are ambiguous — don't do execution by hand.
+- Example: to gauge distress, an agent does not estimate it — it reads the value computed by `services/distress_score.py`.
+
+**Layer 3 — Tools (the execution)**
+- The deterministic modules in `backend/services/` are the tools: every ratio, score, projection, and threshold is computed here — e.g. `financial_ratios.py`, `distress_score.py`, `simulation.py`, `tax_optimizer.py`, `score_contract.py`, `report_generator.py`. Consistent, unit-testable, fast.
+- Operational scripts (`scripts/live_e2e.py`, `run_live_verify.bat`) and `services/` helpers do the API calls, parsing (`file_parser.py`), persistence (`database.py` → SQLite), and rendering (`html_report.py`).
+- Secrets live **only** in `backend/.env` (`ANTHROPIC_API_KEY`, `SERPER_API_KEY`, …) — never anywhere else. See *Environment Variables* below.
+
+**Why this matters:** if every step were 90% accurate, five chained LLM steps compound to ~59% success. Push the numbers into deterministic services and the LLM is left doing only what it is good at — interpretation and narration — which is exactly why Imara verifies prose against the computed source (`services/faithfulness.py`, `services/prose_verifier.py`).
+
+### How to Operate
+
+**1. Reach for an existing service first.** Before writing new code, check `backend/services/` and `backend/agents/` — Imara already has tools for ratios, scoring, simulation, tax, benchmarks, and reporting. Only build new when nothing fits.
+
+**2. Learn and adapt when things fail.** On an error: read the full trace, fix the service, re-test. **If a change exercises paid Anthropic/SERPER calls or credits, check with Ruan before re-running** (use `MOCK_MODE=true` for import/logic checks that don't need the API). Capture what you learned (rate limits, quirks, timing) in the relevant SOP under `docs/`.
+
+**3. Keep SOPs current — but don't rewrite them unasked.** When you find a better method or a new constraint, update the workflow/runbook. **Do not create or overwrite SOPs without asking** unless explicitly told to — these are durable instructions, not scratch.
+
+### The Self-Improvement Loop
+
+Every failure hardens the system — this mirrors the *Extending the engine* build pattern:
+1. Identify what broke.
+2. Fix the tool/service.
+3. Verify the fix — pressure-test (None / malformed / hostile / huge / unicode / injection) and lock it with a regression test.
+4. Update the SOP with the new approach.
+5. Gate on a live A/B (`run_live_verify.bat`) if real Anthropic behaviour changed — `MOCK_MODE` cannot judge it.
+6. Move on, more robust than before.
+
+### Artifact Flow — durable vs disposable
+
+- **Deliverables (durable):** the report a client/operator sees — the `Dashboard.jsx` render, the shared link, and the PDF/HTML exports (`report_generator.py`, `html_report.py`). The system of record is SQLite at `backend/data/analyses.db`.
+- **In-flight state:** `SharedMemory` (`memory/shared_memory.py`) is the single mutable object threaded through the pipeline — it carries computed values between agents; it is not a saved artifact.
+- **Disposable:** scratch and intermediate files belong in the session scratchpad (or regenerable `backend/data/` exports), never committed. Anything regenerable is disposable.
+
+**Bottom line:** you sit between intent (the SOPs and pipeline) and execution (the services). Read the instruction, make the call, run the right tool, recover from errors, and leave the system sharper than you found it. Stay pragmatic. Stay reliable. Keep learning.
+
 ---
 
 ## Local Dev Commands
