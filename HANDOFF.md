@@ -20,7 +20,7 @@ An AI business-intelligence / bankability platform for South African SMEs. A cli
 
 ## 2. Current live state (2026-06-26)
 - **Repo:** GitHub `bouwerruan10-boop/business-forensics-ai`, branch `main`.
-- **Deployed commit:** `b981412` (v1.96) is live. Local `main` is **1 commit ahead** — `f973513` (the 2026-06-26 documentation reorg; **not yet pushed**; deploy-safe because the Dockerfile copies only `backend/`). Push with `push_imara.bat` when ready.
+- **Deployed commit:** `b981412` (v1.96) is live on `origin/main`. Local `main` is **2 commits ahead, not yet pushed** — `f973513` (the 2026-06-26 documentation reorg) + `bc3104b` (this handoff refresh); both deploy-safe (docs-only — the Dockerfile copies only `backend/`, Vercel builds only `frontend/`). Push with `push_imara.bat` (or `git push`) when ready.
 - **Backend** → Railway (FastAPI, Docker, healthcheck `/api/health`). **Frontend** → Vercel (React/Vite), auto-deploys from `main`.
 - **Shipped through v1.96 (per carried-over memory — the most current truth; the roadmap doc is dated 21 Jun and lags this):** Imara Score™; deterministic financial-ratios anchor + **faithfulness & prose verifiers** (anti-hallucination); **parallelised Phase-2 pipeline (~11 min, down from ~46)**; full UI overhaul; shareable report links; admin gate; AI-extraction fallback for summary-statement CSVs; **Action Simulator v2** (Monte Carlo); **operator login** (built, dormant until `OPERATOR_PASSWORD` is set); **observability** (Sentry + Langfuse) wired but **dormant until env keys are set**.
 
@@ -43,6 +43,13 @@ An AI business-intelligence / bankability platform for South African SMEs. A cli
 - **Deferred housekeeping (from the 2026-06-26 reorg):** dedupe the **outer-folder duplicate copies** and resolve the **orphan repo** at `Desktop\Consulting Firm` (only a bare `.git`). See §6 + the `imara-file-organization` memory.
 
 ---
+
+### Build direction chosen 2026-06-26 — new analysis features / agents
+Near-term focus is **extending the analysis engine**. Follow `CLAUDE.md → Extending the engine` for the required pattern (compute-in-code → LLM narrates → verify → wire through SharedMemory/report/Dashboard → gates). Candidate work, grounded in what already exists:
+- **Macro-economics agent (designed, not built — top candidate).** Macro→single-firm bottom-up sensitivity (rates/FX/inflation/electricity) from free WB + SARB data; IFRS-9 probability-weighted scenarios into the Action Simulator; surfaced as a **"Macro Resilience" overlay, not a Score change**. Full plan: `IMARA_ECONOMICS_AGENT_PLAN.md` (+ `economics-agent-research` memory).
+- **Deepen an existing specialist** over adding breadth — e.g. richer working-capital / cash-conversion analytics in FinancialAgent, or a covenant/affordability calculator feeding FundingFit.
+- **A new deterministic panel** off data already in SharedMemory (zero new LLM cost) — e.g. a scenario/sensitivity table over the existing figures.
+- **Guardrail:** the strategic bottleneck is still **evidence + distribution** (Tier 0). Prefer the feature a design-partner pilot would actually ask for, and keep the Score contract stable.
 
 ## 4. Architecture & data-flow (recap — full detail in `CLAUDE.md`)
 ```

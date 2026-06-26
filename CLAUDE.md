@@ -98,6 +98,19 @@ Order matters — they run sequentially:
 3. Add to `ALL_AGENTS` list. CEO Phase 2 picks it up automatically.
 4. For SA-specific agents that need prior findings context: add as a dedicated phase in `ceo_agent.py` instead.
 
+### Extending the engine — the build pattern (read before adding ANY feature or agent)
+
+The engine is **deterministic-first**: the LLM never invents a number. Every new agent or analytical feature follows the same spine:
+
+1. **Compute in code.** Put every figure (ratio, score, projection, threshold) in a pure, unit-testable function under `services/` — no LLM. The agent *reads* these values; it does not produce them.
+2. **LLM narrates only.** The `analyze()` call turns the computed numbers into findings/prose. It may interpret and prioritise, but every quantitative claim must trace back to a code-computed value.
+3. **Verify the narration.** Cross-check LLM output against the computed source (faithfulness + prose verifiers). A number in the prose that isn't in the computed set is a bug — fail closed, don't ship.
+4. **Thread a new output through all three layers** or it's invisible: add field(s) to `SharedMemory` (and `to_context_summary()` if synthesis needs them) → assemble into the report dict in CEO Phase 5 → render a section in `Dashboard.jsx` (and `SharedReport.jsx` for public links).
+5. **Honour the contract + gates:** findings obey `FINDING_RULES` (specific ZAR + SA legislation); pressure-test the new code (None/malformed/hostile/huge/unicode/injection) and lock it with a regression test; run the cleanup audit (`ruff`/`vulture`/`jscpd`) before "done"; if it changes real Anthropic behaviour, gate on a live A/B (`run_live_verify.bat`) — MOCK_MODE can't judge it.
+6. **Keep the Score contract stable.** New analysis usually ships as an *overlay/panel*, not a change to the Imara Score formula, unless the Score is explicitly being recalibrated against real outcomes.
+
+Worked, already-designed example: `IMARA_ECONOMICS_AGENT_PLAN.md` (a macro→firm sensitivity agent adding a "Macro Resilience" overlay — not a Score change).
+
 ---
 
 ## SharedMemory (`memory/shared_memory.py`)
