@@ -293,7 +293,7 @@ intake → analyzing → done
 
 5. **SA agents excluded from ALL_AGENTS.** SATaxAgent and SALegalAgent run as phases 2c/2d — not in the Phase 2 loop — so they can read all prior agent findings.
 
-6. **Git operations from user's Windows terminal.** The sandbox cannot read `.git/config`. Use `push_imara.bat` (double-click in File Explorer) for all pushes.
+6. **Git push directly.** Commit and push to `main` with plain `git` (`git add -A && git commit && git push`); Railway + Vercel auto-deploy from `main`. The old `push_imara.bat` helper was removed 2026-06-26 (it had gone stale with a hardcoded file list). If a stale `.git/index.lock` ever blocks a commit, `fix_git_lock.bat` clears it.
 
 ---
 

@@ -30,7 +30,7 @@ already in place; this closes the account/repo gaps. Do these in order.
 
 ## 2. Protect `main` with a solo-safe ruleset
 
-Use a **ruleset** (the modern replacement for branch-protection rules). The goal is to stop accidental history loss **without** requiring pull-request reviews — requiring PRs would break the direct-push `push_imara.bat` workflow.
+Use a **ruleset** (the modern replacement for branch-protection rules). The goal is to stop accidental history loss **without** requiring pull-request reviews — requiring PRs would break the direct-push (`git push` to `main`) workflow.
 
 1. Repo → **Settings → Rules → Rulesets → New branch ruleset**.
 2. **Name:** `main-protect`. **Enforcement status:** Active.
@@ -39,11 +39,11 @@ Use a **ruleset** (the modern replacement for branch-protection rules). The goal
    - ✅ **Restrict deletions** (can't delete `main`)
    - ✅ **Block force pushes** (can't rewrite history)
    - ✅ **Require status checks to pass** → add the **gitleaks** check (and the test workflow if present) so a secret-leaking or failing push is rejected.
-5. **Do NOT enable** "Require a pull request before merging" — you push directly to `main` via `push_imara.bat`; a PR requirement would block every push.
+5. **Do NOT enable** "Require a pull request before merging" — you push directly to `main` via `git push`; a PR requirement would block every push.
 6. **Bypass list:** add yourself (repo admin) so you're never locked out of an emergency direct push.
 7. **Create**.
 
-Verify: `push_imara.bat` still pushes successfully after the ruleset is active (it should — direct pushes are allowed; only force-push/delete are blocked).
+Verify: a normal `git push` to `main` still succeeds after the ruleset is active (it should — direct pushes are allowed; only force-push/delete are blocked).
 
 ## 3. Secret scanning + push protection
 
@@ -66,5 +66,5 @@ Verify: `push_imara.bat` still pushes successfully after the ruleset is active (
 ## Re-verify after changes
 
 - 2FA: log out / back in → prompted for the TOTP code.
-- Ruleset: try `git push --force` to `main` → should be **rejected**; a normal `push_imara.bat` → **succeeds**.
+- Ruleset: try `git push --force` to `main` → should be **rejected**; a normal `git push` → **succeeds**.
 - Push protection: it only triggers on a real secret; don't test with a live key.

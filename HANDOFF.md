@@ -9,7 +9,7 @@ _Last updated: 2026-06-26. This supersedes the 2026-06-19 handoff; the older tex
 3. **Then read, in order:** this `HANDOFF.md` (current state + open work) → `IMARA_IMPROVEMENT_ROADMAP.md` (the canonical living plan) → `docs/MEMORY_EXPORT.md` (long-term project memory carried over from the prior Cowork sessions — Claude Code does **not** inherit it automatically) → `docs/README.md` (the documentation map).
 4. **Optional but recommended:** run `/init` only to *review* what Claude Code would generate — **do not overwrite the existing curated `CLAUDE.md`.** Consider adding project-scoped helpers under `.claude/` (commands/agents) later; not required.
 
-**Hard rules that were paid for in bugs (also in CLAUDE.md):** write large `.py`/`.md` files via bash heredoc or Python string-replace — naive editors **truncate** on this Windows mount (this corrupted `specialist_agents.py`, `Dashboard.jsx`, `client.js`); do **git from Windows** via `push_imara.bat` (clears the stale `.git/index.lock`); **profile values beat extracted values**; `primary_concern` must appear in CEO Phases 1/3/5; `SATaxAgent`/`SALegalAgent` stay **out** of `ALL_AGENTS` (they run as phases 2c/2d).
+**Hard rules that were paid for in bugs (also in CLAUDE.md):** write large `.py`/`.md` files via bash heredoc or Python string-replace — naive editors **truncate** on this Windows mount (this corrupted `specialist_agents.py`, `Dashboard.jsx`, `client.js`); **git push directly** (`git add -A && git commit && git push` to `main`; if a stale `.git/index.lock` blocks a commit, `fix_git_lock.bat` clears it); **profile values beat extracted values**; `primary_concern` must appear in CEO Phases 1/3/5; `SATaxAgent`/`SALegalAgent` stay **out** of `ALL_AGENTS` (they run as phases 2c/2d).
 
 ---
 
@@ -20,13 +20,13 @@ An AI business-intelligence / bankability platform for South African SMEs. A cli
 
 ## 2. Current live state (2026-06-26)
 - **Repo:** GitHub `bouwerruan10-boop/business-forensics-ai`, branch `main`.
-- **Deployed commit:** `b981412` (v1.96) is live on `origin/main`. Local `main` is **2 commits ahead, not yet pushed** — `f973513` (the 2026-06-26 documentation reorg) + `bc3104b` (this handoff refresh); both deploy-safe (docs-only — the Dockerfile copies only `backend/`, Vercel builds only `frontend/`). Push with `push_imara.bat` (or `git push`) when ready.
+- **Deployed commit:** `b981412` (v1.96) is live on `origin/main`. Local `main` is **2 commits ahead, not yet pushed** — `f973513` (the 2026-06-26 documentation reorg) + `bc3104b` (this handoff refresh); both deploy-safe (docs-only — the Dockerfile copies only `backend/`, Vercel builds only `frontend/`). Push with `git push` when ready.
 - **Backend** → Railway (FastAPI, Docker, healthcheck `/api/health`). **Frontend** → Vercel (React/Vite), auto-deploys from `main`.
 - **Shipped through v1.96 (per carried-over memory — the most current truth; the roadmap doc is dated 21 Jun and lags this):** Imara Score™; deterministic financial-ratios anchor + **faithfulness & prose verifiers** (anti-hallucination); **parallelised Phase-2 pipeline (~11 min, down from ~46)**; full UI overhaul; shareable report links; admin gate; AI-extraction fallback for summary-statement CSVs; **Action Simulator v2** (Monte Carlo); **operator login** (built, dormant until `OPERATOR_PASSWORD` is set); **observability** (Sentry + Langfuse) wired but **dormant until env keys are set**.
 
 
 ### Uncommitted working-tree changes (this session, 2026-06-26) — not yet committed/pushed
-Maintenance + docs, on top of the 2-commits-ahead state above. Review with `git diff`, then commit/push via `push_imara.bat`. Tracked changes: `CLAUDE.md`, `frontend/package-lock.json`, `frontend/src/App.jsx`, and the two deleted components.
+Maintenance + docs, on top of the 2-commits-ahead state above. Review with `git diff`, then commit/push via plain `git` (`git add -A && git commit && git push`). Tracked changes: `CLAUDE.md`, `frontend/package-lock.json`, `frontend/src/App.jsx`, and the two deleted components.
 - **Frontend build repaired (was broken locally).** `frontend/node_modules` had been installed in a Linux sandbox (its leftover `vite.config.js.timestamp-*.mjs` files carried `/sessions/.../mnt` paths) and failed on Windows/Node 24 with *"Dynamic require of workbox-build is not supported."* Underlying cause: a **stale `frontend/package-lock.json`** out of sync with `package.json` (missing `@sentry/react`, `vite-plugin-pwa@0.20.5`, `workbox-build@7.4.1`, ...), so `npm ci` was impossible. Fix: `npm install` regenerated the lockfile + reinstalled for this OS — **`npm run build` now passes**, incl. PWA `generateSW`. The regenerated `package-lock.json` is the tracked change to commit (deploy-safe; Vercel installs fresh). Also deleted 53 stale `timestamp-*.mjs` junk files (already gitignored).
 - **App.jsx phase bug** (`src/App.jsx:207`). The admin toggle set `setPhase('profile')` — a phase with no render branch — so leaving admin showed a blank page. Changed to `'intake'`. (This is the current incarnation of the old `setPhase('upload')` item from the 2026-06-19 handoff, which had since migrated.)
 - **Removed dead components** `BusinessProfile.jsx` + `FileUpload.jsx` (zero references anywhere; superseded by `SmartIntake`).
@@ -77,7 +77,7 @@ backend (FastAPI)
 
 ## 5. Run / deploy / test
 - **Local:** `cd backend && uvicorn main:app --reload --port 8000`; `cd frontend && npm run dev`. Import smoke check: `cd backend && MOCK_MODE=true python -c "from agents.ceo_agent import CEOAgent; print('OK')"`.
-- **Deploy:** `push_imara.bat` (Railway + Vercel auto-deploy from `main`); if Railway misses the webhook, `redeploy_imara.bat` (empty-commit re-trigger). **Verify on the Railway dashboard / a POST / the JS bundle — not cached `/api/health` or `/api/demo` GETs.**
+- **Deploy:** `git push` to `main` (Railway + Vercel auto-deploy); if Railway misses the webhook, `redeploy_imara.bat` (empty-commit re-trigger). **Verify on the Railway dashboard / a POST / the JS bundle — not cached `/api/health` or `/api/demo` GETs.**
 - **Test:** `MOCK_MODE` pytest battery (~324) + `ruff`/`vulture` + `vite build`; live LLM-behaviour changes gated on `run_live_verify.bat`.
 
 ## 6. Folder layout & the "two Consulting Firm" gotcha

@@ -11,7 +11,7 @@ name: Claude Code Review
 # with a notice until an `ANTHROPIC_API_KEY` repository secret is added
 # (GitHub > Settings > Secrets and variables > Actions). To use it, also adopt a
 # feature-branch -> PR -> merge flow for NON-TRIVIAL changes; trivial changes can stay
-# direct-to-main via push_imara.bat.
+# direct-to-main via git push.
 #
 # NOTE: the review action is not hardened against prompt injection — keep
 # "Require approval for all external contributors" on, and only review trusted PRs.

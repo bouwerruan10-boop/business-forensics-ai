@@ -5,7 +5,7 @@ echo.
 set "LOCK=.git\index.lock"
 
 if not exist "%LOCK%" (
-  echo No lock file present. You're good to run push_imara.bat.
+  echo No lock file present. You're good to run git push.
   goto done
 )
 
@@ -30,7 +30,7 @@ goto done
 :ok
 echo.
 echo Lock cleared. Verifying git is healthy...
-git status -s >nul 2>&1 && echo Git OK — now run push_imara.bat. || echo Git still reports an issue — see message above.
+git status -s >nul 2>&1 && echo Git OK — now run git push. || echo Git still reports an issue — see message above.
 
 :done
 echo.
