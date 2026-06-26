@@ -3,7 +3,7 @@
 > **⚠️ CONFIDENTIAL & PROPRIETARY — NOT OPEN SOURCE.** Copyright © 2026 Ruan Bouwer. All rights reserved.
 > This repository contains trade-secret material. No right is granted to use, copy, modify, distribute, or
 > reverse-engineer it. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and
-> [`IMARA_CODE_CONFIDENTIALITY.md`](IMARA_CODE_CONFIDENTIALITY.md).
+> [`legal/IMARA_CODE_CONFIDENTIALITY.md`](legal/IMARA_CODE_CONFIDENTIALITY.md).
 
 An AI-powered business analysis platform. Upload your Excel, CSV, or PDF files and 11 specialist Claude agents analyse every department, identify profit leaks, and generate a full consulting report with PDF download.
 
