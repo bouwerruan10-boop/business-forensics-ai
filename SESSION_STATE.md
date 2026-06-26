@@ -1,4 +1,6 @@
 # Imara — Session State / Continue Here
+> **⚠ SUPERSEDED 2026-06-26 — read `HANDOFF.md` for current state.** This file is kept as a historical snapshot from the 2026-06-19 session.
+
 _Saved 2026-06-19. Read this first to resume._
 
 ## Where things stand (all GREEN and live)
