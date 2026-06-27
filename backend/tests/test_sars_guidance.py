@@ -4,13 +4,19 @@ from services.sars_guidance import sars_process_guidance as g
 
 def test_all_cards_well_formed():
     r = g()
-    assert r["available"] is True and r["count"] == 6
+    assert r["available"] is True and r["count"] == 9
     keys = {c["key"] for c in r["cards"]}
     assert keys == {"verification", "audit", "vdp", "record_keeping",
-                    "suspension_of_payment", "payment_arrangement"}
+                    "suspension_of_payment", "payment_arrangement",
+                    "dta", "cfc", "crs"}
     for c in r["cards"]:
-        assert c["title"] and c["deadline"] and c["citation"].startswith("Tax Administration Act")
+        assert c["title"] and c["deadline"] and c["citation"]
         assert c["do"] and c["dont"]
+
+
+def test_cross_border_cards_present():
+    assert g("cfc")["card"]["citation"].startswith("Income Tax Act 58/1962 s9D")
+    assert "Common Reporting Standard" in g("crs")["card"]["what_it_is"]
 
 
 def test_topic_lookup():

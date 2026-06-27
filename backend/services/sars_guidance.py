@@ -121,6 +121,60 @@ _GUIDANCE = (
         ],
         "citation": "Tax Administration Act 28/2011 s167-168 (instalment payment agreement).",
     },
+    {
+        "key": "dta",
+        "title": "Double-tax agreement (DTA) relief",
+        "situation": "The same income is taxable in SA and another country.",
+        "what_it_is": ("A treaty between SA and another country that decides which one taxes the income and "
+                       "gives relief (exemption or a foreign-tax credit) so it is not taxed twice. A DTA "
+                       "'tie-breaker' can also settle dual residency."),
+        "deadline": "Claim the relief in the relevant year's return; keep proof of foreign tax paid.",
+        "do": [
+            "Check whether a DTA exists with the other country before assuming double tax.",
+            "Keep evidence of foreign tax paid to support a s6quat foreign-tax credit.",
+            "Use the tie-breaker test where two countries both claim you as resident.",
+        ],
+        "dont": [
+            "Assume a DTA overrides SA's s9H exit charge - it generally does not.",
+            "Claim a credit without documentary proof of the foreign tax.",
+        ],
+        "citation": "Income Tax Act 58/1962 s6quat (foreign-tax credit) + the relevant bilateral DTA.",
+    },
+    {
+        "key": "cfc",
+        "title": "Controlled foreign company (CFC)",
+        "situation": "SA residents hold more than 50% of a foreign company.",
+        "what_it_is": ("Anti-deferral rules that can attribute a CFC's net income to its SA shareholders and "
+                       "tax it in SA even if no dividend is paid - unless an exemption (e.g. the foreign "
+                       "business establishment exemption) applies."),
+        "deadline": "Disclose CFC interests in the annual return for each year of assessment.",
+        "do": [
+            "Identify any foreign company that is more than 50% SA-held.",
+            "Test whether the foreign-business-establishment (genuine substance) exemption applies.",
+            "Disclose the CFC and its imputed income correctly.",
+        ],
+        "dont": [
+            "Assume offshore profits are untaxed in SA until distributed - the CFC rules can impute them now.",
+        ],
+        "citation": "Income Tax Act 58/1962 s9D (controlled foreign company).",
+    },
+    {
+        "key": "crs",
+        "title": "Automatic exchange of information (CRS)",
+        "situation": "You hold foreign bank/investment accounts.",
+        "what_it_is": ("Under the OECD Common Reporting Standard, foreign financial institutions report SA "
+                       "residents' account balances and income to SARS automatically. SARS already sees most "
+                       "offshore accounts - non-disclosure is high-risk."),
+        "deadline": "Declare all foreign accounts and income every year; regularise past omissions via VDP.",
+        "do": [
+            "Declare all foreign accounts, interest, dividends and gains in your SA return.",
+            "Use the VDP to regularise any historical non-disclosure before SARS acts.",
+        ],
+        "dont": [
+            "Assume an offshore account is invisible to SARS - CRS data flows automatically.",
+        ],
+        "citation": "OECD Common Reporting Standard (CRS); Tax Administration Act reporting rules.",
+    },
 )
 
 
