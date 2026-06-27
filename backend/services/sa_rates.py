@@ -13,6 +13,7 @@ AS_OF_NOTE = "SARB 28 May 2026 (+25bps) and Budget 2026 (effective 1 April 2026)
 REPO_RATE = 7.00            # %  SARB repo rate
 PRIME_RATE = 10.50          # %  prime = repo + 3.5% spread
 SARS_INTEREST_RATE = 10.50  # %  interest on outstanding SARS debt (repo + 3.5%)
+OFFICIAL_RATE_OF_INTEREST = 7.75  # %  repo + 1%; fringe-benefit low-interest loans (from 1 Dec 2025)
 
 # ── VAT & turnover-based thresholds (ZAR) ──
 VAT_RATE = 15.0

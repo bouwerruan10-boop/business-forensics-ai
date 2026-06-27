@@ -51,3 +51,18 @@ def test_provisional_section():
     assert r["provisional"]["tax_on_estimate"] == 300_000.0 * 0 + 40_572.0
     assert r["provisional"]["total_provisional"] == 40_572.0
     assert "income_tax" not in r   # only the provisional section was supplied
+
+
+def test_cgt_section():
+    r = assess_all({"cgt": {"total_gains": 200_000, "taxpayer": "company"}})
+    assert r["cgt"]["taxable_capital_gain"] == 160_000.0
+    assert r["cgt"]["cgt_payable"] == 43_200.0
+
+
+def test_fringe_and_lump_sections():
+    r = assess_all({
+        "fringe_benefits": {"car_determined_value": 400_000, "loan_amount": 500_000},
+        "lump_sum": {"amount": 600_000, "kind": "retirement"},
+    })
+    assert r["fringe_benefits"]["total_taxable_fringe_benefits"] == 206_750.0
+    assert r["lump_sum"]["tax"] == 9_000.0
