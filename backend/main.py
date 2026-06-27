@@ -1859,6 +1859,21 @@ async def tax_relocation(request: Request):
     return relocation_first_pass(body if isinstance(body, dict) else {})
 
 
+@app.post("/api/tax/income")
+@limiter.limit(TAX_RATE_LIMIT)
+async def tax_income(request: Request):
+    """Deterministic SA tax assessment from IRP5-style inputs: individual income
+    tax (brackets/rebates/travel/medical), VAT201 position, and ETI. Public, no
+    stored client data; decision-support only, NOT advice (see
+    services/tax_assessment.py)."""
+    from services.tax_assessment import assess_all
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    return assess_all(body if isinstance(body, dict) else {})
+
+
 @app.get("/api/demo/pdf")
 def demo_pdf(audience: str = "owner"):
     """Generate a PDF from the demo report."""
