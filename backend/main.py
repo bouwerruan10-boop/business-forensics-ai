@@ -1899,6 +1899,17 @@ async def tax_income(request: Request):
     return assess_all(body if isinstance(body, dict) else {})
 
 
+@app.get("/api/tax/dispute-deadlines")
+@limiter.limit(TAX_RATE_LIMIT)
+async def tax_dispute_deadlines(request: Request, assessment_date: str = ""):
+    """Deterministic SARS dispute timeline from an assessment date: request-for-
+    reasons / objection / SARS-decision / appeal deadlines in TAA business days
+    (weekends, public holidays and the 16 Dec-15 Jan recess excluded). Public, no
+    client data; decision-support only (see services/sars_dispute.py)."""
+    from services.sars_dispute import dispute_timeline
+    return dispute_timeline(assessment_date)
+
+
 @app.get("/api/demo/pdf")
 def demo_pdf(audience: str = "owner"):
     """Generate a PDF from the demo report."""

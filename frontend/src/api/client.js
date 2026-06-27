@@ -242,6 +242,14 @@ export async function getTaxIncome(payload) {
   return res.json()
 }
 
+export async function getDisputeDeadlines(assessmentDate) {
+  const res = await fetch(`${BASE}/tax/dispute-deadlines?assessment_date=${encodeURIComponent(assessmentDate || '')}`, {
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
 export async function getRatioDiagnostics(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/ratio-diagnostics`, { headers: authHeaders() })
   if (!res.ok) throw await _friendlyError(res)

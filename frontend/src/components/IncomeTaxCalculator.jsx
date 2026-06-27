@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getTaxIncome } from '../api/client'
+import { getTaxIncome, getDisputeDeadlines } from '../api/client'
 
 const rand = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA')
 const numOrUndef = (v) => { const n = parseFloat(v); return !isNaN(n) && n > 0 ? n : undefined }
@@ -75,6 +75,19 @@ export default function IncomeTaxCalculator() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  // SARS dispute deadlines (independent lookup)
+  const [disputeDate, setDisputeDate] = useState('')
+  const [dispute, setDispute] = useState(null)
+  const [disputeErr, setDisputeErr] = useState(null)
+
+  const runDispute = async () => {
+    setDisputeErr(null); setDispute(null)
+    try {
+      const r = await getDisputeDeadlines(disputeDate)
+      if (!r.available) { setDisputeErr(r.reason || 'Enter the assessment date.'); return }
+      setDispute(r)
+    } catch (e) { setDisputeErr(e.message) }
+  }
 
   const setI = (k, v) => setInc((s) => ({ ...s, [k]: v }))
   const setV = (k, v) => setVat((s) => ({ ...s, [k]: v }))
@@ -452,6 +465,40 @@ export default function IncomeTaxCalculator() {
           {data.disclaimer && <p className="text-xs text-slate-500">{data.disclaimer}</p>}
         </div>
       )}
+
+      {/* SARS dispute deadlines (independent of the calculator) */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-white">SARS dispute deadlines</h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Disagree with an assessment? Enter its date to see the statutory deadlines in TAA business
+            days (weekends, public holidays and the 16 Dec–15 Jan recess excluded). The 80-day objection clock is the critical one.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs text-slate-400">
+            Assessment date
+            <input type="date" value={disputeDate} onChange={(e) => setDisputeDate(e.target.value)}
+              className="mt-1 block rounded-lg bg-navy border border-white/10 px-2.5 py-1.5 text-sm text-white focus:border-gold/40 outline-none" />
+          </label>
+          <button type="button" onClick={runDispute}
+            className="rounded-xl px-4 py-2 text-sm font-semibold border border-gold/40 text-gold hover:bg-gold/10">
+            Show deadlines
+          </button>
+          {disputeErr && <span className="text-sm text-red-300">{disputeErr}</span>}
+        </div>
+        {dispute && (
+          <div className="space-y-1">
+            {dispute.steps.map((s) => (
+              <div key={s.key} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+                <span className="text-xs text-slate-400">{s.label} <span className="text-slate-600">({s.business_days} bd)</span></span>
+                <span className="text-sm text-slate-200 font-medium">{s.deadline}</span>
+              </div>
+            ))}
+            <p className="text-xs text-slate-500 pt-2">{dispute.note}</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
