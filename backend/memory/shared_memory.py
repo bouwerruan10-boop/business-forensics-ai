@@ -19,6 +19,7 @@ class AgentFinding:
     cost_of_inaction: str = ""
     benchmark_reference: str = ""
     data_source: str = ""
+    evidence_plain_language: str = ""   # plain-English "what we found / from where / why it matters"
     quick_win: bool = False
     verification: str = ""        # "" | "confirmed" | "conflict" (vs computed ratios)
     verification_note: str = ""

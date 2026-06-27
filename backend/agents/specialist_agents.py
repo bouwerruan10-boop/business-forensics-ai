@@ -19,6 +19,7 @@ MANDATORY RULES FOR EVERY FINDING YOU WRITE:
 7. Flag as quick_win=true if fixable in under 30 days
 8. If there is insufficient data to make a specific finding, say so and note what data would be needed.
 9. NEVER invent, infer, estimate, or fabricate a figure that is not in the supplied data. If the data does not contain the number, write "not quantifiable from supplied data" for the financial impact rather than guessing one.
+10. EVIDENCE IN PLAIN LANGUAGE: also fill "evidence_plain_language" with one or two sentences a non-accountant understands - WHAT you found, WHERE it came from (the figure or document), and WHY it matters in rands. Use everyday words, not jargon. Example: "You are owed money for 67 days on average (debtor days, from trade receivables R2.1M vs daily sales) versus the sector's 45 - about R550K in cash tied up." This MUST be grounded in the same data; never introduce a new number here.
 Never write vague statements like "costs appear elevated" — always anchor to numbers FROM THE DATA.
 """
 

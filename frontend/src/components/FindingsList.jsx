@@ -70,6 +70,12 @@ function FindingCard({ finding }) {
             <div className="text-xs text-slate-500 font-medium uppercase tracking-wide mb-1">Recommendation</div>
             <p className="text-slate-300 leading-relaxed">{finding.recommendation}</p>
           </div>
+          {finding.evidence_plain_language && (
+            <div className="bg-gold/[0.04] border border-gold/15 rounded-lg p-3">
+              <div className="text-xs text-gold/80 font-medium uppercase tracking-wide mb-1">Evidence — in plain terms</div>
+              <p className="text-slate-300 text-xs leading-relaxed">{finding.evidence_plain_language}</p>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {finding.roi_estimate && (
               <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-lg p-3">

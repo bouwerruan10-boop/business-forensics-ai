@@ -27,6 +27,7 @@ _FINDING_PROPS = {
     "cost_of_inaction": {"type": "string"},
     "benchmark_reference": {"type": "string"},
     "data_source": {"type": "string"},
+    "evidence_plain_language": {"type": "string"},
     "quick_win": {"type": "boolean"},
 }
 _FINDINGS_OUTPUT_CONFIG = {
@@ -288,6 +289,7 @@ Return ONLY a valid JSON array. No explanation text. No markdown fences.
                 cost_of_inaction=item.get("cost_of_inaction", ""),
                 benchmark_reference=item.get("benchmark_reference", ""),
                 data_source=item.get("data_source", ""),
+                evidence_plain_language=item.get("evidence_plain_language", ""),
                 quick_win=bool(item.get("quick_win", False))
             ))
         return findings
