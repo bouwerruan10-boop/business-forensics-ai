@@ -767,6 +767,17 @@ def simulate_actions(req: ActionSimRequest, principal: Principal = Depends(get_p
     return apply_actions(result, req.actions, req.scenario)
 
 
+@app.get("/api/report/{analysis_id}/ratio-diagnostics")
+def report_ratio_diagnostics(analysis_id: str):
+    """Each financial ratio joined to its plain-language meaning, the findings that
+    reference it, and the simulator action that closes its gap (deterministic)."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.ratio_diagnostics import build_diagnostics
+    return build_diagnostics(result)
+
+
 @app.get("/api/report/{analysis_id}/levers")
 def report_levers(analysis_id: str, scenario: str = "expected"):
     """Sensitivity ranking — each action's standalone impact (the biggest levers)."""

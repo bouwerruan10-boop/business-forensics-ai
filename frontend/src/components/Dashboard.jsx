@@ -4,6 +4,7 @@ import VerdictHero from './VerdictHero'
 import AskImara from './AskImara'
 import ScoreReasons from './ScoreReasons'
 import FinancialRatios from './FinancialRatios'
+import FinancialRatioDiagnostics from './FinancialRatioDiagnostics'
 import FindingsList from './FindingsList'
 import Roadmap from './Roadmap'
 import ActionSimulator from './ActionSimulator'
@@ -232,6 +233,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
           subtitle="Ratios computed directly from your financials — traceable to source figures"
         >
           <FinancialRatios report={report} />
+          <FinancialRatioDiagnostics analysisId={analysisId} />
         </Section>
       )}
 

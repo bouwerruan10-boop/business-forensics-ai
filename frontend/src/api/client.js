@@ -241,3 +241,9 @@ export async function getTaxIncome(payload) {
   if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
+
+export async function getRatioDiagnostics(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/ratio-diagnostics`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
