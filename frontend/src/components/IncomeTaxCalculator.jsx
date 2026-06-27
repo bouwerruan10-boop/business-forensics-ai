@@ -56,6 +56,7 @@ export default function IncomeTaxCalculator() {
   // ETI roster (optional)
   const [emps, setEmps] = useState([])
   const [etiYear, setEtiYear] = useState(1)
+  const [prov, setProv] = useState({ estimate_taxable: '', latest_assessed_taxable: '', actual_taxable: '' })
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -66,6 +67,7 @@ export default function IncomeTaxCalculator() {
   const addEmp = () => setEmps((e) => [...e, { age: '', monthly_remuneration: '' }])
   const setEmp = (i, k, v) => setEmps((e) => e.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
   const delEmp = (i) => setEmps((e) => e.filter((_, j) => j !== i))
+  const setP = (k, v) => setProv((s) => ({ ...s, [k]: v }))
 
   const onlyPositive = (obj) => {
     const out = {}
@@ -84,6 +86,15 @@ export default function IncomeTaxCalculator() {
       .map((e) => ({ age: numOrUndef(e.age), monthly_remuneration: numOrUndef(e.monthly_remuneration) }))
       .filter((e) => e.age || e.monthly_remuneration)
     if (roster.length) { payload.employees = roster; payload.eti_year = etiYear }
+    const provEst = numOrUndef(prov.estimate_taxable)
+    if (provEst) {
+      const pv = { estimate_taxable: provEst }
+      if (numOrUndef(inc.age)) pv.age = numOrUndef(inc.age)
+      if (numOrUndef(inc.paye_paid)) pv.paye_paid = numOrUndef(inc.paye_paid)
+      if (numOrUndef(prov.latest_assessed_taxable)) pv.latest_assessed_taxable = numOrUndef(prov.latest_assessed_taxable)
+      if (numOrUndef(prov.actual_taxable)) pv.actual_taxable = numOrUndef(prov.actual_taxable)
+      payload.provisional = pv
+    }
     try {
       setData(await getTaxIncome(payload))
     } catch (e) {
@@ -96,6 +107,7 @@ export default function IncomeTaxCalculator() {
   const t = data?.income_tax
   const vr = data?.vat
   const er = data?.eti
+  const pr = data?.provisional
 
   return (
     <div className="space-y-6">
@@ -169,6 +181,18 @@ export default function IncomeTaxCalculator() {
         ))}
       </div>
 
+      {/* Provisional tax (optional) */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+          Provisional tax (IRP6) <span className="text-slate-500 normal-case">(optional — uses Age & PAYE above)</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <NumField label="Estimated taxable income (year)" value={prov.estimate_taxable} onChange={(v) => setP('estimate_taxable', v)} />
+          <NumField label="Last assessed taxable income" value={prov.latest_assessed_taxable} onChange={(v) => setP('latest_assessed_taxable', v)} />
+          <NumField label="Actual taxable income (if known)" value={prov.actual_taxable} onChange={(v) => setP('actual_taxable', v)} />
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <button type="button" onClick={run} disabled={loading}
           className="rounded-xl px-5 py-2.5 text-sm font-semibold bg-gold text-navy hover:bg-gold/90 disabled:opacity-50">
@@ -224,6 +248,21 @@ export default function IncomeTaxCalculator() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+          {pr && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-sm font-semibold text-white mb-3">Provisional tax (IRP6)</h2>
+              <Row label="Tax on estimate" value={rand(pr.tax_on_estimate)} />
+              <Row label="First payment" value={rand(pr.first_payment)} />
+              <Row label="Second payment" value={rand(pr.second_payment)} />
+              <Row label="Total provisional" value={rand(pr.total_provisional)} strong />
+              {pr.underestimation_penalty !== undefined && (
+                <Row label="Under-estimation penalty (par 20)" value={rand(pr.underestimation_penalty)} />
+              )}
+              {pr.balance_on_assessment !== undefined && (
+                <Row label="Balance on assessment" value={rand(pr.balance_on_assessment)} strong />
+              )}
             </div>
           )}
           {data.disclaimer && <p className="text-xs text-slate-500">{data.disclaimer}</p>}
