@@ -11,7 +11,7 @@ advice; figures are SARS 2026/27 and must be confirmed with a practitioner.
 
 from services import (
     income_tax, vat_calc, eti, provisional_tax, cgt, fringe_benefits, lump_sum,
-    assessed_losses,
+    assessed_losses, tax_residency, exit_tax, foreign_income,
 )
 
 _INCOME_KEYS = (
@@ -42,6 +42,9 @@ _LOSS_KEYS = (
     "taxable_income_before", "balance_brought_forward", "taxpayer",
     "suspect_trade", "fails_facts_test",
 )
+_RESIDENCY_KEYS = ("current_year_days", "prior_years_days", "days_continuously_absent")
+_EXIT_KEYS = ("deemed_gains", "taxpayer", "total_losses", "other_taxable_income", "age")
+_FOREIGN_KEYS = ("foreign_employment_income", "days_outside_total", "longest_continuous_days")
 
 _DISCLAIMER = (
     "Decision-support only - not tax advice. Figures are SARS 2026/27; confirm "
@@ -96,5 +99,17 @@ def assess_all(body):
     loss = _pick(body.get("assessed_loss"), _LOSS_KEYS)
     if loss and (loss.get("balance_brought_forward") or loss.get("taxable_income_before")):
         out["assessed_loss"] = assessed_losses.assess_assessed_loss(**loss)
+
+    residency = _pick(body.get("residency"), _RESIDENCY_KEYS)
+    if residency and residency.get("current_year_days") is not None:
+        out["residency"] = tax_residency.physical_presence_test(**residency)
+
+    exit_in = _pick(body.get("exit_tax"), _EXIT_KEYS)
+    if exit_in and exit_in.get("deemed_gains"):
+        out["exit_tax"] = exit_tax.assess_exit_tax(**exit_in)
+
+    foreign = _pick(body.get("foreign_income"), _FOREIGN_KEYS)
+    if foreign and foreign.get("foreign_employment_income"):
+        out["foreign_income"] = foreign_income.assess_foreign_employment(**foreign)
 
     return out

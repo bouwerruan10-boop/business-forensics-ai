@@ -71,6 +71,11 @@ export default function IncomeTaxCalculator() {
   const [loss, setLossState] = useState({ taxable_income_before: '', balance_brought_forward: '' })
   const [lossTaxpayer, setLossTaxpayer] = useState('company')
   const [lossSuspect, setLossSuspect] = useState(false)
+  // Cross-border (optional)
+  const [resid, setResid] = useState({ current_year_days: '', p1: '', p2: '', p3: '', p4: '', p5: '', days_continuously_absent: '' })
+  const [exitT, setExitT] = useState({ deemed_gains: '', other_taxable_income: '' })
+  const [exitTaxpayer, setExitTaxpayer] = useState('individual')
+  const [foreign, setForeign] = useState({ foreign_employment_income: '', days_outside_total: '', longest_continuous_days: '' })
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -107,6 +112,9 @@ export default function IncomeTaxCalculator() {
   const setF = (k, v) => setFringe((s) => ({ ...s, [k]: v }))
   const setL = (k, v) => setLump((s) => ({ ...s, [k]: v }))
   const setLoss = (k, v) => setLossState((s) => ({ ...s, [k]: v }))
+  const setR = (k, v) => setResid((s) => ({ ...s, [k]: v }))
+  const setEx = (k, v) => setExitT((s) => ({ ...s, [k]: v }))
+  const setFgn = (k, v) => setForeign((s) => ({ ...s, [k]: v }))
 
   const onlyPositive = (obj) => {
     const out = {}
@@ -160,6 +168,30 @@ export default function IncomeTaxCalculator() {
       if (lossTaxpayer !== 'company' && lossSuspect) lossIn.suspect_trade = true
       payload.assessed_loss = lossIn
     }
+    const cyd = numOrUndef(resid.current_year_days)
+    if (cyd) {
+      const priors = ['p1', 'p2', 'p3', 'p4', 'p5'].map((k) => numOrUndef(resid[k]) || 0)
+      const rp = { current_year_days: cyd, prior_years_days: priors }
+      if (numOrUndef(resid.days_continuously_absent)) rp.days_continuously_absent = numOrUndef(resid.days_continuously_absent)
+      payload.residency = rp
+    }
+    const dg = numOrUndef(exitT.deemed_gains)
+    if (dg) {
+      const ep = { deemed_gains: dg, taxpayer: exitTaxpayer }
+      if (exitTaxpayer === 'individual') {
+        if (numOrUndef(exitT.other_taxable_income)) ep.other_taxable_income = numOrUndef(exitT.other_taxable_income)
+        if (numOrUndef(inc.age)) ep.age = numOrUndef(inc.age)
+      }
+      payload.exit_tax = ep
+    }
+    const fi = numOrUndef(foreign.foreign_employment_income)
+    if (fi) {
+      payload.foreign_income = {
+        foreign_employment_income: fi,
+        days_outside_total: numOrUndef(foreign.days_outside_total) || 0,
+        longest_continuous_days: numOrUndef(foreign.longest_continuous_days) || 0,
+      }
+    }
     try {
       setData(await getTaxIncome(payload))
     } catch (e) {
@@ -177,6 +209,9 @@ export default function IncomeTaxCalculator() {
   const fbr = data?.fringe_benefits
   const lr = data?.lump_sum
   const alr = data?.assessed_loss
+  const rr = data?.residency
+  const etr = data?.exit_tax
+  const fir = data?.foreign_income
 
   return (
     <div className="space-y-6">
@@ -352,6 +387,56 @@ export default function IncomeTaxCalculator() {
         )}
       </div>
 
+      {/* Cross-border (Tax Me If You Can) */}
+      <div className="rounded-2xl border border-gold/20 bg-gold/[0.03] p-5 space-y-4">
+        <div className="text-xs font-semibold text-gold uppercase tracking-wide">
+          Cross-border — “Tax Me If You Can” <span className="text-slate-500 normal-case">(optional — residency, exit tax, foreign income)</span>
+        </div>
+
+        {/* Residency day-count */}
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold text-slate-300">Physical-presence test (days in SA)</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <NumField label="This year" value={resid.current_year_days} onChange={(v) => setR('current_year_days', v)} />
+            <NumField label="Prior yr 1" value={resid.p1} onChange={(v) => setR('p1', v)} />
+            <NumField label="Prior yr 2" value={resid.p2} onChange={(v) => setR('p2', v)} />
+            <NumField label="Prior yr 3" value={resid.p3} onChange={(v) => setR('p3', v)} />
+            <NumField label="Prior yr 4" value={resid.p4} onChange={(v) => setR('p4', v)} />
+            <NumField label="Prior yr 5" value={resid.p5} onChange={(v) => setR('p5', v)} />
+            <NumField label="Continuous days absent" value={resid.days_continuously_absent} onChange={(v) => setR('days_continuously_absent', v)} />
+          </div>
+        </div>
+
+        {/* Exit tax */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-semibold text-slate-300">Exit tax (s9H deemed disposal)</div>
+            <select value={exitTaxpayer} onChange={(e) => setExitTaxpayer(e.target.value)}
+              className="text-xs rounded-lg bg-navy border border-white/10 px-2 py-1 text-slate-200 focus:border-gold/40 outline-none">
+              <option value="individual">Individual</option>
+              <option value="company">Company</option>
+              <option value="trust">Trust</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <NumField label="Deemed gain (excl. SA property)" value={exitT.deemed_gains} onChange={(v) => setEx('deemed_gains', v)} />
+            {exitTaxpayer === 'individual' && (
+              <NumField label="Other taxable income" value={exitT.other_taxable_income} onChange={(v) => setEx('other_taxable_income', v)} />
+            )}
+          </div>
+        </div>
+
+        {/* Foreign employment income */}
+        <div className="space-y-2">
+          <div className="text-[11px] font-semibold text-slate-300">Foreign employment income (s10(1)(o)(ii))</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <NumField label="Foreign employment income" value={foreign.foreign_employment_income} onChange={(v) => setFgn('foreign_employment_income', v)} />
+            <NumField label="Days outside SA (total)" value={foreign.days_outside_total} onChange={(v) => setFgn('days_outside_total', v)} />
+            <NumField label="Longest continuous days out" value={foreign.longest_continuous_days} onChange={(v) => setFgn('longest_continuous_days', v)} />
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <button type="button" onClick={run} disabled={loading}
           className="rounded-xl px-5 py-2.5 text-sm font-semibold bg-gold text-navy hover:bg-gold/90 disabled:opacity-50">
@@ -468,6 +553,44 @@ export default function IncomeTaxCalculator() {
               <Row label="Set-off allowed this year" value={'− ' + rand(alr.allowed_setoff)} />
               <Row label="Taxable income after set-off" value={rand(alr.taxable_income_after)} strong />
               <Row label="Loss carried forward" value={rand(alr.carried_forward)} strong />
+            </div>
+          )}
+          {rr && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-white">Tax residency (physical-presence test)</h2>
+                <span className={`text-xs rounded-lg px-2.5 py-1 border ${rr.resident_by_presence ? 'border-amber-400/40 text-amber-300 bg-amber-400/10' : 'border-emerald-400/40 text-emerald-300 bg-emerald-400/10'}`}>
+                  {rr.status.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {rr.prongs.map((p) => (
+                <Row key={p.prong} label={p.label} value={p.met ? '✓ met' : '✗ not met'} />
+              ))}
+              <p className="text-xs text-slate-400 mt-2">{rr.summary}</p>
+              <p className="text-xs text-slate-600 mt-1">{rr.ordinarily_resident_note}</p>
+            </div>
+          )}
+          {etr && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-sm font-semibold text-white mb-3">Exit tax (s9H deemed disposal · {etr.taxpayer})</h2>
+              <Row label="Deemed gain" value={rand(etr.deemed_gains)} />
+              <Row label="Taxable capital gain" value={rand(etr.taxable_capital_gain)} />
+              <Row label="Exit tax payable" value={rand(etr.exit_tax_payable)} strong />
+              <p className="text-xs text-slate-600 mt-2">{etr.excluded_assets_note}</p>
+            </div>
+          )}
+          {fir && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-white">Foreign employment income (s10(1)(o)(ii))</h2>
+                <span className={`text-xs rounded-lg px-2.5 py-1 border ${fir.qualifies ? 'border-emerald-400/40 text-emerald-300 bg-emerald-400/10' : 'border-red-400/40 text-red-300 bg-red-400/10'}`}>
+                  {fir.qualifies ? 'qualifies' : 'no exemption'}
+                </span>
+              </div>
+              <Row label="Foreign employment income" value={rand(fir.foreign_employment_income)} />
+              <Row label="Exempt (cap R1.25m)" value={'− ' + rand(fir.exempt_amount)} />
+              <Row label="Taxable in SA" value={rand(fir.taxable_amount)} strong />
+              <p className="text-xs text-slate-400 mt-2">{fir.summary}</p>
             </div>
           )}
           {data.disclaimer && <p className="text-xs text-slate-500">{data.disclaimer}</p>}

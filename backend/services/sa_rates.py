@@ -146,6 +146,25 @@ TRAVEL_INCLUSION_BUSINESS = 0.20
 ASSESSED_LOSS_SETOFF_FLOOR = 1_000_000   # the R1m floor below which a company may set off in full
 ASSESSED_LOSS_SETOFF_CAP_PCT = 0.80      # else limited to 80% of taxable income before set-off
 
+# -- Tax residency: physical-presence test (s1 "resident", Income Tax Act 58/1962) --
+# A natural person is resident by physical presence if present in SA for MORE THAN
+# 91 days in the current year of assessment, MORE THAN 91 days in EACH of the 5
+# preceding years, AND MORE THAN 915 days in AGGREGATE across those 5 preceding
+# years. A person resident on this basis CEASES to be resident once outside SA for
+# a continuous period of at least 330 full days. Re-verify against SARS.
+PRESENCE_CURRENT_MIN = 91          # > 91 days in the year under consideration
+PRESENCE_EACH_PRIOR_MIN = 91       # > 91 days in EACH of the 5 preceding years
+PRESENCE_AGGREGATE_PRIOR_MIN = 915  # > 915 days in aggregate over the 5 preceding years
+PRESENCE_CESSATION_DAYS = 330      # continuous full days outside SA that end residency
+
+# -- Foreign employment income exemption (s10(1)(o)(ii), Income Tax Act 58/1962) --
+# The first R1.25m of foreign EMPLOYMENT income is exempt where the employee renders
+# services outside SA for more than 183 days in aggregate in any 12-month period,
+# INCLUDING a continuous period of more than 60 full days outside SA. Re-verify.
+FOREIGN_EMPLOYMENT_EXEMPTION_CAP = 1_250_000
+FOREIGN_DAYS_TOTAL_MIN = 183       # > 183 days outside SA in the 12-month period
+FOREIGN_DAYS_CONTINUOUS_MIN = 60   # including a continuous block > 60 full days
+
 # ── Skills Development Levy ──
 SDL_RATE = 1.0                    # %  of total annual payroll
 SDL_EXEMPT_PAYROLL = 500_000      # R/year; below this the employer is SDL-exempt
