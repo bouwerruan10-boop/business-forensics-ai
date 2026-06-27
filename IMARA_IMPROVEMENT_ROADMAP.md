@@ -33,6 +33,24 @@ A new flagship initiative now sits **above the Imara tiers in priority** (Ruan's
 
 ---
 
+## 2026-06-27 — Execution plan: SA tax engine + report quality + repo cleanup (from the Charl working session)
+
+A concrete near-term build plan, distinct from the cross-border flagship above: a **SA income / expense / tax analysis module** — an IRP5-clone input feeding income tax, VAT, ETI, and provisional-vs-full-year calculations (Taxtim-grade, but for SA SMEs **and** their owners — scope confirmed with Ruan = BOTH entity and individual). Plus report-quality upgrades. Full plan + code grounding: the approved plan file (`~/.claude/plans/...rocket.md`).
+
+**Strategic frame (competitor-landscape research, 2026-06-26):** Imara's defensible whitespace = SME-direct + deep SA compliance + a single bankability score + *verified* anti-hallucination. Biggest threat = **Fathom** (already ships number-traceable AI narration). So the two highest-leverage builds are the **SA tax engine** (deepens the compliance moat) and **evidence-in-plain-language** (neutralises Fathom with infra Imara already has).
+
+**Sequence & status:**
+- **[DONE] W0 — repo cleanup (shipped).** Removed stale/dangerous push+deploy scripts (`push_imara.bat`, `PUSH.bat/ps1`, `DEPLOY.bat/ps1`, `build_frontend.bat`, `CHECK_BACKEND.bat`, `CREATE_SHORTCUT.bat`); standard path is now plain `git push`; tidied `redeploy_imara.bat`. (commits `725e34c`, `4a4a40b`, `257f30e`.)
+- **[IN PROGRESS] W1 — tax engine (phased):**
+  - **[DONE] (i-a)** `services/vat_calc.py` — deterministic VAT (15/115 fraction, VAT201 categories, net payable/refund) + 9 unit tests (commit `008a6d0`).
+  - **[DEFERRED] (i-b)** `services/eti.py`, **(ii)** `services/income_tax.py` + IRP5 input form + `/api/tax/income`, **(iii)** `services/provisional_tax.py`. The external SA-tax research cycle (2026-06-27) was cut short by a provider outage, so the exact **ETI bands, travel-allowance deemed-cost table, and provisional-penalty** figures are unconfirmed. Per the deterministic-first / dated-figures discipline these ship only once each rate is SARS-cited in `sa_rates.py` — re-run the research after the limit resets, then build.
+- **[QUEUED] W2 — report quality (no Score-formula change):** (c) **evidence-in-plain-language** on `AgentFinding` (counters Fathom; LLM-behaviour change → gate on `run_live_verify.bat`); (b) ratio→finding→action linking; (a) more intake context → client-tailored report; (d) changeable-vs-fixed do's/don'ts (`services/constraints.py`).
+- **[DONE] W3 — IP posture (doc):** SA patent-infringement risk is **LOW** (software excluded "as such"; non-examining office; no case law) — real exposure is trademark + copyright. Captured in `legal/IMARA_TRADEMARK_RISK_BRIEF.md` §7.
+
+**Verification gates:** pure unit tests + a golden-set of SARS worked examples per tax service; `ruff F401/F811/F841` + `vulture`; `vite build`; live A/B for any LLM-behaviour change; date + cite every rate in `sa_rates.py`.
+
+---
+
 ## Tier 0 — The actual highest-value work (Ruan-led; I execute the analysis)
 
 **This is the plan. Everything below is secondary.**

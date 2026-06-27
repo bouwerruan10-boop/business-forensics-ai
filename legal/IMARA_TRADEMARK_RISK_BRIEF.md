@@ -57,6 +57,20 @@ A clash in **class 36** (and likely 9/42) is the realistic exposure.
 4. **If you keep "Imara":** only do so on a written attorney opinion, and consider seeking a **coexistence agreement** with Imara Group defining the SME-decision-support niche — but plan for the realistic chance they decline.
 5. **Either way, register the chosen mark** (classes 9/36/42) to stop the *next* entrant and to strengthen your own position.
 
+## 7. Patent risk (added 2026-06-27) — LOW
+
+Separate from the trademark question above: could Imara infringe a software **patent** of a similar program in SA?
+
+- **Software is largely unpatentable in SA "as such".** The Patents Act 57 of 1978 (s25(2)) excludes "a program for a computer ... as such" (with mathematical methods and methods of doing business). A computer-implemented invention with a genuine technical effect *may* squeak through, but the carve-out is narrow.
+- **No SA case law.** SA courts have never ruled on the software exclusion; scope is genuinely uncertain and courts would likely look to UK/EPO reasoning.
+- **SA is a non-examining (depository) office.** CIPC grants patents on formalities only — no novelty/inventive-step exam — so any granted SA software patent is weak and readily challengeable.
+- **Net: patent-infringement risk for Imara in SA is LOW.** Comparable SA fintechs (Taxtim et al.) protect via trademark + copyright + trade secret, not patents. The real IP exposure is **trademark (this brief) and copyright**.
+
+**Do:** keep the trademark workstream (§1–6) as the priority; protect source/UI via copyright + NDAs/confidentiality + trade-secret hygiene; register the chosen mark.
+**Don't:** clone a competitor's specific UI/question-flow verbatim (e.g. Taxtim's interview screens) — that is a copyright risk; don't represent Imara as "patented".
+
+*Verification note: an automated research pass on 2026-06-27 was cut short by a provider outage; the above reflects well-established SA IP law but should be confirmed in the attorney opinion recommended in §6.2 (cheap to fold in).*
+
 ---
 
 *Sources: imara.com; imaracapital.com; african-markets.com; Trade Marks Act 194 of 1993 (SAFLII / WIPO Lex); SA IP firms (Adams & Adams, Spoor & Fisher, SAIIPL); CIPC IPOnline + SA trademark-filing guides; trademark coexistence-agreement practitioner guidance. Full links in the chat message. This brief is research and risk-scoping only and is **not legal advice.***
