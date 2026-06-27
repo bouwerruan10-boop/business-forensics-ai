@@ -247,3 +247,9 @@ export async function getRatioDiagnostics(analysisId) {
   if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
+
+export async function getActionConstraints(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/action-constraints`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}

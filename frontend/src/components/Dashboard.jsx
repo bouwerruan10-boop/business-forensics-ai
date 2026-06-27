@@ -8,6 +8,7 @@ import FinancialRatioDiagnostics from './FinancialRatioDiagnostics'
 import FindingsList from './FindingsList'
 import Roadmap from './Roadmap'
 import ActionSimulator from './ActionSimulator'
+import ActionConstraints from './ActionConstraints'
 import EconomicEnvironment from './EconomicEnvironment'
 import BankabilityEvidence from './BankabilityEvidence'
 import CashFlow13Week from './CashFlow13Week'
@@ -438,6 +439,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         subtitle="See the projected outcome of the actions you could take — on your numbers and your Imara Score"
       >
         <ActionSimulator analysisId={analysisId} currency={report.currency} />
+        <ActionConstraints analysisId={analysisId} />
       </Section>
 
       {/* Methodology & confidence */}

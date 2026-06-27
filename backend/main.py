@@ -788,6 +788,17 @@ def report_levers(analysis_id: str, scenario: str = "expected"):
     return {"levers": rank_levers(result, scenario)}
 
 
+@app.get("/api/report/{analysis_id}/action-constraints")
+def report_action_constraints(analysis_id: str):
+    """Each improvement action with changeable-vs-fixed guidance + do's/don'ts
+    (realistic-ceiling decision-support; does not change the Score)."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.action_constraints import annotate
+    return annotate(result)
+
+
 @app.get("/api/report/{analysis_id}/optimize")
 def report_optimize(analysis_id: str, scenario: str = "expected",
                     max_actions: int = 3, objective: str = "imara"):
