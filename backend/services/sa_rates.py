@@ -86,6 +86,16 @@ def company_flat_tax(taxable_income) -> float:
     return max(0.0, float(taxable_income or 0)) * COMPANY_FLAT_RATE / 100.0
 
 
+# ── Capital Gains Tax (8th Schedule) ──
+# Source: SARS CGT rates; Budget 2026 raised the individual annual exclusion R40k->R50k
+# and the primary-residence exclusion R2m->R3m (effective 25 February 2026).
+CGT_INCLUSION_INDIVIDUAL = 0.40        # individuals & special trusts
+CGT_INCLUSION_COMPANY = 0.80           # companies & ordinary trusts
+CGT_ANNUAL_EXCLUSION = 50_000          # individual annual exclusion (2026)
+CGT_DEATH_EXCLUSION = 300_000          # individual exclusion in the year of death
+CGT_PRIMARY_RESIDENCE_EXCLUSION = 3_000_000   # gain excluded on a primary residence
+TRUST_FLAT_RATE = 45.0                 # ordinary-trust income-tax rate (%)
+
 # ── Employment Tax Incentive (ETI) — bands effective 1 April 2025 ──
 # Source: ETI Act 26 of 2013 (as amended); SARS "ETI changes with effect from 1 April 2025".
 # Monthly incentive per qualifying employee (age 18-29), by monthly remuneration band:
