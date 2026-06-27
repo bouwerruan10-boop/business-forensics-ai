@@ -94,6 +94,7 @@ export default function SACompliancePanel({ report }) {
   const assurance     = report?.assurance || null
   const calendar      = report?.compliance_calendar || null
   const tcs           = report?.tcs_status || null
+  const auditRisk     = report?.audit_risk || null
 
   // Pull SA findings from all_findings_ranked
   const allFindings = report?.all_findings_ranked || []
@@ -214,6 +215,35 @@ export default function SACompliancePanel({ report }) {
           <p className="text-[9px] text-slate-600 mt-2">{calendar.note}</p>
         </div>
       )}
+
+      {auditRisk?.available && (() => {
+        const c = auditRisk.band === 'high' ? '#ef4444' : auditRisk.band === 'elevated' ? '#f97316' : auditRisk.band === 'moderate' ? '#f59e0b' : '#22c55e'
+        return (
+          <div className="bg-[#161b27] border border-white/8 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[13px] font-bold text-white flex items-center gap-2">
+                🔍 SARS Audit-Risk Score
+                <span className="text-[10px] text-slate-400 font-normal">aggregated from structural tax-risk flags · overlay only</span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded border" style={{ color: c, borderColor: c + '55', background: c + '15' }}>
+                {auditRisk.band?.toUpperCase()}
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-3xl font-black" style={{ color: c }}>{auditRisk.score}<span className="text-sm text-slate-500">/100</span></div>
+              <p className="text-[11px] text-slate-300 flex-1">{auditRisk.verdict}</p>
+            </div>
+            {auditRisk.drivers?.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {auditRisk.drivers.map((d, i) => (
+                  <span key={i} className={`text-[9px] px-2 py-0.5 rounded-full border ${d.severity === 'high' ? 'text-red-400 border-red-500/30' : d.severity === 'medium' ? 'text-amber-400 border-amber-500/30' : 'text-slate-400 border-white/15'}`}>{d.title}</span>
+                ))}
+              </div>
+            )}
+            <p className="text-[9px] text-slate-600 mt-2">{auditRisk.note}</p>
+          </div>
+        )
+      })()}
 
       {tcs?.available && (() => {
         const pillarMeta = {

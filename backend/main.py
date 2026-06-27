@@ -932,6 +932,19 @@ def report_tcs_status(analysis_id: str):
     return build_tcs_status(result)
 
 
+@app.get("/api/report/{analysis_id}/audit-risk")
+def report_audit_risk(analysis_id: str):
+    """SARS audit-likelihood score (0-100) aggregated from the structural tax-risk
+    flags. Deterministic overlay; does not affect the Imara Score."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("audit_risk"):
+        return result["audit_risk"]
+    from services.audit_risk import build_audit_risk
+    return build_audit_risk(result)
+
+
 @app.get("/api/report/{analysis_id}/cashflow")
 def report_cashflow(analysis_id: str):
     """Deterministic 13-week direct-method cash-flow projection - the short-term
@@ -1444,6 +1457,10 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["compliance_calendar"] = build_compliance_calendar(report)
             from services.tcs_status import build_tcs_status
             report["tcs_status"] = build_tcs_status(report)
+            from services.audit_risk import build_audit_risk
+            _ar = build_audit_risk(report)
+            if _ar.get("available"):
+                report["audit_risk"] = _ar
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark
@@ -1765,6 +1782,10 @@ def _enrich_demo():
     DEMO_REPORT["compliance_calendar"] = _build_cal(DEMO_REPORT)
     from services.tcs_status import build_tcs_status as _build_tcs
     DEMO_REPORT["tcs_status"] = _build_tcs(DEMO_REPORT)
+    from services.audit_risk import build_audit_risk as _build_ar
+    _demo_ar = _build_ar(DEMO_REPORT)
+    if _demo_ar.get("available"):
+        DEMO_REPORT["audit_risk"] = _demo_ar
 
     # SA Compliance panel — demo renders the full panel (incl. the Assurance & Compliance
     # Calendar cards) by setting the performed flags + realistic SA fields for Mzansi Retail.
