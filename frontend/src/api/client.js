@@ -229,3 +229,15 @@ export async function getTaxRelocation(payload) {
   if (!res.ok) throw await _friendlyError(res)
   return res.json()
 }
+
+// SA income / VAT / ETI assessment from IRP5-style inputs. Public POST endpoint;
+// returns { income_tax, vat, eti, disclaimer } (sections present only when supplied).
+export async function getTaxIncome(payload) {
+  const res = await fetch(`${BASE}/tax/income`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}

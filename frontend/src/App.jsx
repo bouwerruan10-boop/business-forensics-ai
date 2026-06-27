@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard'
 import AdminDashboard from './components/AdminDashboard'
 import SharedReport from './components/SharedReport'
 import TaxPlanner from './components/TaxPlanner'
+import IncomeTaxCalculator from './components/IncomeTaxCalculator'
 import NotFound from './components/NotFound'
 import Login from './components/Login'
 import Toast from './components/Toast'
@@ -15,6 +16,7 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default function App() {
   const [phase, setPhase] = useState('intake') // intake | analyzing | done | admin
+  const [taxTab, setTaxTab] = useState('income') // income | relocation
   const [profile, setProfile] = useState(null)
   const [analysisId, setAnalysisId] = useState(null)
   const [status, setStatus] = useState(null)
@@ -242,8 +244,18 @@ export default function App() {
         )}
 
         {phase === 'tax' && (
-          <div className="fade-in">
-            <TaxPlanner />
+          <div className="fade-in space-y-4">
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setTaxTab('income')}
+                className={`text-sm rounded-lg px-3.5 py-1.5 border transition-colors ${taxTab === 'income' ? 'border-gold/50 text-gold bg-gold/10' : 'border-white/10 text-slate-400 hover:border-white/25 hover:text-white'}`}>
+                Income &amp; Tax (IRP5)
+              </button>
+              <button type="button" onClick={() => setTaxTab('relocation')}
+                className={`text-sm rounded-lg px-3.5 py-1.5 border transition-colors ${taxTab === 'relocation' ? 'border-gold/50 text-gold bg-gold/10' : 'border-white/10 text-slate-400 hover:border-white/25 hover:text-white'}`}>
+                Relocation
+              </button>
+            </div>
+            {taxTab === 'relocation' ? <TaxPlanner /> : <IncomeTaxCalculator />}
           </div>
         )}
       </main>
