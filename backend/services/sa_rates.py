@@ -107,6 +107,15 @@ ETI_MAX_MONTHLY_Y2 = 750.0        # overall max monthly incentive, second 12 mon
 ETI_AGE_MIN = 18
 ETI_AGE_MAX = 29
 
+# -- Travel allowance / reimbursive travel (section 8(1)(b)) --
+# Prescribed tax-free rate per km, 1 March 2026 - 28 Feb 2027 (SARS Rate-per-Kilometre
+# schedule PAYE-GEN-01-G03-A01). Used for the simplified deemed-cost deduction.
+TRAVEL_RATE_PER_KM = 4.95
+# PAYE inclusion of a travel ALLOWANCE in remuneration: 80%, reduced to 20% where the
+# employer is satisfied >= 80% of use will be for business (s8(1)(b)).
+TRAVEL_INCLUSION_DEFAULT = 0.80
+TRAVEL_INCLUSION_BUSINESS = 0.20
+
 # ── Skills Development Levy ──
 SDL_RATE = 1.0                    # %  of total annual payroll
 SDL_EXEMPT_PAYROLL = 500_000      # R/year; below this the employer is SDL-exempt
