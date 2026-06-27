@@ -9,7 +9,7 @@ each engine, so an arbitrary/hostile body can never raise a TypeError. Not tax
 advice; figures are SARS 2026/27 and must be confirmed with a practitioner.
 """
 
-from services import income_tax, vat_calc, eti
+from services import income_tax, vat_calc, eti, provisional_tax
 
 _INCOME_KEYS = (
     "salary", "annual_payment", "commission", "overtime", "travel_allowance",
@@ -19,6 +19,11 @@ _INCOME_KEYS = (
 _VAT_KEYS = (
     "standard_rated_incl", "standard_rated_excl", "zero_rated", "exempt",
     "input_capital_incl", "input_other_incl", "output_adjustments", "input_adjustments",
+)
+
+_PROV_KEYS = (
+    "estimate_taxable", "age", "paye_paid", "latest_assessed_taxable",
+    "escalation_years", "actual_taxable",
 )
 
 _DISCLAIMER = (
@@ -54,5 +59,9 @@ def assess_all(body):
     if isinstance(employees, list) and employees:
         year = 2 if body.get("eti_year") == 2 else 1
         out["eti"] = eti.quantify_eti(employees, year=year)
+
+    prov = _pick(body.get("provisional"), _PROV_KEYS)
+    if prov:
+        out["provisional"] = provisional_tax.assess_provisional(**prov)
 
     return out

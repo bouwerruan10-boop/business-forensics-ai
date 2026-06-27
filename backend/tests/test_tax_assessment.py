@@ -43,3 +43,11 @@ def test_endpoint_smoke():
         resp = c.post("/api/tax/income", json={"income": {"salary": 300_000, "age": 30}})
         assert resp.status_code == 200
         assert resp.json()["income_tax"]["taxable_income"] == 300_000.0
+
+
+def test_provisional_section():
+    r = assess_all({"provisional": {"estimate_taxable": 300_000, "age": 30,
+                                    "latest_assessed_taxable": 280_000}})
+    assert r["provisional"]["tax_on_estimate"] == 300_000.0 * 0 + 40_572.0
+    assert r["provisional"]["total_provisional"] == 40_572.0
+    assert "income_tax" not in r   # only the provisional section was supplied

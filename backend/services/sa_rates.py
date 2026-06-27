@@ -107,6 +107,15 @@ ETI_MAX_MONTHLY_Y2 = 750.0        # overall max monthly incentive, second 12 mon
 ETI_AGE_MIN = 18
 ETI_AGE_MAX = 29
 
+# -- Provisional tax (IRP6) --
+# Source: Income Tax Act, Fourth Schedule (par 19-21, 27); SARS Guide to Provisional Tax.
+PROV_PENALTY_RATE = 0.20             # par 20 under-estimation penalty (20% of shortfall)
+PROV_UNDERSTATE_THRESHOLD = 1_000_000  # taxable-income line splitting the 90% vs 80% safe harbour
+PROV_SAFE_HARBOUR_LE_1M = 0.90       # estimate must reach lesser(90% of actual, basic amount) if <= R1m
+PROV_SAFE_HARBOUR_GT_1M = 0.80       # estimate must reach 80% of actual if > R1m (basic amount ignored)
+PROV_LATE_PAYMENT_PENALTY = 0.10     # par 27 late-payment penalty (10% of unpaid amount)
+PROV_BASIC_AMOUNT_ESCALATION = 0.08  # 8% p.a. escalation if the latest assessment is > 18 months old
+
 # -- Travel allowance / reimbursive travel (section 8(1)(b)) --
 # Prescribed tax-free rate per km, 1 March 2026 - 28 Feb 2027 (SARS Rate-per-Kilometre
 # schedule PAYE-GEN-01-G03-A01). Used for the simplified deemed-cost deduction.
