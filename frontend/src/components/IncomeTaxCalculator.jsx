@@ -67,6 +67,10 @@ export default function IncomeTaxCalculator() {
   // Lump sum (optional)
   const [lump, setLump] = useState({ amount: '', prior: '' })
   const [lumpKind, setLumpKind] = useState('retirement')
+  // Assessed loss (optional)
+  const [loss, setLossState] = useState({ taxable_income_before: '', balance_brought_forward: '' })
+  const [lossTaxpayer, setLossTaxpayer] = useState('company')
+  const [lossSuspect, setLossSuspect] = useState(false)
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -81,6 +85,7 @@ export default function IncomeTaxCalculator() {
   const setC = (k, v) => setCgt((s) => ({ ...s, [k]: v }))
   const setF = (k, v) => setFringe((s) => ({ ...s, [k]: v }))
   const setL = (k, v) => setLump((s) => ({ ...s, [k]: v }))
+  const setLoss = (k, v) => setLossState((s) => ({ ...s, [k]: v }))
 
   const onlyPositive = (obj) => {
     const out = {}
@@ -128,6 +133,12 @@ export default function IncomeTaxCalculator() {
       if (numOrUndef(lump.prior)) lp.prior = numOrUndef(lump.prior)
       payload.lump_sum = lp
     }
+    const lossIn = onlyPositive(loss)
+    if (numOrUndef(loss.balance_brought_forward)) {
+      lossIn.taxpayer = lossTaxpayer
+      if (lossTaxpayer !== 'company' && lossSuspect) lossIn.suspect_trade = true
+      payload.assessed_loss = lossIn
+    }
     try {
       setData(await getTaxIncome(payload))
     } catch (e) {
@@ -144,6 +155,7 @@ export default function IncomeTaxCalculator() {
   const cr = data?.cgt
   const fbr = data?.fringe_benefits
   const lr = data?.lump_sum
+  const alr = data?.assessed_loss
 
   return (
     <div className="space-y-6">
@@ -294,6 +306,31 @@ export default function IncomeTaxCalculator() {
         </div>
       </div>
 
+      {/* Assessed loss (optional) */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+            Assessed loss (s20) <span className="text-slate-500 normal-case">(optional — loss brought forward)</span>
+          </div>
+          <select value={lossTaxpayer} onChange={(e) => setLossTaxpayer(e.target.value)}
+            className="text-xs rounded-lg bg-navy border border-white/10 px-2 py-1 text-slate-200 focus:border-gold/40 outline-none">
+            <option value="company">Company</option>
+            <option value="individual">Individual</option>
+            <option value="trust">Trust</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <NumField label="Taxable income (before set-off)" value={loss.taxable_income_before} onChange={(v) => setLoss('taxable_income_before', v)} />
+          <NumField label="Assessed loss brought forward" value={loss.balance_brought_forward} onChange={(v) => setLoss('balance_brought_forward', v)} />
+        </div>
+        {lossTaxpayer !== 'company' && (
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            <input type="checkbox" checked={lossSuspect} onChange={(e) => setLossSuspect(e.target.checked)} className="accent-gold" />
+            Suspect trade (s20A ring-fencing if top-bracket)
+          </label>
+        )}
+      </div>
+
       <div className="flex items-center gap-3">
         <button type="button" onClick={run} disabled={loading}
           className="rounded-xl px-5 py-2.5 text-sm font-semibold bg-gold text-navy hover:bg-gold/90 disabled:opacity-50">
@@ -396,6 +433,20 @@ export default function IncomeTaxCalculator() {
               <Row label="Tax on lump sum" value={rand(lr.tax)} strong />
               <Row label="Net in hand" value={rand(lr.net)} strong />
               <Row label="Effective rate" value={lr.effective_rate_pct + '%'} />
+            </div>
+          )}
+          {alr && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-white">Assessed loss set-off ({alr.taxpayer})</h2>
+                {alr.ring_fenced && <span className="text-xs rounded-lg px-2.5 py-1 border border-amber-400/40 text-amber-300 bg-amber-400/10">ring-fenced</span>}
+                {alr.capped && <span className="text-xs rounded-lg px-2.5 py-1 border border-amber-400/40 text-amber-300 bg-amber-400/10">80% cap applied</span>}
+              </div>
+              <Row label="Taxable income before set-off" value={rand(alr.taxable_income_before)} />
+              <Row label="Loss brought forward" value={rand(alr.balance_brought_forward)} />
+              <Row label="Set-off allowed this year" value={'− ' + rand(alr.allowed_setoff)} />
+              <Row label="Taxable income after set-off" value={rand(alr.taxable_income_after)} strong />
+              <Row label="Loss carried forward" value={rand(alr.carried_forward)} strong />
             </div>
           )}
           {data.disclaimer && <p className="text-xs text-slate-500">{data.disclaimer}</p>}

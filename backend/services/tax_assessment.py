@@ -9,7 +9,10 @@ each engine, so an arbitrary/hostile body can never raise a TypeError. Not tax
 advice; figures are SARS 2026/27 and must be confirmed with a practitioner.
 """
 
-from services import income_tax, vat_calc, eti, provisional_tax, cgt, fringe_benefits, lump_sum
+from services import (
+    income_tax, vat_calc, eti, provisional_tax, cgt, fringe_benefits, lump_sum,
+    assessed_losses,
+)
 
 _INCOME_KEYS = (
     "salary", "annual_payment", "commission", "overtime", "travel_allowance",
@@ -35,6 +38,10 @@ _FRINGE_KEYS = (
     "loan_interest_paid_pct", "accommodation_remuneration_proxy",
 )
 _LUMP_KEYS = ("amount", "kind", "prior")
+_LOSS_KEYS = (
+    "taxable_income_before", "balance_brought_forward", "taxpayer",
+    "suspect_trade", "fails_facts_test",
+)
 
 _DISCLAIMER = (
     "Decision-support only - not tax advice. Figures are SARS 2026/27; confirm "
@@ -85,5 +92,9 @@ def assess_all(body):
     prov = _pick(body.get("provisional"), _PROV_KEYS)
     if prov:
         out["provisional"] = provisional_tax.assess_provisional(**prov)
+
+    loss = _pick(body.get("assessed_loss"), _LOSS_KEYS)
+    if loss and (loss.get("balance_brought_forward") or loss.get("taxable_income_before")):
+        out["assessed_loss"] = assessed_losses.assess_assessed_loss(**loss)
 
     return out

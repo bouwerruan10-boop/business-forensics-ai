@@ -136,6 +136,16 @@ TRAVEL_RATE_PER_KM = 4.95
 TRAVEL_INCLUSION_DEFAULT = 0.80
 TRAVEL_INCLUSION_BUSINESS = 0.20
 
+# -- Assessed losses (section 20 / 20A, Income Tax Act 58/1962) --
+# Company set-off cap: for years of assessment ending on/after 31 March 2023 the
+# balance of assessed loss brought forward that may be set off is limited to the
+# HIGHER of R1,000,000 or 80% of taxable income (computed before the set-off);
+# the unutilised balance is carried forward. Individuals and trusts are NOT
+# subject to this 80% cap. Re-verify against the SARS Comprehensive Guide to the
+# ITR14 / s20 each year of assessment.
+ASSESSED_LOSS_SETOFF_FLOOR = 1_000_000   # the R1m floor below which a company may set off in full
+ASSESSED_LOSS_SETOFF_CAP_PCT = 0.80      # else limited to 80% of taxable income before set-off
+
 # ── Skills Development Levy ──
 SDL_RATE = 1.0                    # %  of total annual payroll
 SDL_EXEMPT_PAYROLL = 500_000      # R/year; below this the employer is SDL-exempt
