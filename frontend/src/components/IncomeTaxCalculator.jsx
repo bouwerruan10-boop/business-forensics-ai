@@ -57,6 +57,16 @@ export default function IncomeTaxCalculator() {
   const [emps, setEmps] = useState([])
   const [etiYear, setEtiYear] = useState(1)
   const [prov, setProv] = useState({ estimate_taxable: '', latest_assessed_taxable: '', actual_taxable: '' })
+  // Capital gains (optional)
+  const [cgt, setCgt] = useState({ total_gains: '', total_losses: '', primary_residence_gain: '', other_taxable_income: '' })
+  const [cgtTaxpayer, setCgtTaxpayer] = useState('individual')
+  const [cgtDeath, setCgtDeath] = useState(false)
+  // Fringe benefits (optional)
+  const [fringe, setFringe] = useState({ car_determined_value: '', loan_amount: '', loan_interest_paid_pct: '', accommodation_remuneration_proxy: '' })
+  const [carMaint, setCarMaint] = useState(false)
+  // Lump sum (optional)
+  const [lump, setLump] = useState({ amount: '', prior: '' })
+  const [lumpKind, setLumpKind] = useState('retirement')
 
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -68,6 +78,9 @@ export default function IncomeTaxCalculator() {
   const setEmp = (i, k, v) => setEmps((e) => e.map((x, j) => (j === i ? { ...x, [k]: v } : x)))
   const delEmp = (i) => setEmps((e) => e.filter((_, j) => j !== i))
   const setP = (k, v) => setProv((s) => ({ ...s, [k]: v }))
+  const setC = (k, v) => setCgt((s) => ({ ...s, [k]: v }))
+  const setF = (k, v) => setFringe((s) => ({ ...s, [k]: v }))
+  const setL = (k, v) => setLump((s) => ({ ...s, [k]: v }))
 
   const onlyPositive = (obj) => {
     const out = {}
@@ -95,6 +108,26 @@ export default function IncomeTaxCalculator() {
       if (numOrUndef(prov.actual_taxable)) pv.actual_taxable = numOrUndef(prov.actual_taxable)
       payload.provisional = pv
     }
+    const cgtIn = onlyPositive(cgt)
+    if (Object.keys(cgtIn).length) {
+      cgtIn.taxpayer = cgtTaxpayer
+      if (cgtTaxpayer === 'individual') {
+        if (numOrUndef(inc.age)) cgtIn.age = numOrUndef(inc.age)
+        if (cgtDeath) cgtIn.year_of_death = true
+      }
+      payload.cgt = cgtIn
+    }
+    const fr = onlyPositive(fringe)
+    if (Object.keys(fr).length) {
+      if (carMaint) fr.car_has_maintenance = true
+      payload.fringe_benefits = fr
+    }
+    const lumpAmt = numOrUndef(lump.amount)
+    if (lumpAmt) {
+      const lp = { amount: lumpAmt, kind: lumpKind }
+      if (numOrUndef(lump.prior)) lp.prior = numOrUndef(lump.prior)
+      payload.lump_sum = lp
+    }
     try {
       setData(await getTaxIncome(payload))
     } catch (e) {
@@ -108,6 +141,9 @@ export default function IncomeTaxCalculator() {
   const vr = data?.vat
   const er = data?.eti
   const pr = data?.provisional
+  const cr = data?.cgt
+  const fbr = data?.fringe_benefits
+  const lr = data?.lump_sum
 
   return (
     <div className="space-y-6">
@@ -193,6 +229,71 @@ export default function IncomeTaxCalculator() {
         </div>
       </div>
 
+      {/* Capital gains (optional) */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+            Capital gains (8th Schedule) <span className="text-slate-500 normal-case">(optional)</span>
+          </div>
+          <select value={cgtTaxpayer} onChange={(e) => setCgtTaxpayer(e.target.value)}
+            className="text-xs rounded-lg bg-navy border border-white/10 px-2 py-1 text-slate-200 focus:border-gold/40 outline-none">
+            <option value="individual">Individual</option>
+            <option value="company">Company</option>
+            <option value="trust">Trust</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <NumField label="Total capital gains" value={cgt.total_gains} onChange={(v) => setC('total_gains', v)} />
+          <NumField label="Total capital losses" value={cgt.total_losses} onChange={(v) => setC('total_losses', v)} />
+          <NumField label="Primary-residence gain" value={cgt.primary_residence_gain} onChange={(v) => setC('primary_residence_gain', v)} />
+          {cgtTaxpayer === 'individual' && (
+            <NumField label="Other taxable income" value={cgt.other_taxable_income} onChange={(v) => setC('other_taxable_income', v)} />
+          )}
+        </div>
+        {cgtTaxpayer === 'individual' && (
+          <label className="flex items-center gap-2 text-xs text-slate-400">
+            <input type="checkbox" checked={cgtDeath} onChange={(e) => setCgtDeath(e.target.checked)} className="accent-gold" />
+            Year of death (R300k exclusion)
+          </label>
+        )}
+      </div>
+
+      {/* Fringe benefits (optional) */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+          Fringe benefits (7th Schedule) <span className="text-slate-500 normal-case">(optional — annual)</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <NumField label="Company-car determined value" value={fringe.car_determined_value} onChange={(v) => setF('car_determined_value', v)} />
+          <NumField label="Low-interest loan amount" value={fringe.loan_amount} onChange={(v) => setF('loan_amount', v)} />
+          <NumField label="Interest rate paid on loan (%)" value={fringe.loan_interest_paid_pct} onChange={(v) => setF('loan_interest_paid_pct', v)} />
+          <NumField label="Accommodation remuneration proxy" value={fringe.accommodation_remuneration_proxy} onChange={(v) => setF('accommodation_remuneration_proxy', v)} />
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-400">
+          <input type="checkbox" checked={carMaint} onChange={(e) => setCarMaint(e.target.checked)} className="accent-gold" />
+          Car has a maintenance plan (3.25% instead of 3.5%)
+        </label>
+      </div>
+
+      {/* Lump sum (optional) */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
+            Lump sum <span className="text-slate-500 normal-case">(optional — retirement / severance / withdrawal)</span>
+          </div>
+          <select value={lumpKind} onChange={(e) => setLumpKind(e.target.value)}
+            className="text-xs rounded-lg bg-navy border border-white/10 px-2 py-1 text-slate-200 focus:border-gold/40 outline-none">
+            <option value="retirement">Retirement / death</option>
+            <option value="severance">Severance</option>
+            <option value="withdrawal">Pre-retirement withdrawal</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <NumField label="Lump-sum amount" value={lump.amount} onChange={(v) => setL('amount', v)} />
+          <NumField label="Prior lump sums (lifetime)" value={lump.prior} onChange={(v) => setL('prior', v)} />
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <button type="button" onClick={run} disabled={loading}
           className="rounded-xl px-5 py-2.5 text-sm font-semibold bg-gold text-navy hover:bg-gold/90 disabled:opacity-50">
@@ -263,6 +364,38 @@ export default function IncomeTaxCalculator() {
               {pr.balance_on_assessment !== undefined && (
                 <Row label="Balance on assessment" value={rand(pr.balance_on_assessment)} strong />
               )}
+            </div>
+          )}
+          {cr && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-white">Capital gains tax ({cr.taxpayer})</h2>
+                <span className="text-xs text-slate-400">incl. {Math.round(cr.inclusion_rate * 100)}%</span>
+              </div>
+              <Row label="Aggregate capital gain" value={rand(cr.aggregate_capital_gain)} />
+              <Row label="Net capital gain" value={rand(cr.net_capital_gain)} />
+              <Row label="Taxable capital gain" value={rand(cr.taxable_capital_gain)} />
+              <Row label="CGT payable" value={rand(cr.cgt_payable)} strong />
+              <Row label="Effective rate on gains" value={cr.effective_rate_pct + '%'} />
+            </div>
+          )}
+          {fbr && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-sm font-semibold text-white mb-3">Fringe benefits (taxable value)</h2>
+              {fbr.company_car > 0 && <Row label="Company car" value={rand(fbr.company_car)} />}
+              {fbr.low_interest_loan > 0 && <Row label={`Low-interest loan (vs ${fbr.official_rate_used}%)`} value={rand(fbr.low_interest_loan)} />}
+              {fbr.accommodation > 0 && <Row label="Accommodation" value={rand(fbr.accommodation)} />}
+              <Row label="Total taxable fringe benefits" value={rand(fbr.total_taxable_fringe_benefits)} strong />
+            </div>
+          )}
+          {lr && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+              <h2 className="text-sm font-semibold text-white mb-3">Lump sum ({lr.kind})</h2>
+              <Row label="Lump-sum amount" value={rand(lr.amount)} />
+              {lr.prior_lump_sums > 0 && <Row label="Prior lump sums (lifetime)" value={rand(lr.prior_lump_sums)} />}
+              <Row label="Tax on lump sum" value={rand(lr.tax)} strong />
+              <Row label="Net in hand" value={rand(lr.net)} strong />
+              <Row label="Effective rate" value={lr.effective_rate_pct + '%'} />
             </div>
           )}
           {data.disclaimer && <p className="text-xs text-slate-500">{data.disclaimer}</p>}

@@ -41,13 +41,17 @@ A concrete near-term build plan, distinct from the cross-border flagship above: 
 
 **Sequence & status:**
 - **[DONE] W0 — repo cleanup (shipped).** Removed stale/dangerous push+deploy scripts (`push_imara.bat`, `PUSH.bat/ps1`, `DEPLOY.bat/ps1`, `build_frontend.bat`, `CHECK_BACKEND.bat`, `CREATE_SHORTCUT.bat`); standard path is now plain `git push`; tidied `redeploy_imara.bat`. (commits `725e34c`, `4a4a40b`, `257f30e`.)
-- **[IN PROGRESS] W1 — tax engine (phased):**
-  - **[DONE] (i-a)** `services/vat_calc.py` — deterministic VAT (15/115 fraction, VAT201 categories, net payable/refund) + 9 unit tests (commit `008a6d0`).
-  - **[DEFERRED] (i-b)** `services/eti.py`, **(ii)** `services/income_tax.py` + IRP5 input form + `/api/tax/income`, **(iii)** `services/provisional_tax.py`. The external SA-tax research cycle (2026-06-27) was cut short by a provider outage, so the exact **ETI bands, travel-allowance deemed-cost table, and provisional-penalty** figures are unconfirmed. Per the deterministic-first / dated-figures discipline these ship only once each rate is SARS-cited in `sa_rates.py` — re-run the research after the limit resets, then build.
-- **[QUEUED] W2 — report quality (no Score-formula change):** (c) **evidence-in-plain-language** on `AgentFinding` (counters Fathom; LLM-behaviour change → gate on `run_live_verify.bat`); (b) ratio→finding→action linking; (a) more intake context → client-tailored report; (d) changeable-vs-fixed do's/don'ts (`services/constraints.py`).
+- **[DONE] W1 — SA tax engine (deterministic, owner + entity).** The deep SARS research cycle was re-run successfully (cited gap analysis: `docs/research/IMARA_SARS_DEEP_RESEARCH.md`) and the tiered build executed. All engines are pure `services/` functions with worked-example unit tests, surfaced through `POST /api/tax/income` (orchestrated by `services/tax_assessment.py`, hostile-key-safe) and the IRP5-clone UI (`IncomeTaxCalculator.jsx`):
+  - **(i-a)** `vat_calc.py` — 15/115 fraction, VAT201 categories, net payable/refund (commit `008a6d0`).
+  - **(i-b)** `eti.py` — per-employee ETI quantification; **fixed an incentive-cap bug** in `sa_rates.py` (Y1 R1500 / Y2 R750, not the band thresholds) caught by the research (commit `ac5219f`).
+  - **(ii)** `income_tax.py` — IRP5 source-code mapping, travel-allowance deduction s8(1)(b), retirement s11F, medical credits + the IRP5 input form (commits `f0af37c`, `d79bcd7`/`915b434`).
+  - **(iii)** `provisional_tax.py` — IRP6 1st/2nd estimate, basic amount, par-20 under-estimation penalty (commit `e08475d`).
+  - **Tier A (8th/7th Schedule + penalties):** `cgt.py` capital gains (commit `e30e05c`), `sars_penalties.py` s211 admin + s223 USP + interest, with a **USP exposure band** that the LLM narrates rather than a fabricated number (commit `4f9b8c0`, Tier C3), `fringe_benefits.py` + `lump_sum.py` (commit `b0317ba`). CGT / fringe / lump-sum result cards now surfaced in the IRP5 calculator.
+  - **[QUEUED, this build] A4** assessed losses (s20/s20A). **[BLOCKED] A5** turnover tax — the qualifying-turnover threshold came back conflicting (R1m vs R2.3m, possibly confused with the VAT threshold); do **not** ship the gate until SARS-confirmed.
+- **[DONE] W2 — report quality (no Score-formula change):** (c) **evidence-in-plain-language** on `AgentFinding` shipped (commit `5d55d5b`) — LLM-behaviour change, **still pending the live A/B** (`run_live_verify.bat`, Ruan-owned) before it counts as verified; (b) ratio→finding→action linking (`ratio_diagnostics.py`, commit `989cf1e`); (a) more intake context → tailored report (`business_context`, commit `59935d5`, **pending the same live A/B**); (d) changeable-vs-fixed do's/don'ts (`action_constraints.py`, commit `8f4c5b5`).
 - **[DONE] W3 — IP posture (doc):** SA patent-infringement risk is **LOW** (software excluded "as such"; non-examining office; no case law) — real exposure is trademark + copyright. Captured in `legal/IMARA_TRADEMARK_RISK_BRIEF.md` §7.
 
-**Verification gates:** pure unit tests + a golden-set of SARS worked examples per tax service; `ruff F401/F811/F841` + `vulture`; `vite build`; live A/B for any LLM-behaviour change; date + cite every rate in `sa_rates.py`.
+**Verification gates:** pure unit tests + worked SARS examples per tax service (533+ passing); `ruff F401/F811/F841` + `vulture`; `vite build`; live A/B for any LLM-behaviour change (W2a/W2c still owe this); date + cite every rate in `sa_rates.py` — **every tax figure flagged to re-confirm against current SARS tables before a client relies on it.**
 
 ---
 
