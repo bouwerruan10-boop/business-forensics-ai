@@ -86,12 +86,26 @@ def company_flat_tax(taxable_income) -> float:
     return max(0.0, float(taxable_income or 0)) * COMPANY_FLAT_RATE / 100.0
 
 
-# ── Employment Tax Incentive (ETI) — from 1 April 2025 ──
-ETI_MAX_MONTHLY_Y1 = 2500         # R/month per qualifying employee, first 12 months
-ETI_MAX_MONTHLY_Y2 = 1250         # R/month per qualifying employee, second 12 months
+# ── Employment Tax Incentive (ETI) — bands effective 1 April 2025 ──
+# Source: ETI Act 26 of 2013 (as amended); SARS "ETI changes with effect from 1 April 2025".
+# Monthly incentive per qualifying employee (age 18-29), by monthly remuneration band:
+#   R0-2,499.99      : 60% of remuneration (Y1) / 30% (Y2)
+#   R2,500-5,499.99  : R1,500 flat (Y1) / R750 (Y2)
+#   R5,500-7,499.99  : R1,500 - 75%*(remun-5,500) (Y1) / R750 - 37.5%*(remun-5,500) (Y2)
+#   >= R7,500        : nil
+ETI_BAND1_CEILING = 2500.0        # R/month; below this the incentive is a % of remuneration
+ETI_BAND1_RATE_Y1 = 0.60
+ETI_BAND1_RATE_Y2 = 0.30
+ETI_BAND2_CEILING = 5500.0        # R/month; flat-amount band up to here
+ETI_BAND2_FLAT_Y1 = 1500.0        # R/month, first 12 qualifying months
+ETI_BAND2_FLAT_Y2 = 750.0         # R/month, second 12 qualifying months
+ETI_TAPER_RATE_Y1 = 0.75          # phase-out per R above R5,500 (Y1)
+ETI_TAPER_RATE_Y2 = 0.375         # phase-out per R above R5,500 (Y2)
+ETI_EARN_CEILING = 7500.0         # R/month; employees earning >= this do not qualify
+ETI_MAX_MONTHLY_Y1 = 1500.0       # overall max monthly incentive, first 12 months
+ETI_MAX_MONTHLY_Y2 = 750.0        # overall max monthly incentive, second 12 months
 ETI_AGE_MIN = 18
 ETI_AGE_MAX = 29
-ETI_EARN_CEILING = 7500           # R/month; employees earning >= this do not qualify
 
 # ── Skills Development Levy ──
 SDL_RATE = 1.0                    # %  of total annual payroll

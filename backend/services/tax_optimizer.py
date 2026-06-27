@@ -134,7 +134,7 @@ def analyze_tax_optimization(memory) -> dict:
             "name": "Employment Tax Incentive (ETI)",
             "eligible": "possibly", "quantified": False,
             "est_saving_low": 0, "est_saving_high": 0,
-            "basis": "You report {} employee(s). Each qualifying young worker (18-29) earning <R7,500/mo can attract up to R2,500/mo (~{}/yr) in year 1, R1,250/mo in year 2 - a PER-EMPLOYEE benefit claimed for however many of your staff actually qualify (not an aggregate).".format(headcount, _r(per_emp)),
+            "basis": "You report {} employee(s). Each qualifying young worker (18-29) earning <R7,500/mo can attract up to R1,500/mo (~{}/yr) in year 1, R750/mo in year 2 - a PER-EMPLOYEE benefit claimed for however many of your staff actually qualify (not an aggregate).".format(headcount, _r(per_emp)),
             "action": "Check how many staff are 18-29 earning <R7,500/mo and claim ETI via EMP201.",
             "caveat": "Depends on employee ages, wages, hours and minimum-wage compliance; quantify per qualifying employee with your practitioner.",
         })
