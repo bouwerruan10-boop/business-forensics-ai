@@ -497,6 +497,7 @@ async def analyze(
     currency: Optional[str] = Form("ZAR"),
     country: Optional[str] = Form(""),
     primary_concern: Optional[str] = Form(None),
+    business_context: Optional[str] = Form(None),
     # SA-specific intake fields
     entity_type: Optional[str] = Form(""),
     cipc_number: Optional[str] = Form(""),
@@ -588,6 +589,7 @@ async def analyze(
         "currency": currency or "ZAR",
         "country": country or "",
         "primary_concern": primary_concern or "",
+        "business_context": business_context or "",
         "consent_at": consent_at or "",
         # SA-specific
         "entity_type": entity_type or "",
@@ -1347,6 +1349,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
                 currency=profile.get("currency", "ZAR"),
                 country=profile.get("country", ""),
                 primary_concern=profile.get("primary_concern", ""),
+                business_context=profile.get("business_context", ""),
                 # SA intake fields
                 entity_type=profile.get("entity_type", ""),
                 cipc_number=profile.get("cipc_number", ""),

@@ -79,6 +79,7 @@ class SharedMemory:
 
     # Client context
     primary_concern: str = ""   # client's stated focus area from profile form
+    business_context: str = ""  # extra narrative context about the business / its current state
 
     # Business model context
     business_model_summary: str = ""
@@ -221,6 +222,8 @@ class SharedMemory:
         ]
         if self.primary_concern:
             parts.append(f"Primary concern: {self.primary_concern}")
+        if self.business_context:
+            parts.append(f"Business context: {self.business_context}")
         if self.business_model_summary:
             parts.append(f"Business model: {self.business_model_summary}")
         if self.market_context_summary:

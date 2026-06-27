@@ -159,6 +159,7 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
   const [docFiles, setDocFiles] = useState({ financial: [], bank: [], tax: [], legal: [], hr: [], business_plan: [] })
   // Context
   const [primaryConcern, setPrimaryConcern] = useState('')
+  const [businessContext, setBusinessContext] = useState('')
   const [bankingPartner, setBankingPartner] = useState('')
   const [reportAudience, setReportAudience] = useState('owner')
 
@@ -244,7 +245,7 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
     const profile = {
       company_name: companyName.trim(), industry_key: industryKey,
       annual_revenue: parseFloat(annualRevenue.replace(/[^\d.]/g, '')) || 0,
-      headcount: parseInt(headcount) || 0, currency, country, primary_concern: primaryConcern,
+      headcount: parseInt(headcount) || 0, currency, country, primary_concern: primaryConcern, business_context: businessContext,
       entity_type: entityType, cipc_number: cipcNumber, vat_registered: vatRegistered,
       vat_number: vatNumber, tax_year_end: taxYearEnd, years_in_business: yearsInBusiness,
       bbbee_level: bbbeeLevel, banking_partner: bankingPartner, report_audience: reportAudience,
@@ -426,6 +427,13 @@ export default function SmartIntake({ onAnalyze, onDemo, error }) {
                 <textarea className={`${inputCls} h-20 resize-none`}
                   placeholder="e.g. Our margins are shrinking every month but we can't identify why. Cash is also tight and we struggle to pay suppliers on time."
                   value={primaryConcern} onChange={e => setPrimaryConcern(e.target.value)} />
+              </Field>
+            </div>
+            <div className="col-span-2">
+              <Field label="Business Context" hint="Optional — current state, any do's/don'ts, or what's changing. More context = a more tailored report.">
+                <textarea className={`${inputCls} h-20 resize-none`}
+                  placeholder="e.g. Family manufacturer, 12 staff, just moved premises. Locked into our main supplier (3-yr contract) but want to grow the retail side."
+                  value={businessContext} onChange={e => setBusinessContext(e.target.value)} />
               </Field>
             </div>
             <Field label="Main Banking Partner" hint="Aligns credit-readiness findings to your lender's criteria">

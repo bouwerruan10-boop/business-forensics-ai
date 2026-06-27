@@ -206,8 +206,8 @@ generic business language."""
         take priority — we only use extracted values to fill gaps.
         """
         concern_line = (
-            f"- Client's primary concern: \"{memory.primary_concern}\""
-            if memory.primary_concern else ""
+            (f"- Client's primary concern: \"{memory.primary_concern}\"" if memory.primary_concern else "")
+            + (f"\n- Additional business context: \"{memory.business_context}\"" if memory.business_context else "")
         )
         prompt = f"""
 Analyse this raw business data and extract the business structure.
@@ -284,10 +284,12 @@ Return ONLY valid JSON. No explanation.
         rev = memory.annual_revenue
 
         concern_block = (
-            f"\nCLIENT'S PRIMARY CONCERN: \"{memory.primary_concern}\"\n"
-            "Your synthesis MUST directly address this concern. If the findings confirm it, "
-            "quantify it precisely. If the data reveals a different root cause, explain why.\n"
-            if memory.primary_concern else ""
+            (f"\nCLIENT'S PRIMARY CONCERN: \"{memory.primary_concern}\"\n"
+             "Your synthesis MUST directly address this concern. If the findings confirm it, "
+             "quantify it precisely. If the data reveals a different root cause, explain why.\n"
+             if memory.primary_concern else "")
+            + (f"\nADDITIONAL BUSINESS CONTEXT (use to tailor the narrative): \"{memory.business_context}\"\n"
+               if memory.business_context else "")
         )
         from services.agent_consistency import consistency_block
         corrob = consistency_block([f.__dict__ for f in memory.findings])
