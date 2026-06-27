@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getTaxIncome, getDisputeDeadlines } from '../api/client'
+import { getTaxIncome, getDisputeDeadlines, getSarsGuidance } from '../api/client'
 
 const rand = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA')
 const numOrUndef = (v) => { const n = parseFloat(v); return !isNaN(n) && n > 0 ? n : undefined }
@@ -87,6 +87,14 @@ export default function IncomeTaxCalculator() {
       if (!r.available) { setDisputeErr(r.reason || 'Enter the assessment date.'); return }
       setDispute(r)
     } catch (e) { setDisputeErr(e.message) }
+  }
+
+  // SARS process guidance (fetched once, lazily)
+  const [guidance, setGuidance] = useState(null)
+  const [openCard, setOpenCard] = useState(null)
+  const loadGuidance = async () => {
+    if (guidance) { setGuidance(null); return }   // toggle closed
+    try { setGuidance(await getSarsGuidance()) } catch (e) { setDisputeErr(e.message) }
   }
 
   const setI = (k, v) => setInc((s) => ({ ...s, [k]: v }))
@@ -496,6 +504,51 @@ export default function IncomeTaxCalculator() {
               </div>
             ))}
             <p className="text-xs text-slate-500 pt-2">{dispute.note}</p>
+          </div>
+        )}
+      </div>
+
+      {/* SARS process guidance */}
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Dealing with SARS — process guide</h2>
+            <p className="text-xs text-slate-400 mt-1">Verification, audit, VDP, record-keeping and debt relief — deadlines + do's/don'ts, cited to the TAA.</p>
+          </div>
+          <button type="button" onClick={loadGuidance}
+            className="shrink-0 text-xs rounded-lg px-3 py-1.5 border border-white/10 text-slate-300 hover:border-white/25">
+            {guidance ? 'Hide' : 'Show guide'}
+          </button>
+        </div>
+        {guidance?.cards && (
+          <div className="space-y-2">
+            {guidance.cards.map((c) => (
+              <div key={c.key} className="rounded-lg border border-white/10 overflow-hidden">
+                <button type="button" onClick={() => setOpenCard(openCard === c.key ? null : c.key)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/[0.03]">
+                  <span className="text-sm text-white font-medium">{c.title}</span>
+                  <span className="text-xs text-slate-500">{openCard === c.key ? '−' : '+'}</span>
+                </button>
+                {openCard === c.key && (
+                  <div className="px-3 pb-3 space-y-2 text-xs">
+                    <p className="text-slate-400">{c.what_it_is}</p>
+                    <p className="text-amber-300/90"><span className="font-semibold">Deadline:</span> {c.deadline}</p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-emerald-400 font-semibold mb-1">Do</div>
+                        <ul className="space-y-0.5 text-slate-400">{c.do.map((d, i) => <li key={i}>· {d}</li>)}</ul>
+                      </div>
+                      <div>
+                        <div className="text-red-400 font-semibold mb-1">Don't</div>
+                        <ul className="space-y-0.5 text-slate-400">{c.dont.map((d, i) => <li key={i}>· {d}</li>)}</ul>
+                      </div>
+                    </div>
+                    <p className="text-slate-600">{c.citation}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+            <p className="text-xs text-slate-500">{guidance.disclaimer}</p>
           </div>
         )}
       </div>

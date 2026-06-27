@@ -1928,6 +1928,16 @@ async def tax_dispute_deadlines(request: Request, assessment_date: str = ""):
     return dispute_timeline(assessment_date)
 
 
+@app.get("/api/tax/sars-guidance")
+@limiter.limit(TAX_RATE_LIMIT)
+async def tax_sars_guidance(request: Request, topic: str = ""):
+    """Deterministic SARS-process guidance cards (verification / audit / VDP /
+    record-keeping / payment relief): response deadlines + do's/don'ts, cited to
+    the TAA. Pass ?topic= for one card. Public, decision-support only."""
+    from services.sars_guidance import sars_process_guidance
+    return sars_process_guidance(topic or None)
+
+
 @app.get("/api/demo/pdf")
 def demo_pdf(audience: str = "owner"):
     """Generate a PDF from the demo report."""
