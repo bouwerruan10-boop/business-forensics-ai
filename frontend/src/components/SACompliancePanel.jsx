@@ -93,6 +93,7 @@ export default function SACompliancePanel({ report }) {
   const bbbeeLevel    = report?.bbbee_level || ''
   const assurance     = report?.assurance || null
   const calendar      = report?.compliance_calendar || null
+  const tcs           = report?.tcs_status || null
 
   // Pull SA findings from all_findings_ranked
   const allFindings = report?.all_findings_ranked || []
@@ -213,6 +214,55 @@ export default function SACompliancePanel({ report }) {
           <p className="text-[9px] text-slate-600 mt-2">{calendar.note}</p>
         </div>
       )}
+
+      {tcs?.available && (() => {
+        const pillarMeta = {
+          registration: 'Registration',
+          submission: 'Submission of returns',
+          debt: 'Outstanding debt',
+          relevant_material: 'Relevant material',
+        }
+        const pillCol = { pass: 'text-green-400 border-green-500/30', action: 'text-red-400 border-red-500/30', verify: 'text-amber-400 border-amber-500/30' }
+        const pillLabel = { pass: '✓ Clear', action: '✗ Action', verify: '? Verify' }
+        const overallCol = tcs.overall === 'action_required' ? 'bg-red-500/15 text-red-400 border-red-500/30'
+          : tcs.overall === 'likely_compliant' ? 'bg-green-500/15 text-green-400 border-green-500/30'
+          : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+        return (
+          <div className="bg-[#161b27] border border-white/8 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[13px] font-bold text-white flex items-center gap-2">
+                ✅ Tax Compliance Status (TCS)
+                <span className="text-[10px] text-slate-400 font-normal">SARS eFiling · 4 pillars · bankability gate</span>
+              </div>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${overallCol}`}>
+                {tcs.overall?.replace(/_/g, ' ').toUpperCase()}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 mb-3">{tcs.verdict}</p>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {Object.entries(tcs.pillars).map(([key, p]) => (
+                <div key={key} className="bg-[#0f1117] border border-white/8 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-slate-300">{pillarMeta[key] || key}</span>
+                    <span className={`text-[9px] font-bold border rounded-full px-2 py-0.5 ${pillCol[p.status] || pillCol.verify}`}>{pillLabel[p.status] || p.status}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500">{p.detail}</p>
+                  {key === 'registration' && p.required?.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {p.required.map((r, i) => (
+                        <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded border ${r.satisfied === false ? 'text-red-400 border-red-500/30' : r.satisfied === true ? 'text-green-400 border-green-500/30' : 'text-slate-400 border-white/15'}`}>{r.tax}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-400">{tcs.why_it_matters}</p>
+            <p className="text-[10px] text-slate-400 mt-1">{tcs.how_to_get}</p>
+            <p className="text-[9px] text-slate-600 mt-2">{tcs.note}</p>
+          </div>
+        )
+      })()}
 
       {/* BBBEE card + finding columns */}
       <div className="grid grid-cols-3 gap-4">

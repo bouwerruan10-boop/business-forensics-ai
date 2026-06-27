@@ -918,6 +918,20 @@ def report_compliance_calendar(analysis_id: str):
     return build_compliance_calendar(result)
 
 
+@app.get("/api/report/{analysis_id}/tcs-status")
+def report_tcs_status(analysis_id: str):
+    """SARS Tax Compliance Status (TCS) readiness across the four MCP pillars.
+    Deterministic; the registration pillar is derived from the profile, the rest
+    flagged to verify on eFiling. Decision-support / bankability signal."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("tcs_status"):
+        return result["tcs_status"]
+    from services.tcs_status import build_tcs_status
+    return build_tcs_status(result)
+
+
 @app.get("/api/report/{analysis_id}/cashflow")
 def report_cashflow(analysis_id: str):
     """Deterministic 13-week direct-method cash-flow projection - the short-term
@@ -1428,6 +1442,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["working_capital"] = build_working_capital(report)
             from services.compliance_calendar import build_compliance_calendar
             report["compliance_calendar"] = build_compliance_calendar(report)
+            from services.tcs_status import build_tcs_status
+            report["tcs_status"] = build_tcs_status(report)
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark
@@ -1747,6 +1763,8 @@ def _enrich_demo():
     DEMO_REPORT["working_capital"] = _build_wc(DEMO_REPORT)
     from services.compliance_calendar import build_compliance_calendar as _build_cal
     DEMO_REPORT["compliance_calendar"] = _build_cal(DEMO_REPORT)
+    from services.tcs_status import build_tcs_status as _build_tcs
+    DEMO_REPORT["tcs_status"] = _build_tcs(DEMO_REPORT)
 
     # SA Compliance panel — demo renders the full panel (incl. the Assurance & Compliance
     # Calendar cards) by setting the performed flags + realistic SA fields for Mzansi Retail.
