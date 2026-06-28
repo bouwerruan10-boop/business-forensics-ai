@@ -96,3 +96,40 @@ def test_full_pipeline_survives_hostile_input(stub_llm, profile, docs):
     report = CEOAgent().run_full_analysis(bd, mem)
     assert isinstance(report, dict) and report
     json.dumps(report, allow_nan=False, default=str)   # no crash, finite, valid JSON
+
+
+# ---- TRUE end-to-end: drive main._run_analysis (pipeline + ~25 report overlays) ----
+
+_FIN = b"Revenue: R5,000,000\nCost of sales: R3,340,000\nNet profit: R450,000\nTotal assets: R3,000,000"
+_E2E = [
+    pytest.param({"company_name": "Acme Pty Ltd", "industry_key": "retail", "annual_revenue": 5_000_000,
+                  "headcount": 12, "country": "South Africa", "vat_registered": "yes"},
+                 [{"filename": "fin.txt", "content": _FIN, "category": "financial"}], id="baseline"),
+    # the case that used to crash the SharedMemory construction site (int("twelve"))
+    pytest.param({"company_name": ["list"], "industry_key": {"d": 1}, "annual_revenue": float("inf"),
+                  "headcount": "twelve", "country": 123, "vat_registered": {"x": 1}},
+                 [{"filename": "s.pdf", "content": b"%PDF not really", "category": "bank"}], id="all-wrong-types"),
+]
+
+
+@pytest.mark.parametrize("profile,files", _E2E)
+def test_run_analysis_end_to_end(stub_llm, monkeypatch, tmp_path, profile, files):
+    import asyncio
+    import services.database as db
+    monkeypatch.setattr(db, "_DB_PATH", tmp_path / "e2e.db")
+    db.init_db()
+    import agents.market_research_agent as mra
+    monkeypatch.setattr(mra, "MOCK_MODE", True)
+    import main
+    aid = "e2e-test-" + str(abs(hash(str(profile))) % 99999)
+    main.analysis_status[aid] = {"status": "processing", "current_agent": "", "message": "", "progress": []}
+    try:
+        asyncio.run(main._run_analysis(aid, files, profile))
+        # a hostile-but-parseable input must COMPLETE, not error out
+        assert main.analysis_status[aid]["status"] == "complete"
+        report = main.analyses[aid]
+        json.dumps(report, allow_nan=False, default=str)        # whole report finite + valid JSON
+        assert "claim_ledger" in report and report["claim_ledger"]["available"] is True
+    finally:
+        main.analyses.pop(aid, None)
+        main.analysis_status.pop(aid, None)

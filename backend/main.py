@@ -1490,8 +1490,10 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
                 business_name=profile["company_name"],
                 industry=profile.get("industry_key", "general"),
                 industry_key=profile.get("industry_key", "general"),
-                annual_revenue=float(profile.get("annual_revenue", 0) or 0),
-                headcount=int(profile.get("headcount", 0) or 0),
+                # pass raw — SharedMemory.__post_init__ coerces to a finite float / non-negative
+                # int (a hostile "twelve" or 1e400 must not crash the construction site).
+                annual_revenue=profile.get("annual_revenue", 0),
+                headcount=profile.get("headcount", 0),
                 currency=profile.get("currency", "ZAR"),
                 country=profile.get("country", ""),
                 primary_concern=profile.get("primary_concern", ""),
@@ -1539,8 +1541,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             from services.benchmark_service import industry_display_name as _idn
             report["industry"] = _idn(report.get("industry_key")) or report.get("industry")
             report["currency"] = profile.get("currency", "ZAR")
-            report["annual_revenue"] = profile.get("annual_revenue", 0)
-            report["headcount"] = profile.get("headcount", 0)
+            report["annual_revenue"] = memory.annual_revenue   # normalised (finite float)
+            report["headcount"] = memory.headcount             # normalised (non-negative int)
             report["entity_type"] = profile.get("entity_type", "")
             report["cipc_number"] = profile.get("cipc_number", "")
             report["vat_registered"] = profile.get("vat_registered", "unknown")
