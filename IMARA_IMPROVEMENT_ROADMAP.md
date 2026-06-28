@@ -74,7 +74,7 @@ The five evidenced findings:
 **Tier-1 enablers I can build now** (low-risk, each directly helps land the pilot — these supersede adding new analytical surface area):
 - **(E1)** Conceptual-soundness dossier + Z''-convergence report — package existing material as pilot sell-collateral.
 - **(E2)** Per-score **reason codes / factor attribution + contestability** — extend `reason_codes.py`/`model_card.py`; satisfies POPIA s71(3) *and* NCA s62 *and* the FSCA SHAP/LIME expectation.
-- **(E3)** **Parser hardening** — forward balance-reconciliation hard-gate + PDF-metadata fraud detection in `file_parser.py` (currently absent).
+- **(E3) [DONE]** **Statement-integrity hardening** — `statement_integrity.py`: forward balance reconciliation (honest "insufficient_data", never a fabricated pass) + PDF-metadata tamper signals (clean/review/likely_tampered); wired into `_run_analysis`, persisted on the report, `GET /report/{id}/statement-integrity`, rendered in the Credit & Fraud panel (commit `6b79253`).
 - **(E4)** **"SARS-cited audit trail"** packaging of the shipped tax engine (moat layer #1).
 
 **Non-recommendation (research-backed):** do not add more agents/panels/features until the pilot exists. All five threads independently say the bottleneck is evidence + distribution.
