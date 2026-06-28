@@ -11,7 +11,7 @@ def test_current_rates_values():
     assert VAT_COMPULSORY_THRESHOLD == 2_300_000   # Budget 2026
     assert REPO_RATE == 7.00
     assert PRIME_RATE == 10.50                      # repo + 3.5%
-    assert SARS_INTEREST_RATE == 10.50
+    assert SARS_INTEREST_RATE == 10.25              # eff. 1 Mar 2026 (SARS Interest Rate Table 1)
 
 
 def test_rates_block_contains_current_figures():
@@ -20,9 +20,9 @@ def test_rates_block_contains_current_figures():
     assert "10.50%" in b
     assert "R120,000" in b          # voluntary threshold
     assert "+200bps" in b
-    # the old stale numbers must not appear
-    assert "R1,000,000" not in b
-    assert "10.25" not in b
+    # the current figures appear; the old stale ones do not
+    assert "R1,000,000" not in b          # old VAT compulsory threshold
+    assert "10.25% p.a." in b             # current SARS interest on outstanding debt (was 10.50%)
 
 
 def test_sme_debt_rate_range():

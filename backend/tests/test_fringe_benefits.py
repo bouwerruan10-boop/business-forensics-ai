@@ -11,10 +11,10 @@ def test_company_car():
 
 
 def test_low_interest_loan():
-    # R500,000 loan, 0% paid, official 7.75% -> R38,750
-    assert fb.low_interest_loan_benefit(500_000) == pytest.approx(38_750.0)
-    # paying 5% -> shortfall 2.75% -> R13,750
-    assert fb.low_interest_loan_benefit(500_000, interest_rate_paid_pct=5) == pytest.approx(13_750.0)
+    # R500,000 loan, 0% paid, official 8.00% -> R40,000
+    assert fb.low_interest_loan_benefit(500_000) == pytest.approx(40_000.0)
+    # paying 5% -> shortfall 3.00% -> R15,000
+    assert fb.low_interest_loan_benefit(500_000, interest_rate_paid_pct=5) == pytest.approx(15_000.0)
     # paying at/above official -> nil
     assert fb.low_interest_loan_benefit(500_000, interest_rate_paid_pct=8) == 0.0
 
@@ -31,9 +31,9 @@ def test_accommodation_formula():
 def test_assess_aggregate():
     r = fb.assess_fringe_benefits(car_determined_value=400_000, loan_amount=500_000)
     assert r["company_car"] == pytest.approx(168_000.0)
-    assert r["low_interest_loan"] == pytest.approx(38_750.0)
-    assert r["total_taxable_fringe_benefits"] == pytest.approx(206_750.0)
-    assert r["official_rate_used"] == 7.75
+    assert r["low_interest_loan"] == pytest.approx(40_000.0)
+    assert r["total_taxable_fringe_benefits"] == pytest.approx(208_000.0)
+    assert r["official_rate_used"] == 8.00
 
 
 def test_robust_to_none():

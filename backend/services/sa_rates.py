@@ -6,14 +6,16 @@ every agent that injects sa_rates_block() picks up the change automatically, so 
 rate ever has to be hunted down inside a prompt string again.
 """
 
-AS_OF = "2026-06-21"
-AS_OF_NOTE = "SARB 28 May 2026 (+25bps) and Budget 2026 (effective 1 April 2026)"
+AS_OF = "2026-06-28"
+AS_OF_NOTE = ("SARB 28 May 2026 (+25bps) and Budget 2026 (effective 1 April 2026). "
+              "SARS interest rates verified against the SARS Interest Rate Tables 1 & 3 on "
+              "2026-06-28: official rate 8.00% (eff. 1 Jun 2026), outstanding-tax 10.25% (eff. 1 Mar 2026).")
 
 # ── Interest / lending ──
 REPO_RATE = 7.00            # %  SARB repo rate
 PRIME_RATE = 10.50          # %  prime = repo + 3.5% spread
-SARS_INTEREST_RATE = 10.50  # %  interest on outstanding SARS debt (repo + 3.5%)
-OFFICIAL_RATE_OF_INTEREST = 7.75  # %  repo + 1%; fringe-benefit low-interest loans (from 1 Dec 2025)
+SARS_INTEREST_RATE = 10.25  # %  interest on outstanding SARS debt (eff. 1 Mar 2026; SARS Interest Rate Table 1)
+OFFICIAL_RATE_OF_INTEREST = 8.00  # %  repo + 1%; fringe-benefit low-interest loans (eff. 1 Jun 2026; SARS Interest Rate Table 3)
 
 # ── VAT & turnover-based thresholds (ZAR) ──
 VAT_RATE = 15.0

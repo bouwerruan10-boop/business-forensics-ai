@@ -7,6 +7,31 @@ staleness, this records what was done about it. Surfaced at GET /api/admin/corpu
 
 REFRESHES = [
     {
+        "date": "2026-06-28",
+        "corpus": "SA interest rates (sa_rates.py)",
+        "from_tax_year": "2026/27",
+        "to_tax_year": "2026/27",
+        "applied": True,
+        "sources": [
+            "SARS Interest Rate Table 3 (Legal-Pub-IRT-03) — official rate of interest, fringe-benefit loans",
+            "SARS Interest Rate Table 1 (Legal-Pub-IRT-01) — interest on outstanding taxes",
+            "Confirmed directly from the SARS PDF tables (sars.gov.za/legal-counsel/.../tables-of-interest-rates/)",
+        ],
+        "changes": [
+            {"field": "official_rate_of_interest", "from": 7.75, "to": 8.00},   # eff. 1 Jun 2026 (repo 7.00 + 1%)
+            {"field": "sars_interest_rate", "from": 10.50, "to": 10.25},        # eff. 1 Mar 2026
+        ],
+        "unchanged": [
+            "REPO_RATE 7.00 / PRIME_RATE 10.50 (the +25bps already applied)",
+            "All Budget-2026 figures (rebates, brackets, VAT/CGT thresholds) refreshed 2026-06-24 below",
+        ],
+        "note": ("Flagged by the SARS rate-currency checker (services/sars_rate_check.py) as drift, then "
+                 "CONFIRMED against the authoritative SARS Interest Rate PDFs before applying. The official "
+                 "rate moved 7.75%->8.00% on 1 Jun 2026 (it had lagged the repo rate, which sa_rates already "
+                 "carried at 7.00%); outstanding-tax interest moved 10.50%->10.25% on 1 Mar 2026. The checker "
+                 "proposed; a human verified the source; the change is recorded here."),
+    },
+    {
         "date": "2026-06-24",
         "corpus": "SA personal income tax (relocation_tax / tax engine + stay-and-optimise levers)",
         "from_tax_year": "2025/26",

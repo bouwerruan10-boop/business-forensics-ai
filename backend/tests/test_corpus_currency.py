@@ -40,7 +40,9 @@ def test_refresh_log_present_and_sourced():
     assert log["count"] >= 1
     r0 = log["refreshes"][0]
     assert r0["to_tax_year"] == "2026/27" and r0["applied"] is True and r0["sources"]
-    assert any(c["field"] == "primary_rebate" and c["to"] == 17820 for c in r0["changes"])
+    # the Budget-2026 primary-rebate refresh is recorded (search all entries — order-independent)
+    assert any(c["field"] == "primary_rebate" and c["to"] == 17820
+               for r in log["refreshes"] for c in r["changes"])
     json.dumps(log)
 
 

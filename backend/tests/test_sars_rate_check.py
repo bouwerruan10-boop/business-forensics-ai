@@ -47,7 +47,7 @@ def test_extract_percent_zar_and_million():
 
 # ---- the diff engine ----
 
-def _sars_pages(official="7.75", interest="10.50"):
+def _sars_pages(official="8.00", interest="10.25"):   # the current SARS values (= the live constants)
     return {
         "individuals": "Primary rebate R17 820. Secondary rebate R9 765. Tertiary rebate R3 249.",
         "vat": "VAT is levied at the standard rate of 15%. Registration is compulsory if taxable supplies exceed R2.3 million in any 12-month period.",
@@ -66,14 +66,14 @@ def test_all_current_when_pages_match_code():
 
 
 def test_drift_detected_and_reported():
-    # SARS shows 8.00% / 10.25% but Imara has 7.75 / 10.50 -> two drifts flagged
-    r = check(_sars_pages(official="8.00", interest="10.25"))
+    # if SARS later shows 8.25% / 10.50% but the code still has 8.00 / 10.25 -> two drifts flagged
+    r = check(_sars_pages(official="8.25", interest="10.50"))
     assert r["status"] == "drift_detected"
     drift_keys = {m["key"] for m in r["mismatches"]}
     assert "official_rate_of_interest" in drift_keys
     assert "sars_interest_rate" in drift_keys
     off = next(m for m in r["mismatches"] if m["key"] == "official_rate_of_interest")
-    assert off["expected"] == 7.75 and off["found"] == 8.0
+    assert off["expected"] == 8.0 and off["found"] == 8.25
 
 
 def test_html_content_is_parsed():
@@ -107,7 +107,7 @@ def test_robust_to_hostile_input():
 def test_endpoint_returns_report_on_supplied_content():
     import main
     client = TestClient(main.app)
-    res = client.post("/api/admin/sars-rate-check", json={"page_contents": _sars_pages(official="8.00")})
+    res = client.post("/api/admin/sars-rate-check", json={"page_contents": _sars_pages(official="8.25")})
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "drift_detected"

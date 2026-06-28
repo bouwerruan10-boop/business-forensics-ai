@@ -64,5 +64,5 @@ def test_fringe_and_lump_sections():
         "fringe_benefits": {"car_determined_value": 400_000, "loan_amount": 500_000},
         "lump_sum": {"amount": 600_000, "kind": "retirement"},
     })
-    assert r["fringe_benefits"]["total_taxable_fringe_benefits"] == 206_750.0
+    assert r["fringe_benefits"]["total_taxable_fringe_benefits"] == 208_000.0   # car 168k + loan 40k (official 8.00%)
     assert r["lump_sum"]["tax"] == 9_000.0
