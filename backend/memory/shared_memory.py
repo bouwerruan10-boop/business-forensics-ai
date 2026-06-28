@@ -3,7 +3,23 @@ Shared Memory -- the single source of truth across all agents.
 Every specialist agent reads from and writes to this object.
 """
 
+import math
 from dataclasses import dataclass, field
+
+
+def _finite_float(v):
+    """Coerce to a finite float; non-numeric / inf / nan -> 0.0."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return 0.0
+    return f if math.isfinite(f) else 0.0
+
+
+def _finite_nonneg_int(v):
+    """Coerce to a non-negative int; non-numeric / inf / nan / negative -> 0."""
+    f = _finite_float(v)
+    return int(f) if f > 0 else 0
 
 
 @dataclass
@@ -177,6 +193,30 @@ class SharedMemory:
     macro_overall_exposure: str = ""         # low | medium | high
     macro_top_driver: str = ""               # the macro factor the firm is most exposed to
     macro_sensitivity: dict = field(default_factory=dict)  # per-driver exposure profile
+
+    # Identity + document fields that MUST be their declared type: a downstream
+    # consumer doing memory.country.strip() / .lower() / an f-string format-spec must
+    # never meet an int/dict/None from a hostile profile or direct construction.
+    _STR_FIELDS = (
+        "business_name", "industry", "industry_key", "currency", "country",
+        "entity_type", "vat_registered", "vat_number", "tax_year_end",
+        "years_in_business", "bbbee_level", "banking_partner", "report_audience",
+        "primary_concern", "business_context",
+        "uploaded_financial_text", "uploaded_bank_text", "uploaded_tax_text",
+        "uploaded_legal_text", "uploaded_hr_text", "uploaded_plan_text",
+    )
+
+    def __post_init__(self):
+        # Normalise identity fields at the single source of truth so NO downstream
+        # consumer (f-strings like {rev:,.0f}, comparisons, .strip()/.lower(), JSON
+        # output) can ever see a wrong-typed or non-finite value — a hostile "1e400"
+        # (-> inf), "twelve", or a dict/int would otherwise crash the pipeline.
+        self.annual_revenue = _finite_float(self.annual_revenue)
+        self.headcount = _finite_nonneg_int(self.headcount)
+        for _f in self._STR_FIELDS:
+            v = getattr(self, _f)
+            if not isinstance(v, str):
+                setattr(self, _f, "" if v is None else str(v))
 
     def add_finding(self, finding):
         self.findings.append(finding)
