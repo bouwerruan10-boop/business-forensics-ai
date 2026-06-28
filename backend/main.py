@@ -840,6 +840,18 @@ def report_reasons(analysis_id: str):
     return reason_codes(result)
 
 
+@app.get("/api/report/{analysis_id}/evidence-pack")
+def report_evidence_pack(analysis_id: str):
+    """Pilot evidence pack: conceptual soundness + Altman-Z'' convergence + model
+    card + the 4-pillar minimum-viable-evidence status + the outcome-validation
+    roadmap. Honest by design — does NOT claim the Score is statistically validated."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.evidence_pack import build_evidence_pack
+    return build_evidence_pack(result)
+
+
 @app.get("/api/report/{analysis_id}/score-disclosure")
 def report_score_disclosure(analysis_id: str):
     """POPIA s71(3) disclosure for the Imara Score: the underlying logic (weighted
