@@ -56,6 +56,44 @@ def test_narrative_robust_to_hostile():
     assert verify_narrative({})["summary"]["total"] == 0
 
 
+# ---- Phase 2: roadmap + market/tax/legal summaries are now scanned ----
+
+def test_phase2_roadmap_impacts_are_verified():
+    rep = {
+        "financial_ratios": {"gross_margin": {"value": 33.2, "label": "gross margin"}},
+        "financial_figures": {"net_profit": 450_000},
+        "implementation_roadmap": [
+            {"phase": "Phase 1", "focus": "Stop the bleed", "expected_impact": "Recover R450,000",
+             "actions": [{"action": "Lift gross margin to 21.3% by repricing", "owner": "Finance",
+                          "impact": "R900,000 uplift"}]},
+        ],
+    }
+    r = verify_narrative(rep)
+    secs = {c["section"] for c in r["claims"]}
+    assert any(s.startswith("Roadmap:") for s in secs)
+    # R450,000 traces to computed net_profit -> verified
+    assert any(c["kind"] == "currency" and c["verification"] == "verified" for c in r["claims"])
+    # the 21.3% margin in the action conflicts with computed 33.2%
+    assert any(c["kind"] == "metric" and c["verification"] == "conflict" for c in r["claims"])
+    # the R900,000 projection is not traceable -> honest unverified, never a silent pass
+    assert any(c["kind"] == "currency" and c["verification"] == "unverified" for c in r["claims"])
+
+
+def test_phase2_sa_summaries_scanned():
+    rep = {
+        "financial_ratios": {},
+        "financial_figures": {"vat_liability": 320_000},
+        "sa_tax_summary": "Estimated VAT exposure is R320,000 for the period.",
+        "market_context_summary": "An untapped segment worth R5 million was identified.",
+    }
+    r = verify_narrative(rep)
+    secs = {c["section"] for c in r["claims"]}
+    assert "SA tax summary" in secs and "Market intelligence" in secs
+    # R320,000 traces to a computed figure; R5m market estimate does not
+    assert any(c["verification"] == "verified" for c in r["claims"])
+    assert any(c["verification"] == "unverified" for c in r["claims"])
+
+
 # ---- claim_ledger ----
 
 def test_ledger_overall_states():

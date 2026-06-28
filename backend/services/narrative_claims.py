@@ -1,9 +1,10 @@
 """
 narrative_claims.py - verify the numbers inside Imara's LLM-written narratives.
 
-The most-read outputs (executive summary, the Situation/Complication/Resolution story,
-systemic-theme "combined impact" figures, the quick-wins narrative) are free-text the LLM
-wrote. This scans them for (a) METRIC claims (gross margin, debtor days, ...) and checks each
+The user-facing narratives (executive summary, the Situation/Complication/Resolution story,
+systemic-theme "combined impact" figures, the quick-wins/strategic-plays narrative, the
+implementation roadmap's impact figures, and the market/SA-tax/SA-legal summaries) are
+free-text the LLM wrote. This scans them for (a) METRIC claims (gross margin, debtor days, ...) and checks each
 against the deterministically-computed ratio, and (b) RAND amounts and checks each against the
 report's known computed figures. Each becomes a uniform claim object (claim_contract.py).
 Honest by design: a number that can't be traced is `unverified`, never a silent pass; a number
@@ -24,6 +25,10 @@ _NARRATIVE_KEYS = (
     ("Resolution", "resolution"),
     ("Quick-wins narrative", "quick_wins_narrative"),
     ("Strategic plays narrative", "strategic_plays_narrative"),
+    # Phase 2 — surfaces that were emitting unverified numbers untracked:
+    ("Market intelligence", "market_context_summary"),
+    ("SA tax summary", "sa_tax_summary"),
+    ("SA legal summary", "sa_legal_summary"),
 )
 
 _CUR_RE = re.compile(r"R\s?(\d[\d  ,\.]*\d|\d)\s*(million|billion|bn|m|k)?", re.IGNORECASE)
@@ -78,6 +83,19 @@ def _section_texts(report):
             parts = " ".join(str(theme.get(k, "")) for k in ("title", "narrative", "combined_impact"))
             if parts.strip():
                 texts.append(("Systemic theme: " + str(theme.get("title", i))[:40], parts))
+    # Phase 2 — the implementation roadmap (list of phase dicts) carries LLM-written
+    # impact figures (per-phase expected_impact + per-action impact) that were never checked.
+    for i, phase in enumerate(report.get("implementation_roadmap") or []):
+        if not isinstance(phase, dict):
+            continue
+        parts = [str(phase.get("focus", "")), str(phase.get("expected_impact", ""))]
+        for act in phase.get("actions") or []:
+            if isinstance(act, dict):
+                parts.append(str(act.get("action", "")))
+                parts.append(str(act.get("impact", "")))
+        joined = " ".join(p for p in parts if p)
+        if joined.strip():
+            texts.append(("Roadmap: " + str(phase.get("phase", i))[:40], joined))
     return texts
 
 
