@@ -220,6 +220,40 @@ def generate_html_report(report: dict) -> str:
     </div>
   </div>"""
 
+    # ── Verification & evidence — the "prove it" contract, on the exported HTML ──
+    _led = report.get("claim_ledger") if isinstance(report.get("claim_ledger"), dict) else {}
+    verification_html = ""
+    if _led.get("available"):
+        _va = _led.get("assurance") or {}
+        _ov = _led.get("overall")
+        _vcol, _state = ((RED, "NEEDS REVIEW") if _ov == "conflicts_present"
+                         else (AMBER, "SOME ESTIMATES") if _ov == "unverified_present"
+                         else (GREEN, "VERIFIED"))
+        _vclaims = (_led.get("narrative_claims") or []) + (_led.get("finding_figure_claims") or [])
+        _vconf = [c for c in _vclaims if isinstance(c, dict) and c.get("verification") == "conflict"]
+        _vest = [c for c in _vclaims if isinstance(c, dict) and c.get("verification") == "unverified"]
+        _cov, _ac = _va.get("coverage_pct"), _va.get("avg_confidence")
+        _vrows = ""
+        for c in _vconf[:8]:
+            _vrows += (f'<li style="color:{NAVY}"><b style="color:{RED}">&#10007; conflict</b> '
+                       f'&ldquo;{_e(str(c.get("text",""))[:90])}&rdquo; &mdash; {_e(str(c.get("explanation",""))[:170])}</li>')
+        for c in _vest[:8]:
+            _vrows += (f'<li style="color:{DARK}"><b style="color:{AMBER}">? estimate</b> '
+                       f'&ldquo;{_e(str(c.get("text",""))[:100])}&rdquo;</li>')
+        if not _vconf and not _vest:
+            _vrows = f'<li style="color:{GREEN}">All numbers in the narrative match Imara&rsquo;s computed values.</li>'
+        verification_html = f"""
+  <div class="section-block" style="background:#fff;border:1px solid {_vcol}55;border-radius:12px;padding:16px;margin-bottom:22px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:800;letter-spacing:1px;color:#fff;background:{_vcol};border-radius:6px;padding:3px 10px">{_state}</span>
+      <span style="font-size:15px;font-weight:700;color:{NAVY}">Every number, checked against your data</span>
+    </div>
+    <div style="font-size:12px;color:{DARK};margin:8px 0 4px">{_e(_va.get("statement") or _led.get("headline") or "")}</div>
+    <div style="font-size:12px;color:{GRAY};margin-bottom:10px">{(str(_cov) + "% traced to computed data") if _cov is not None else ""}{(" &middot; avg confidence " + str(_ac)) if _ac is not None else ""}</div>
+    <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">{_vrows}</ul>
+    <div style="font-size:10.5px;color:{GRAY};margin-top:10px">Every number in Imara&rsquo;s narrative is checked against its own deterministically-computed values. &lsquo;Verified&rsquo; = matches the computation; &lsquo;conflict&rsquo; = the narrative disagrees with the computed figure; &lsquo;unverified&rsquo; = an estimate that cannot be traced to a computed figure. Imara never silently presents an unverified number as fact.</div>
+  </div>"""
+
     # ── Valuation bar SVG ─────────────────────────────────────────
     def _val_bar_svg() -> str:
         if not val_mid:
@@ -811,6 +845,7 @@ def generate_html_report(report: dict) -> str:
 <!-- ── OVERVIEW ───────────────────────────────────────────── -->
 <div id="page-overview" class="page active">
   {imara_html}
+  {verification_html}
   {ratios_html}
   <div class="metrics-grid">
     <div class="metric-card">

@@ -112,6 +112,10 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
     # ── Imara Score hero (all audiences) ──────────
     _imara_score_block(story, report)
 
+    # ── Verification & evidence (all audiences) — the "prove it" contract,
+    #    now travelling onto the exported artifact the recipient receives ──
+    _verification_section(story, report)
+
     # ── Traffic light scorecard (all audiences) ────────────────────
     _traffic_light_section(story, report)
     _financial_ratios_section(story, report)
@@ -981,6 +985,89 @@ def _style(**kwargs):
         **kwargs,
     )
     return ps
+
+
+def _verification_section(story, report):
+    """'Prove it', on the exported artifact — the report-wide verification/evidence contract.
+
+    Renders the assurance roll-up (overall state, coverage %, avg confidence, plain statement),
+    the conflicts, and a sample of unverified estimates, so the RECIPIENT (lender / investor /
+    funder) can see that every number was checked against Imara's deterministically-computed
+    data. Reuses the existing claim_ledger; pure/deterministic; no-op if absent."""
+    led = report.get("claim_ledger")
+    if not isinstance(led, dict) or not led.get("available"):
+        return
+    a = led.get("assurance") or {}
+
+    def _esc(t):
+        return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    overall = led.get("overall")
+    if overall == "conflicts_present":
+        col, bg, state = RED, RED_BG, "NEEDS REVIEW"
+    elif overall == "unverified_present":
+        col, bg, state = AMBER, AMBER_BG, "SOME ESTIMATES"
+    else:
+        col, bg, state = GREEN, GREEN_BG, "VERIFIED"
+
+    _section_header(story, "VERIFICATION & EVIDENCE  -  EVERY NUMBER CHECKED")
+
+    cov = a.get("coverage_pct")
+    conf = a.get("avg_confidence")
+    stmt = _esc(a.get("statement") or led.get("headline") or "")
+    headline = (
+        '<font name="Helvetica-Bold" size="11" color="#{}">{}</font>'.format(_hex(col), state)
+        + '<font name="Helvetica" size="9" color="#{}">    {}{}</font>'.format(
+            _hex(DARK_GRAY),
+            ("{}% traced to computed data".format(cov) if cov is not None else ""),
+            ("   -   avg confidence {}".format(conf) if conf is not None else "")))
+    box = Table([[_para(headline, _style(leading=14))],
+                 [_para(stmt, _style(fontSize=9, textColor=NAVY, leading=12))]],
+                colWidths=[CONTENT_W])
+    box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), bg),
+        ("BOX", (0, 0), (-1, -1), 0.7, col),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(box)
+    story.append(Spacer(1, 0.25 * cm))
+
+    claims = (led.get("narrative_claims") or []) + (led.get("finding_figure_claims") or [])
+    conflicts = [c for c in claims if isinstance(c, dict) and c.get("verification") == "conflict"]
+    estimates = [c for c in claims if isinstance(c, dict) and c.get("verification") == "unverified"]
+
+    if conflicts:
+        story.append(_para("CONFLICTS - the narrative disagrees with the computed figure:",
+                           _style(fontSize=8, fontName="Helvetica-Bold", textColor=RED, letterSpacing=1)))
+        for c in conflicts[:6]:
+            story.append(_para('!  "{}"  -  {}'.format(_esc(c.get("text"))[:80], _esc(c.get("explanation"))[:170]),
+                               _style(fontSize=8.5, textColor=NAVY, leading=11)))
+        story.append(Spacer(1, 0.2 * cm))
+
+    if estimates:
+        story.append(_para("UNVERIFIED ESTIMATES - not traceable to a computed figure (treat as estimates):",
+                           _style(fontSize=8, fontName="Helvetica-Bold", textColor=AMBER, letterSpacing=1)))
+        for c in estimates[:6]:
+            story.append(_para('?  "{}"'.format(_esc(c.get("text"))[:90]),
+                               _style(fontSize=8.5, textColor=DARK_GRAY, leading=11)))
+        if len(estimates) > 6:
+            story.append(_para("... and {} more estimate(s) flagged in the report.".format(len(estimates) - 6),
+                               _style(fontSize=8, textColor=MID_GRAY)))
+        story.append(Spacer(1, 0.2 * cm))
+
+    if not conflicts and not estimates:
+        story.append(_para("All numbers in the narrative match Imara's computed values.",
+                           _style(fontSize=9, textColor=GREEN, fontName="Helvetica-Bold")))
+        story.append(Spacer(1, 0.15 * cm))
+
+    story.append(_para(
+        "How to read this: every number in Imara's narrative is checked against its own "
+        "deterministically-computed values. 'Verified' = matches the computation; 'conflict' = the "
+        "narrative disagrees with the computed figure (review it); 'unverified' = an estimate that cannot "
+        "be traced to a computed figure. Imara never silently presents an unverified number as fact.",
+        _style(fontSize=7.5, textColor=MID_GRAY, leading=10)))
+    story.append(Spacer(1, 0.2 * cm))
 
 
 def _tax_optimisation_section(story, report):
