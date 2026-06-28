@@ -18,6 +18,7 @@ visibility of outstanding returns / debt, so those pillars are returned as
 Decision-support / awareness, not a legal determination; not an Imara Score input.
 """
 
+import math
 import re
 
 VAT_COMPULSORY_THRESHOLD = 1_000_000   # VAT Act s23 - compulsory once 12-month turnover exceeds R1m
@@ -28,12 +29,13 @@ _SDL_AVG_SALARY = 70_000               # rough per-head annual cost, to proxy th
 def _n(v):
     if v is None or isinstance(v, bool):
         return None
-    if isinstance(v, (int, float)):
-        return float(v) if v == v else None
     try:
-        return float(str(v).strip().replace(" ", "").replace(",", "").replace("R", ""))
+        f = float(v if isinstance(v, (int, float))
+                  else str(v).strip().replace(" ", "").replace(",", "").replace("R", ""))
     except (ValueError, TypeError):
         return None
+    # reject non-finite (inf/nan) so a hostile figure can't crash int() downstream
+    return f if math.isfinite(f) else None
 
 
 def _required_registrations(rev, headcount, vat_reg, is_company):

@@ -10,6 +10,7 @@ CIPC deregistration). Computed from intake Imara already captures — no new fie
 Turns a one-off report into a recurring, sticky utility. Decision-support /
 awareness, not a legal determination; not an Imara Score input.
 """
+import math
 import re
 
 _MONTHS = ["january", "february", "march", "april", "may", "june", "july",
@@ -24,12 +25,13 @@ _SDL_AVG_SALARY = 70_000   # rough per-head annual cost, to proxy the SDL payrol
 def _n(v):
     if v is None or isinstance(v, bool):
         return None
-    if isinstance(v, (int, float)):
-        return float(v) if v == v else None
     try:
-        return float(str(v).strip().replace(" ", "").replace(",", "").replace("R", ""))
+        f = float(v if isinstance(v, (int, float))
+                  else str(v).strip().replace(" ", "").replace(",", "").replace("R", ""))
     except (ValueError, TypeError):
         return None
+    # reject non-finite (inf/nan) so a hostile figure can't crash int() downstream
+    return f if math.isfinite(f) else None
 
 
 def _year_end_month(tax_year_end: str):

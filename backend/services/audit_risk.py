@@ -39,10 +39,13 @@ def build_audit_risk(report) -> dict:
     if not isinstance(flags_res, dict) or not flags_res.get("available"):
         return {"available": False, "reason": "No tax-risk scan available (SA taxpayers only)."}
 
-    flags = flags_res.get("flags") or []
+    flags = flags_res.get("flags")
+    flags = flags if isinstance(flags, list) else []
     score = 0
     drivers = []
     for f in flags:
+        if not isinstance(f, dict):
+            continue
         sev = str(f.get("severity", "low")).lower()
         pts = _WEIGHT.get(sev, _WEIGHT["low"])
         score += pts
