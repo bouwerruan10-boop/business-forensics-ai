@@ -5,7 +5,6 @@ or produces invalid JSON; a hostile roster cannot tie up the worker; huge nested
 lists are bounded; type-confused/hostile bodies degrade gracefully.
 """
 import json
-import pytest
 from services.tax_assessment import assess_all, _MAX_LIST
 from services import income_tax, tax_residency
 
