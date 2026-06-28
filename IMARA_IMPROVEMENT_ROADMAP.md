@@ -58,15 +58,38 @@ A concrete near-term build plan, distinct from the cross-border flagship above: 
 
 ---
 
+## 2026-06-28 — Strategic improvement research cycle (5 threads, cited) → it CONFIRMS Tier 0
+
+A self-directed analyse → self-question → research cycle, run because the codebase work was done and the honest question was *product*, not features. Five parallel web-research threads (full synthesis + citations: `docs/research/IMARA_STRATEGIC_RESEARCH_2026-06.md`, commit `e5adffa`). Researched independently, they **converge on one motion** — which is exactly Tier 0, now backed by external evidence:
+
+> **Land 1–2 design-partner lenders running the Score in *shadow / champion-challenger mode*, reached through the *accountant channel*, with a *POPIA-s71-clean* explainability posture and *low-friction consented data ingestion*.** That single motion both starts the outcome-data clock (the only path to a *validated* Score) AND builds the proprietary SA-SME outcome dataset (the only *durable* moat).
+
+The five evidenced findings:
+1. **Validation:** a judgmental/AHP score is defensible *as triage*, never as a decision engine until outcome-tested (SR 11-7). Buyers expect **Gini > 0.40 / AUC > 0.70 / KS > 0.25**, PSI < 0.10, ~1,500–2,000 goods + ~2,000 bads over a 12-mo window. Sell a pilot *now* with a conceptual-soundness dossier + Altman-Z'' convergence; the one move that matters is **shadow-mode on a real lender's book**. Never imply "validated" pre-outcomes.
+2. **Distribution (answers the GTM call below):** SME-direct self-serve is the *worst* fit. The **accountant channel is the proven, reachable wedge** (Bridgement's Xero/Sage integration is the SA proof; ~50k SAICA/SAIPA practitioners hold the financials + trust), explicitly sequenced toward **embedded lender distribution** as the scale play.
+3. **Regulation:** scoring **SMEs (juristic persons)** keeps Imara outside the NCA credit-bureau trap (stay advisory; never warehouse-and-resell a credit database). Real obligation is **POPIA s71** — satisfied by "**a human decides**" + per-score reason codes + contestability + bias audits. FSCA Nov-2025 AI report (SHAP/LIME, bias audits) = de-facto product spec.
+4. **Data ingestion:** integrate consented aggregation (**truID** primary, **Stitch** hedge) as a *supplement*; keep PDF parsing as the universal fallback — and **harden it** (verified: `file_parser.py` does neither balance reconciliation nor PDF-metadata fraud detection).
+5. **Moat:** anti-hallucination is now **table-stakes** — a 2026 wedge, not a 2028 moat. Own the next layer: **SARS-cited, audit-survivable audit trails** + the **outcome-calibrated SA-SME scoring flywheel** + workflow lock-in.
+
+**Tier-1 enablers I can build now** (low-risk, each directly helps land the pilot — these supersede adding new analytical surface area):
+- **(E1)** Conceptual-soundness dossier + Z''-convergence report — package existing material as pilot sell-collateral.
+- **(E2)** Per-score **reason codes / factor attribution + contestability** — extend `reason_codes.py`/`model_card.py`; satisfies POPIA s71(3) *and* NCA s62 *and* the FSCA SHAP/LIME expectation.
+- **(E3)** **Parser hardening** — forward balance-reconciliation hard-gate + PDF-metadata fraud detection in `file_parser.py` (currently absent).
+- **(E4)** **"SARS-cited audit trail"** packaging of the shipped tax engine (moat layer #1).
+
+**Non-recommendation (research-backed):** do not add more agents/panels/features until the pilot exists. All five threads independently say the bottleneck is evidence + distribution.
+
+---
+
 ## Tier 0 — The actual highest-value work (Ruan-led; I execute the analysis)
 
-**This is the plan. Everything below is secondary.**
+**This is the plan. Everything below is secondary.** *(The 2026-06-28 research cycle above now backs every line of this with external evidence.)*
 
 > **▶ Plan of action (researched, v1.23):** the binding constraint is **TIME, not features** — outcome-based validation can't be shortcut (backtesting needs outcomes that only accrue over a real outcome period). So the single highest-value move is to **start the outcome clock NOW** via **founder-led design-partner pilots** (the proven first-customer motion — the founder is the best early salesperson; treat first customers as design partners = commitment + learning, not perfect pricing). Bias toward a small **NBFI/lender** partner (generates labelled approve/repay outcomes fastest) **plus 1–2 accountants** (volume + face-validity feedback; the complementary partner who already has SME trust — the most under-used early channel). In parallel — cheap, immediate, no waiting — get **2–3 credit/lending pros to face-validity-review** a batch of Imara reports and lean on the **Altman Z'' convergence already shipped** as interim evidence (best practice = quantitative + expert judgment). Everything buildable (Tax flagship, 1.3 T2, scaling) stays deferred behind this.
 
 1. **Run the design-partner pilot.** The harness is already built and waiting: the `outcomes` table, `services/validation.py` (AUC / Gini / KS / reliability), `services/score_calibration.py` (Platt cold-start, honest "not calibrated until N≥50"), and `IMARA_PILOT_PROTOCOL.md` (the 3-month program with go/kill gates). It just needs **≥30–50 real labelled outcomes**, which means getting Imara in front of an accountant/advisor or a lender. Only you can open that door.
 2. **Once outcomes exist, I run Layer-3:** calibrate Score weights against real outcomes, run disparate-impact / fairness testing, and re-issue the model card with *real* discrimination metrics instead of the AHP expert prior. This is what converts Imara from "engineering-mature" to "evidence-backed" — the actual moat, and the thing a lender or regulator will ask for.
-3. **Make the GTM call** (it decides what gets built next): **SME-direct** via accountants/advisors, vs **white-label underwriting-intelligence for lenders** (Lula already does 3-month bank-transaction underwriting + embedded distribution — Imara should be the *decision-support layer*, not a lender).
+3. **GTM call — now evidenced (2026-06-28 research):** lead with the **accountant/advisor channel as the wedge** (proven in SA by Bridgement; the accountant holds the financials + trust), **sequenced toward white-label underwriting-intelligence for lenders** as the scale play (Lula/Merchant Capital/Bridgement — Imara as the *decision-support layer*, not a lender). SME-direct self-serve is the worst fit (high-stakes, low-trust, ~3–8% conversion) — top-of-funnel only. Build the **Xero/Sage ledger connection first**; monetise via the practice.
 4. **Keep Railway paid** before the trial lapses, or the backend + persistent volume go offline. (Money action — yours.)
 
 ---
