@@ -1366,6 +1366,37 @@ def admin_corpus_refresh(_admin: None = Depends(verify_admin_key)):
     return corpus_refresh_log()
 
 
+@app.get("/api/admin/sars-rate-manifest")
+def admin_sars_rate_manifest(_admin: None = Depends(verify_admin_key)):
+    """What the SARS rate-currency checker verifies: each figure, its SARS page, and the
+    expected value (read live from sa_rates). Deterministic; reads nothing external."""
+    from services.sars_rate_manifest import manifest_summary
+    return manifest_summary()
+
+
+@app.post("/api/admin/sars-rate-check")
+async def admin_sars_rate_check(request: Request, _admin: None = Depends(verify_admin_key)):
+    """SARS rate-currency check: diff the published SARS rates against Imara's hardcoded
+    values and flag drift for human review. ALERT-ONLY - never edits a figure.
+
+    Body: {"page_contents": {<page-id>: "<html-or-text>"}} for operator-supplied content,
+    and/or {"fetch": true, "pages": [<page-id>...]} to politely fetch one page at a time
+    (single-URL, on-demand; honours SARS s4.8.2 - not a crawler). Supplied content wins."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    body = body if isinstance(body, dict) else {}
+    page_contents = body.get("page_contents") if isinstance(body.get("page_contents"), dict) else {}
+    if body.get("fetch"):
+        from services.sars_fetch import fetch_pages
+        fetched = fetch_pages(body.get("pages"))
+        fetched.pop("_errors", None)
+        page_contents = {**fetched, **page_contents}   # operator-supplied content takes precedence
+    from services.sars_rate_check import check
+    return check(page_contents)
+
+
 @app.get("/api/admin/calibration")
 def admin_calibration(min_n: int = 50, _admin: None = Depends(verify_admin_key)):
     """Platt calibration of the Imara Score -> probability-of-distress from recorded
