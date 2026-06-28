@@ -95,10 +95,6 @@ export async function getReport(analysisId) {
   return res.json()
 }
 
-export function getPdfUrl(analysisId) {
-  return `${BASE}/report/${analysisId}/pdf`
-}
-
 export async function getActions(analysisId) {
   const res = await fetch(`${BASE}/report/${analysisId}/actions`, { headers: authHeaders() })
   if (!res.ok) throw await _friendlyError(res)
