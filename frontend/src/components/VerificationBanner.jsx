@@ -16,11 +16,17 @@ export default function VerificationBanner({ report }) {
   const conflicts = allClaims.filter((c) => c.verification === 'conflict')
   const unverified = allClaims.filter((c) => c.verification === 'unverified')
 
-  const tone = led.overall === 'conflicts_present'
+  const a = led.assurance || {}
+  // Fail-closed at the render boundary: a contract leak (a claim missing its
+  // verification/confidence/explanation) can never show as VERIFIED.
+  const failClosed = a.contract_enforced === false
+  const tone = (led.overall === 'conflicts_present' || failClosed)
     ? { c: '#ef4444', label: 'NEEDS REVIEW', icon: '⚠' }
     : led.overall === 'unverified_present'
     ? { c: '#f59e0b', label: 'SOME ESTIMATES', icon: '◐' }
     : { c: '#22c55e', label: 'VERIFIED', icon: '✓' }
+
+  const bandColor = (b) => (b === 'high' ? '#22c55e' : b === 'medium' ? '#f59e0b' : '#94a3b8')
 
   const Row = ({ c }) => (
     <div className="flex items-start gap-2 py-1.5 border-b border-white/5 last:border-0">
@@ -30,6 +36,11 @@ export default function VerificationBanner({ report }) {
       <div className="min-w-0">
         <div className="text-[11px] text-slate-300">
           <span className="text-slate-500">{c.section}:</span> “{c.text}”
+          {c.confidence_band && (
+            <span className="ml-1.5 text-[9px] uppercase tracking-wide" style={{ color: bandColor(c.confidence_band) }}>
+              · {c.confidence_band} confidence
+            </span>
+          )}
         </div>
         <div className="text-[11px] text-slate-400">{c.explanation}</div>
       </div>
@@ -48,6 +59,13 @@ export default function VerificationBanner({ report }) {
               <span className="text-sm text-white font-medium">Every number, checked against your data</span>
             </div>
             <div className="text-xs text-slate-400 mt-0.5">{led.headline}</div>
+            {a.total_claims > 0 && (
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                {a.coverage_pct}% traced to computed data
+                {typeof a.avg_confidence === 'number' && <> · avg confidence {a.avg_confidence}</>}
+                {failClosed && <span className="text-red-400"> · contract leak — review</span>}
+              </div>
+            )}
           </div>
         </div>
         <span className="text-xs text-slate-500 shrink-0">{open ? 'Hide' : 'Details'}</span>

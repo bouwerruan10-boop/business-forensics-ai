@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from services.claim_contract import make_claim, verify_metric, verify_currency, grade_confidence
 from services.narrative_claims import verify_narrative, verify_finding_figures
-from services.claim_ledger import build_claim_ledger, record_claim_ledger
+from services.claim_ledger import build_claim_ledger, record_claim_ledger, _assurance
 
 
 # ---- claim_contract ----
@@ -194,6 +194,45 @@ def test_ledger_folds_finding_signals():
 def test_ledger_robust():
     assert build_claim_ledger("x")["available"] is False
     assert build_claim_ledger(None)["available"] is False
+
+
+# ---- Phase 3b: assurance roll-up + fail-closed enforcement ----
+
+def test_phase3_assurance_rollup():
+    a = build_claim_ledger(_REPORT)["assurance"]
+    assert a["total_claims"] >= 1
+    assert a["verified"] + a["conflicts"] + a["unverified"] == a["total_claims"]
+    assert 0 <= a["coverage_pct"] <= 100
+    assert isinstance(a["avg_confidence"], float)
+    assert a["contract_enforced"] is True       # verifier-produced claims carry the full contract
+    assert "of" in a["statement"]
+
+
+def test_phase3_assurance_detects_contract_leak():
+    good = make_claim("ok", "currency", value=1000, verification="verified", computed=1000)
+    leak = {"text": "rogue", "verification": "verified"}   # no confidence / no explanation
+    a = _assurance([good, leak])
+    assert a["contract_enforced"] is False and a["leaks"]
+
+
+def test_phase3_fail_closed_forces_review(monkeypatch):
+    # a leaked claim (missing confidence/explanation) must push the WHOLE report to needs-review
+    import services.narrative_claims as nc
+
+    def _leaky(_report):
+        return {"available": True, "claims": [{"text": "rogue", "verification": "verified"}],
+                "summary": {"total": 1, "verified": 1, "conflicts": 0, "unverified": 0}}
+
+    monkeypatch.setattr(nc, "verify_narrative", _leaky)
+    led = build_claim_ledger({"financial_ratios": {}, "financial_figures": {}})
+    assert led["assurance"]["contract_enforced"] is False
+    assert led["overall"] == "conflicts_present"     # fail-closed override
+
+
+def test_phase3_assurance_robust():
+    assert _assurance(None)["total_claims"] == 0
+    assert _assurance([None, 42, "x"])["total_claims"] == 0   # non-dicts ignored
+    assert _assurance([])["coverage_pct"] == 100.0            # vacuous: nothing unverified
 
 
 def test_ledger_record_is_immutable(tmp_path, monkeypatch):
