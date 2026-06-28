@@ -8,9 +8,13 @@ export default function VerificationBanner({ report }) {
   const led = report?.claim_ledger
   if (!led?.available) return null
 
+  // Narrative claims + per-finding figure claims (impact / recommendation / ROI / cost),
+  // surfaced together so no unverified number is hidden from the reader.
   const claims = led.narrative_claims || []
-  const conflicts = claims.filter((c) => c.verification === 'conflict')
-  const unverified = claims.filter((c) => c.verification === 'unverified')
+  const findingClaims = (led.finding_figure_claims || []).map((c) => ({ ...c, section: c.section || 'Finding' }))
+  const allClaims = [...claims, ...findingClaims]
+  const conflicts = allClaims.filter((c) => c.verification === 'conflict')
+  const unverified = allClaims.filter((c) => c.verification === 'unverified')
 
   const tone = led.overall === 'conflicts_present'
     ? { c: '#ef4444', label: 'NEEDS REVIEW', icon: '⚠' }

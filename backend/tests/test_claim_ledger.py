@@ -2,7 +2,7 @@
 from fastapi.testclient import TestClient
 
 from services.claim_contract import make_claim, verify_metric, verify_currency
-from services.narrative_claims import verify_narrative
+from services.narrative_claims import verify_narrative, verify_finding_figures
 from services.claim_ledger import build_claim_ledger, record_claim_ledger
 
 
@@ -77,6 +77,50 @@ def test_phase2_roadmap_impacts_are_verified():
     assert any(c["kind"] == "metric" and c["verification"] == "conflict" for c in r["claims"])
     # the R900,000 projection is not traceable -> honest unverified, never a silent pass
     assert any(c["kind"] == "currency" and c["verification"] == "unverified" for c in r["claims"])
+
+
+def test_phase2_finding_figures_verified_and_unverified():
+    rep = {
+        "financial_figures": {"net_profit": 450_000},
+        "department_findings": {
+            "FinancialAgent": [
+                {"title": "Cash drain", "financial_impact": "R450,000 annual cash drain",
+                 "recommendation": "Recover R450,000 by tightening terms",
+                 "roi_estimate": "3x return", "cost_of_inaction": "Up to R2,000,000 lost over 3 years"},
+            ],
+        },
+    }
+    r = verify_finding_figures(rep)
+    assert r["available"] is True
+    # R450,000 traces to computed net_profit -> verified
+    assert any(c["verification"] == "verified" and c["value"] == 450_000 for c in r["claims"])
+    # the R2,000,000 cost-of-inaction projection is not traceable -> honest unverified
+    assert any(c["verification"] == "unverified" and c["value"] == 2_000_000 for c in r["claims"])
+    assert r["summary"]["verified"] >= 1 and r["summary"]["unverified"] >= 1
+
+
+def test_phase2_finding_figures_robust_to_hostile():
+    assert verify_finding_figures("x")["available"] is False
+    assert verify_finding_figures(None)["summary"] == {}
+    # hostile shapes: non-dict findings, None fields, wrong types -> never crash
+    for bad in (
+        {"department_findings": "not-a-dict"},
+        {"department_findings": {"A": [None, 42, {"financial_impact": None}]}},
+        {"all_findings_ranked": [{"recommendation": 123, "cost_of_inaction": ["x"]}]},
+    ):
+        out = verify_finding_figures(bad)
+        assert out["available"] is True and isinstance(out["claims"], list)
+
+
+def test_phase2_ledger_folds_finding_figures():
+    # an untraceable finding figure (no narrative) must flip overall to unverified_present
+    rep = {"financial_ratios": {}, "financial_figures": {},
+           "department_findings": {"A": [{"title": "X", "cost_of_inaction": "R2,500,000 at risk"}]}}
+    led = build_claim_ledger(rep)
+    assert led["finding_figures"]["checked"] >= 1
+    assert led["finding_figures"]["unverified"] >= 1
+    assert led["overall"] == "unverified_present"
+    assert "finding figures traced" in led["headline"]
 
 
 def test_phase2_sa_summaries_scanned():

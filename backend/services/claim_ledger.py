@@ -13,10 +13,12 @@ def build_claim_ledger(report) -> dict:
     """Assemble the report-wide claim/verification manifest. Pure."""
     if not isinstance(report, dict):
         return {"available": False, "reason": "No report."}
-    from services.narrative_claims import verify_narrative
+    from services.narrative_claims import verify_narrative, verify_finding_figures
 
     nar = verify_narrative(report)
     ns = nar.get("summary", {}) if isinstance(nar, dict) else {}
+    ffr = verify_finding_figures(report)
+    ffs = ffr.get("summary", {}) if isinstance(ffr, dict) else {}
     fs = report.get("faithfulness_summary") if isinstance(report.get("faithfulness_summary"), dict) else {}
     ps = report.get("prose_verifier_summary") if isinstance(report.get("prose_verifier_summary"), dict) else {}
     fq = report.get("finding_quality") if isinstance(report.get("finding_quality"), dict) else {}
@@ -25,20 +27,24 @@ def build_claim_ledger(report) -> dict:
     nar_verified = int(ns.get("verified") or 0)
     nar_conflicts = int(ns.get("conflicts") or 0)
     nar_unverified = int(ns.get("unverified") or 0)
+    ff_checked = int(ffs.get("checked") or 0)
+    ff_verified = int(ffs.get("verified") or 0)
+    ff_unverified = int(ffs.get("unverified") or 0)
     finding_conflicts = int(fs.get("conflicts") or 0) + int(fs.get("benchmark_conflicts") or 0)
     prose_flagged = int(ps.get("flagged") or 0)
 
     total_conflicts = nar_conflicts + finding_conflicts + prose_flagged
     if total_conflicts:
         overall = "conflicts_present"
-    elif nar_unverified:
+    elif nar_unverified or ff_unverified:
         overall = "unverified_present"
     else:
         overall = "all_clear"
 
     headline = ("{}/{} narrative figures verified against your computed data; {} conflict(s); "
-                "{} findings cross-checked.").format(nar_verified, nar_total, total_conflicts,
-                                                     int(fs.get("checked") or 0))
+                "{} findings cross-checked; {}/{} finding figures traced.").format(
+                    nar_verified, nar_total, total_conflicts, int(fs.get("checked") or 0),
+                    ff_verified, ff_checked)
 
     return {
         "available": True,
@@ -46,6 +52,8 @@ def build_claim_ledger(report) -> dict:
         "headline": headline,
         "narrative": ns,
         "narrative_claims": nar.get("claims", []),
+        "finding_figures": {"checked": ff_checked, "verified": ff_verified, "unverified": ff_unverified},
+        "finding_figure_claims": ffr.get("claims", []),
         "findings": {"checked": int(fs.get("checked") or 0), "confirmed": int(fs.get("confirmed") or 0),
                      "conflicts": finding_conflicts, "conflict_titles": fs.get("conflict_titles", [])},
         "prose": {"checked": int(ps.get("checked") or 0), "flagged": prose_flagged,
@@ -70,6 +78,7 @@ def record_claim_ledger(analysis_id, ledger) -> dict:
         "overall": ledger.get("overall"),
         "headline": ledger.get("headline"),
         "narrative": ledger.get("narrative"),
+        "finding_figures": ledger.get("finding_figures"),
         "findings": ledger.get("findings"),
         "prose": ledger.get("prose"),
         "quality": ledger.get("quality"),

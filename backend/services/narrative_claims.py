@@ -143,6 +143,78 @@ def _currency_claims(text, known):
     return claims
 
 
+# Finding fields that carry LLM-written rand amounts (impact / payoff / cost claims).
+_FINDING_FIELDS = ("financial_impact", "recommendation", "roi_estimate", "cost_of_inaction")
+
+
+def _iter_findings(report):
+    """Yield each serialised finding dict from the report once (de-duplicated by title).
+    Prefers the complete `department_findings`; falls back to the ranked/quick-win lists."""
+    seen, buckets = set(), []
+    dept = report.get("department_findings")
+    if isinstance(dept, dict):
+        for lst in dept.values():
+            if isinstance(lst, list):
+                buckets.extend(lst)
+    if not buckets:
+        for key in ("all_findings_ranked", "quick_wins"):
+            v = report.get(key)
+            if isinstance(v, list):
+                buckets.extend(v)
+    for f in buckets:
+        if not isinstance(f, dict):
+            continue
+        title = str(f.get("title", ""))
+        if title in seen:
+            continue
+        seen.add(title)
+        yield f
+
+
+def verify_finding_figures(report) -> dict:
+    """Check the rand amounts inside each finding's impact / recommendation / ROI /
+    cost-of-inaction fields against the report's computed figures. Pure / deterministic.
+    These are mostly forward projections, so most are honestly `unverified` (an estimate),
+    never a silent pass; one that matches a computed figure is `verified`."""
+    if not isinstance(report, dict):
+        return {"available": False, "claims": [], "summary": {}}
+    known = _known_figures(report)
+    claims = []
+    for f in _iter_findings(report):
+        title = str(f.get("title", ""))[:60]
+        for field in _FINDING_FIELDS:
+            text = f.get(field)
+            if not isinstance(text, str) or not text.strip():
+                continue
+            seen_amts = set()
+            for m in _CUR_RE.finditer(text):
+                amt = _to_amount(m.group(1), m.group(2))
+                if amt is None or amt < 1000 or round(amt) in seen_amts:
+                    continue
+                seen_amts.add(round(amt))
+                status, explanation, src = verify_currency(amt, known)
+                claims.append(make_claim(
+                    text=(title + " - " + m.group(0).strip())[:300], kind="currency", value=amt,
+                    source=("computed figure: " + src) if src else "LLM finding (" + field + ")",
+                    verification=status, explanation=explanation, as_of="this analysis"))
+                if len(claims) >= _MAX_CLAIMS:
+                    break
+            if len(claims) >= _MAX_CLAIMS:
+                break
+        if len(claims) >= _MAX_CLAIMS:
+            break
+    verified = sum(1 for c in claims if c["verification"] == "verified")
+    unverified = sum(1 for c in claims if c["verification"] == "unverified")
+    return {
+        "available": True,
+        "claims": claims,
+        "summary": {"checked": len(claims), "verified": verified, "unverified": unverified},
+        "note": ("Rand amounts inside each finding's impact / recommendation / ROI / cost-of-inaction, "
+                 "checked against Imara's computed figures. Most are forward projections that can't be "
+                 "traced to a computed figure -> honestly 'unverified' (an estimate), never a silent pass."),
+    }
+
+
 def verify_narrative(report) -> dict:
     """Scan the report's narratives, verify every number, return the claim list + summary."""
     if not isinstance(report, dict):
