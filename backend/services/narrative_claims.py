@@ -121,7 +121,7 @@ def _metric_claims(text, ratios):
         status, explanation = verify_metric(claimed, computed, unit, label)
         c = make_claim(text=phrase + " ~" + str(claimed), kind="metric", value=claimed,
                        source="computed ratio: " + str(key), verification=status,
-                       explanation=explanation, as_of="this analysis")
+                       explanation=explanation, as_of="this analysis", computed=computed, unit=unit)
         claims.append(c)
     return claims
 

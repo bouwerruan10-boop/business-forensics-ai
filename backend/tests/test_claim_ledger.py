@@ -1,7 +1,7 @@
 """Claim/Evidence contract tests: uniform claim, narrative number verification, ledger."""
 from fastapi.testclient import TestClient
 
-from services.claim_contract import make_claim, verify_metric, verify_currency
+from services.claim_contract import make_claim, verify_metric, verify_currency, grade_confidence
 from services.narrative_claims import verify_narrative, verify_finding_figures
 from services.claim_ledger import build_claim_ledger, record_claim_ledger
 
@@ -24,6 +24,38 @@ def test_make_claim_normalises():
     c = make_claim("x", "bogus_kind", value=1, verification="nonsense")
     assert c["kind"] == "qualitative"           # unknown kind -> qualitative
     assert c["verification"] == "unverified"    # unknown status -> unverified
+
+
+# ---- Phase 3: calibrated per-claim confidence ----
+
+def test_grade_confidence_bands():
+    # verified, near-exact -> high; loose-but-verified -> still reasonable
+    assert grade_confidence("verified", 33.2, 33.2, "%") == (0.97, "high")
+    assert grade_confidence("verified", 35.0, 33.2, "%")[1] in ("high", "medium")
+    assert grade_confidence("verified")[1] == "high"          # status-only default
+    # conflict -> low (we are confident the claim is wrong); unverified estimate -> low
+    assert grade_confidence("conflict")[1] == "low"
+    assert grade_confidence("unverified")[1] == "low"
+    # hostile numbers never crash
+    assert grade_confidence("verified", "x", None, "%")[1] == "high"
+
+
+def test_make_claim_attaches_confidence_and_clamps():
+    c = make_claim("m", "metric", value=33.2, verification="verified", computed=33.2, unit="%")
+    assert c["confidence"] == 0.97 and c["confidence_band"] == "high"
+    # explicit confidence overrides and clamps to [0,1]
+    assert make_claim("x", "metric", confidence=5)["confidence"] == 1.0
+    assert make_claim("x", "metric", confidence="bad")["confidence"] == 0.0
+
+
+def test_narrative_claims_carry_confidence():
+    r = verify_narrative(_REPORT)
+    assert all("confidence" in c and "confidence_band" in c for c in r["claims"])
+    # the conflicting metric must be low-confidence; a verified one high
+    conf = next(c for c in r["claims"] if c["verification"] == "conflict")
+    assert conf["confidence_band"] == "low"
+    ver = next(c for c in r["claims"] if c["verification"] == "verified")
+    assert ver["confidence_band"] == "high"
 
 
 # ---- narrative_claims ----
