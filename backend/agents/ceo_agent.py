@@ -501,6 +501,7 @@ Return ONLY valid JSON.
                 "cost_of_inaction": f.cost_of_inaction,
                 "benchmark_reference": f.benchmark_reference,
                 "data_source": f.data_source,
+                "evidence_plain_language": getattr(f, "evidence_plain_language", ""),
                 "quick_win": f.quick_win,
                 "verification": getattr(f, "verification", ""),
                 "verification_note": getattr(f, "verification_note", ""),

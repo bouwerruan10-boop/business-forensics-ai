@@ -1,5 +1,6 @@
 import ScoreCards from './ScoreCards'
 import ImaraScoreHero from './ImaraScoreHero'
+import VerificationBanner from './VerificationBanner'
 import VerdictHero from './VerdictHero'
 import AskImara from './AskImara'
 import ScoreReasons from './ScoreReasons'
@@ -205,6 +206,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
         <div className="min-w-0 flex-1">
 
       <VerdictHero report={report} />
+      <VerificationBanner report={report} />
       <AskImara report={report} analysisId={analysisId} />
 
       {/* Executive Summary */}

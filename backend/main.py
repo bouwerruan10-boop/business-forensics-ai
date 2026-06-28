@@ -840,6 +840,20 @@ def report_reasons(analysis_id: str):
     return reason_codes(result)
 
 
+@app.get("/api/report/{analysis_id}/claim-ledger")
+def report_claim_ledger(analysis_id: str):
+    """Report-wide verification manifest: every number in the narratives checked against
+    Imara's computed data (verified / conflict / unverified), folded with the finding-level
+    faithfulness + prose + quality signals. Honest by design; never auto-edits anything."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if result.get("claim_ledger"):
+        return result["claim_ledger"]
+    from services.claim_ledger import build_claim_ledger
+    return build_claim_ledger(result)
+
+
 @app.get("/api/report/{analysis_id}/evidence-pack")
 def report_evidence_pack(analysis_id: str):
     """Pilot evidence pack: conceptual soundness + Altman-Z'' convergence + model
@@ -1536,6 +1550,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["llm_usage"] = _ledger.summary()
             from services.finding_quality import critique_report
             report["finding_quality"] = critique_report(report)  # deterministic per-finding critique
+            from services.claim_ledger import build_claim_ledger
+            report["claim_ledger"] = build_claim_ledger(report)  # verify every narrative number vs computed data
             from services.distress_score import altman_z_em
             report["distress_score"] = altman_z_em(report.get("financial_figures") or {}, report.get("imara_band", ""))
             from services.assurance import assess as assess_assurance
