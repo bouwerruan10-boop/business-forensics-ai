@@ -37,7 +37,10 @@ def physical_presence_test(current_year_days, prior_years_days, days_continuousl
     `days_continuously_absent` - longest continuous spell currently OUTSIDE SA.
     """
     cur = _int(current_year_days)
-    priors = [_int(d) for d in (prior_years_days or [])][:5]
+    # slice BEFORE coercing so a hostile multi-million-element list is never fully
+    # iterated (only the 5 preceding years are relevant to the test anyway).
+    raw_priors = prior_years_days[:5] if isinstance(prior_years_days, (list, tuple)) else []
+    priors = [_int(d) for d in raw_priors]
 
     cur_ok = cur > sa_rates.PRESENCE_CURRENT_MIN
     each_ok = len(priors) == 5 and all(d > sa_rates.PRESENCE_EACH_PRIOR_MIN for d in priors)

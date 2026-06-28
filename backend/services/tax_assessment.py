@@ -9,6 +9,8 @@ each engine, so an arbitrary/hostile body can never raise a TypeError. Not tax
 advice; figures are SARS 2026/27 and must be confirmed with a practitioner.
 """
 
+import math
+
 from services import (
     income_tax, vat_calc, eti, provisional_tax, cgt, fringe_benefits, lump_sum,
     assessed_losses, tax_residency, exit_tax, foreign_income,
@@ -51,10 +53,27 @@ _DISCLAIMER = (
     "every result with a registered tax practitioner before filing."
 )
 
+# Hard cap on a list-typed input section (e.g. the employee roster) so a hostile
+# body can never tie the worker up iterating an enormous list (DoS guard). A real
+# SME roster is far below this.
+_MAX_LIST = 2000
+
 
 def _pick(d, keys):
     d = d if isinstance(d, dict) else {}
     return {k: d[k] for k in keys if k in d}
+
+
+def _json_safe(obj):
+    """Recursively clamp non-finite floats (inf/nan) to 0.0 so the public endpoint
+    can never emit invalid JSON (Infinity/NaN) regardless of any engine internals."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else 0.0
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    return obj
 
 
 def assess_all(body):
@@ -78,7 +97,7 @@ def assess_all(body):
     employees = body.get("employees")
     if isinstance(employees, list) and employees:
         year = 2 if body.get("eti_year") == 2 else 1
-        out["eti"] = eti.quantify_eti(employees, year=year)
+        out["eti"] = eti.quantify_eti(employees[:_MAX_LIST], year=year)
 
     fringe = _pick(body.get("fringe_benefits"), _FRINGE_KEYS)
     if fringe:
@@ -112,4 +131,4 @@ def assess_all(body):
     if foreign and foreign.get("foreign_employment_income"):
         out["foreign_income"] = foreign_income.assess_foreign_employment(**foreign)
 
-    return out
+    return _json_safe(out)

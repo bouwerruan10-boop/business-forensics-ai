@@ -14,6 +14,8 @@ balance owing to / refundable by SARS. The full deemed-cost FIXED-COST table
 (by vehicle value) is a later enhancement; this uses the prescribed rate per km.
 """
 
+import math
+
 from services import sa_rates
 from services.relocation_tax import (
     SA_BRACKETS, SA_PRIMARY_REBATE, SA_SECONDARY_REBATE, SA_TERTIARY_REBATE,
@@ -26,7 +28,9 @@ def _num(v):
         f = float(v or 0)
     except (TypeError, ValueError):
         return 0.0
-    return f if f > 0 else 0.0
+    # reject non-finite (inf/nan) so a hostile "1e400" can never propagate into
+    # results or produce invalid JSON (Infinity/NaN) on the public endpoint.
+    return f if (f > 0 and math.isfinite(f)) else 0.0
 
 
 def tax_before_rebates(taxable):
