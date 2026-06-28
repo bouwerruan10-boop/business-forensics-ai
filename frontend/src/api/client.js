@@ -238,6 +238,28 @@ export async function getTaxIncome(payload) {
   return res.json()
 }
 
+export async function getScoreDisclosure(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/score-disclosure`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
+export async function contestScore(analysisId, payload) {
+  const res = await fetch(`${BASE}/report/${analysisId}/contest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
+export async function getContestations(analysisId) {
+  const res = await fetch(`${BASE}/report/${analysisId}/contestations`, { headers: authHeaders() })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
 export async function getDisputeDeadlines(assessmentDate) {
   const res = await fetch(`${BASE}/tax/dispute-deadlines?assessment_date=${encodeURIComponent(assessmentDate || '')}`, {
     headers: authHeaders(),

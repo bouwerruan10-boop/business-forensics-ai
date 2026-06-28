@@ -840,6 +840,45 @@ def report_reasons(analysis_id: str):
     return reason_codes(result)
 
 
+@app.get("/api/report/{analysis_id}/score-disclosure")
+def report_score_disclosure(analysis_id: str):
+    """POPIA s71(3) disclosure for the Imara Score: the underlying logic (weighted
+    components + each one's contribution), the principal reasons (NCA s62), the
+    inputs used vs not used, and the data subject's rights + contestation route."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.score_disclosure import build_disclosure
+    return build_disclosure(result)
+
+
+@app.post("/api/report/{analysis_id}/contest")
+async def report_contest_score(analysis_id: str, request: Request,
+                               principal: Principal = Depends(get_principal)):
+    """Lodge a data-subject representation against the Imara Score (POPIA s71(3)
+    "make representations"). Recorded immutably in the tamper-evident audit chain."""
+    if not (analyses.get(analysis_id) or get_report(analysis_id)):
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    body = body if isinstance(body, dict) else {}
+    from services.score_disclosure import record_contestation
+    return record_contestation(analysis_id, factor=body.get("factor", ""),
+                               statement=body.get("statement", ""), contact=body.get("contact", ""),
+                               submitted_by=getattr(principal, "id", "operator"))
+
+
+@app.get("/api/report/{analysis_id}/contestations")
+def report_list_contestations(analysis_id: str):
+    """The representations lodged against this analysis's score (POPIA s71(3) audit)."""
+    if not (analyses.get(analysis_id) or get_report(analysis_id)):
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.score_disclosure import list_contestations
+    return list_contestations(analysis_id)
+
+
 @app.post("/api/report/{analysis_id}/ask")
 @limiter.limit(ASK_RATE_LIMIT)
 def report_ask(request: Request, analysis_id: str, body: AskRequest,
