@@ -131,6 +131,24 @@ def test_phase2_finding_figures_verified_and_unverified():
     assert r["summary"]["verified"] >= 1 and r["summary"]["unverified"] >= 1
 
 
+def test_finding_detail_currency_covered_and_deduped():
+    # currency in a finding's `detail` prose is now checked (faithfulness only did metrics there);
+    # and the same amount across detail + financial_impact dedups to ONE claim per finding.
+    rep = {
+        "financial_figures": {"net_profit": 450_000},
+        "department_findings": {"Fin": [
+            {"title": "Drain", "detail": "A hidden R5,000,000 exposure sits in the detail prose.",
+             "financial_impact": "R450,000 drain", "recommendation": "Fix the R450,000 leak"},
+        ]},
+    }
+    r = verify_finding_figures(rep)
+    vals = [c["value"] for c in r["claims"]]
+    assert 5_000_000 in vals                       # detail currency now scanned
+    assert vals.count(450_000) == 1                # detail+impact+rec dedup to one per finding
+    assert any(c["verification"] == "verified" and c["value"] == 450_000 for c in r["claims"])
+    assert any(c["verification"] == "unverified" and c["value"] == 5_000_000 for c in r["claims"])
+
+
 def test_phase2_finding_figures_robust_to_hostile():
     assert verify_finding_figures("x")["available"] is False
     assert verify_finding_figures(None)["summary"] == {}

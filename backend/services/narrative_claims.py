@@ -143,8 +143,9 @@ def _currency_claims(text, known):
     return claims
 
 
-# Finding fields that carry LLM-written rand amounts (impact / payoff / cost claims).
-_FINDING_FIELDS = ("financial_impact", "recommendation", "roi_estimate", "cost_of_inaction")
+# Finding fields that carry LLM-written rand amounts (impact / payoff / cost claims + the
+# main `detail` prose — faithfulness checks `detail` for metrics but not for currency).
+_FINDING_FIELDS = ("financial_impact", "recommendation", "roi_estimate", "cost_of_inaction", "detail")
 
 
 def _iter_findings(report):
@@ -182,11 +183,11 @@ def verify_finding_figures(report) -> dict:
     claims = []
     for f in _iter_findings(report):
         title = str(f.get("title", ""))[:60]
+        seen_amts = set()          # dedup per FINDING, so the same amount in detail + impact = one claim
         for field in _FINDING_FIELDS:
             text = f.get(field)
             if not isinstance(text, str) or not text.strip():
                 continue
-            seen_amts = set()
             for m in _CUR_RE.finditer(text):
                 amt = _to_amount(m.group(1), m.group(2))
                 if amt is None or amt < 1000 or round(amt) in seen_amts:
@@ -209,7 +210,7 @@ def verify_finding_figures(report) -> dict:
         "available": True,
         "claims": claims,
         "summary": {"checked": len(claims), "verified": verified, "unverified": unverified},
-        "note": ("Rand amounts inside each finding's impact / recommendation / ROI / cost-of-inaction, "
+        "note": ("Rand amounts inside each finding's impact / recommendation / ROI / cost-of-inaction / detail, "
                  "checked against Imara's computed figures. Most are forward projections that can't be "
                  "traced to a computed figure -> honestly 'unverified' (an estimate), never a silent pass."),
     }
