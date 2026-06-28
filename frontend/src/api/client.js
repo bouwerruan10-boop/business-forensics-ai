@@ -260,6 +260,16 @@ export async function getContestations(analysisId) {
   return res.json()
 }
 
+export async function getTaxAuditTrail(payload) {
+  const res = await fetch(`${BASE}/tax/audit-trail`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload || {}),
+  })
+  if (!res.ok) throw await _friendlyError(res)
+  return res.json()
+}
+
 export async function getDisputeDeadlines(assessmentDate) {
   const res = await fetch(`${BASE}/tax/dispute-deadlines?assessment_date=${encodeURIComponent(assessmentDate || '')}`, {
     headers: authHeaders(),

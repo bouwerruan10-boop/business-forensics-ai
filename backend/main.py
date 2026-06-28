@@ -2006,6 +2006,21 @@ async def tax_income(request: Request):
     return assess_all(body if isinstance(body, dict) else {})
 
 
+@app.post("/api/tax/audit-trail")
+@limiter.limit(TAX_RATE_LIMIT)
+async def tax_audit_trail(request: Request):
+    """Examination-survivable provenance for a tax assessment: per-section statutory
+    citation + dated rate source + the headline figures, so every number is
+    traceable to its SARS provision. Public, deterministic (services/tax_audit_trail.py)."""
+    from services.tax_assessment import assess_all
+    from services.tax_audit_trail import build_tax_audit_trail
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    return build_tax_audit_trail(assess_all(body if isinstance(body, dict) else {}))
+
+
 @app.get("/api/tax/dispute-deadlines")
 @limiter.limit(TAX_RATE_LIMIT)
 async def tax_dispute_deadlines(request: Request, assessment_date: str = ""):

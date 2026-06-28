@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getTaxIncome, getDisputeDeadlines, getSarsGuidance } from '../api/client'
+import { getTaxIncome, getDisputeDeadlines, getSarsGuidance, getTaxAuditTrail } from '../api/client'
 
 const rand = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA')
 const numOrUndef = (v) => { const n = parseFloat(v); return !isNaN(n) && n > 0 ? n : undefined }
@@ -194,11 +194,20 @@ export default function IncomeTaxCalculator() {
     }
     try {
       setData(await getTaxIncome(payload))
+      setLastPayload(payload)
+      setAudit(null)
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  const [lastPayload, setLastPayload] = useState(null)
+  const [audit, setAudit] = useState(null)
+  const loadAudit = async () => {
+    if (audit) { setAudit(null); return }
+    try { setAudit(await getTaxAuditTrail(lastPayload || {})) } catch (e) { setError(e.message) }
   }
 
   const t = data?.income_tax
@@ -593,6 +602,37 @@ export default function IncomeTaxCalculator() {
               <p className="text-xs text-slate-400 mt-2">{fir.summary}</p>
             </div>
           )}
+          {/* SARS-cited audit trail — how each figure was derived */}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-white">Audit trail — how each figure was derived</h2>
+                <p className="text-xs text-slate-400 mt-1">Every number is computed in code from dated SARS constants; each section cites its statutory provision so it’s reproducible and examination-survivable.</p>
+              </div>
+              <button type="button" onClick={loadAudit}
+                className="shrink-0 text-xs rounded-lg px-3 py-1.5 border border-white/10 text-slate-300 hover:border-white/25">
+                {audit ? 'Hide' : 'Show audit trail'}
+              </button>
+            </div>
+            {audit?.entries?.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <div className="text-[11px] text-slate-500">Rates dated {audit.rates_dated} · {audit.rates_note}</div>
+                {audit.entries.map((e) => (
+                  <div key={e.section} className="rounded-lg border border-white/10 p-3">
+                    <div className="text-sm text-white font-medium capitalize">{e.section.replace(/_/g, ' ')}</div>
+                    <div className="text-xs text-gold/90 mt-0.5">{e.provision}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Rate source: {e.rate_source}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-slate-400">
+                      {Object.entries(e.figures).map(([k, v]) => (
+                        <span key={k}>{k.replace(/_/g, ' ')}: <span className="text-slate-200">{typeof v === 'number' ? 'R ' + Math.round(v).toLocaleString('en-ZA') : String(v)}</span></span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-slate-500">{audit.note}</p>
+              </div>
+            )}
+          </div>
           {data.disclaimer && <p className="text-xs text-slate-500">{data.disclaimer}</p>}
         </div>
       )}
