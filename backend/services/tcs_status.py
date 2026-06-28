@@ -102,7 +102,7 @@ def build_tcs_status(report) -> dict:
     pillars = {
         "registration": {
             "status": reg_status, "detail": reg_msg,
-            "required": [{"tax": t, "satisfied": s} for (t, req, s, _note) in reqs],
+            "required": [{"tax": t, "satisfied": s} for (t, _req, s, _note) in reqs],
         },
         "submission": _signal_pillar(
             "outstanding_returns",
