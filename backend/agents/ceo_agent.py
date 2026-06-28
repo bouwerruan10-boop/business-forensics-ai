@@ -265,7 +265,6 @@ Return ONLY valid JSON. No explanation.
             # Non-conflicting fields — always set from extraction
             memory.revenue_streams = model.get("revenue_streams", [])
             memory.cost_centers = model.get("cost_centers", [])
-            memory.departments = model.get("departments", [])
             memory.business_model_summary = model.get("business_model_summary", "")
             memory.key_risks = model.get("key_risks", [])
             memory.key_opportunities = model.get("key_opportunities", [])

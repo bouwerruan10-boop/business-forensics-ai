@@ -39,10 +39,8 @@ class SharedMemory:
     country: str = ""
 
     # Parsed data
-    raw_data: dict = field(default_factory=dict)
     revenue_streams: list = field(default_factory=list)
     cost_centers: list = field(default_factory=list)
-    departments: list = field(default_factory=list)
 
     # Intelligence
     findings: list = field(default_factory=list)

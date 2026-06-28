@@ -117,7 +117,6 @@ def _is_model_unavailable(exc) -> bool:
 
 class BaseAgent:
     name: str = "Base Agent"
-    role: str = ""
     system_prompt: str = ""
 
     def _call_claude(self, user_message: str, system_override: str = "", model_override: str = "",
