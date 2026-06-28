@@ -135,8 +135,9 @@ export default function CreditReport({ report }) {
     score:      report?.fraud_risk_score  || 0,
     indicators: report?.fraud_indicators  || [],
   }
+  const integrity = report?.bank_statement_integrity || null
 
-  if (!credit.score && !credit.grade && fraud.level === 'unknown') return null
+  if (!credit.score && !credit.grade && fraud.level === 'unknown' && !integrity) return null
 
   return (
     <div className="space-y-6">
@@ -173,6 +174,42 @@ export default function CreditReport({ report }) {
           <ProductBadges products={credit.products} />
         </div>
       )}
+
+      {/* Bank-statement integrity (deterministic: reconciliation + PDF tamper signals) */}
+      {integrity?.statements?.length > 0 && (() => {
+        const c = integrity.overall === 'elevated' ? '#ef4444' : integrity.overall === 'review' ? '#f59e0b' : '#22c55e'
+        const reconLabel = { reconciled: '✓ balances tie out', discrepancy: '✗ does not reconcile', insufficient_data: '? not enough data' }
+        const metaLabel = { clean: '✓ no tamper signal', review: '? review metadata', likely_tampered: '✗ likely tampered', unknown: '— no metadata' }
+        return (
+          <div className="bg-navy-card border border-white/[0.08] rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-white font-bold text-sm">Bank-statement integrity</div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded border" style={{ color: c, borderColor: c + '55', background: c + '15' }}>
+                {integrity.overall.toUpperCase()}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {integrity.statements.map((s, i) => (
+                <div key={i} className="bg-[#0f1117] border border-white/8 rounded-xl p-3">
+                  <div className="text-[11px] text-slate-300 font-medium mb-1 truncate">{s.filename}</div>
+                  <div className="flex flex-wrap gap-2 text-[10px] text-slate-400">
+                    <span>{reconLabel[s.reconciliation?.status] || s.reconciliation?.status}</span>
+                    <span className="text-slate-600">·</span>
+                    <span>{metaLabel[s.metadata?.status] || s.metadata?.status}</span>
+                  </div>
+                  {(s.metadata?.flags || []).map((f, j) => (
+                    <div key={j} className="text-[10px] text-amber-300/90 mt-1">⚠ {f}</div>
+                  ))}
+                  {s.reconciliation?.status === 'discrepancy' && (
+                    <div className="text-[10px] text-red-300 mt-1">⚠ {s.reconciliation.note}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-[9px] text-slate-600 mt-3">Risk-awareness only — a flag means “verify the original statement”, not “fraud”. Deterministic check; confirm anything material with the bank.</p>
+          </div>
+        )
+      })()}
     </div>
   )
 }

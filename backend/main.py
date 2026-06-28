@@ -932,6 +932,16 @@ def report_tcs_status(analysis_id: str):
     return build_tcs_status(result)
 
 
+@app.get("/api/report/{analysis_id}/statement-integrity")
+def report_statement_integrity(analysis_id: str):
+    """Bank-statement integrity: forward balance reconciliation + PDF-metadata
+    tamper signals. Deterministic; risk-awareness, not a fraud determination."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return result.get("bank_statement_integrity") or {"available": False, "reason": "No bank statements analysed."}
+
+
 @app.get("/api/report/{analysis_id}/audit-risk")
 def report_audit_risk(analysis_id: str):
     """SARS audit-likelihood score (0-100) aggregated from the structural tax-risk
@@ -1351,6 +1361,7 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
                 "financial": [], "bank": [], "tax": [],
                 "legal": [], "hr": [], "business_plan": [], "general": [],
             }
+            bank_integrity = []
             for fd in file_data:
                 analysis_status[analysis_id]["message"] = "Reading {}...".format(fd["filename"])
                 parsed = parse_file(fd["filename"], fd["content"])
@@ -1363,6 +1374,18 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
                 else:
                     text = str(parsed)
                 category_texts[cat].append(text)
+                # Deterministic statement-integrity check on bank-statement uploads:
+                # forward balance reconciliation + PDF-metadata tamper signals.
+                if cat == "bank":
+                    try:
+                        from services.statement_integrity import assess_statement_integrity
+                        is_pdf = str(fd["filename"]).lower().endswith(".pdf")
+                        chk = assess_statement_integrity(
+                            pdf_bytes=fd["content"] if is_pdf else None, text=text)
+                        chk["filename"] = fd["filename"]
+                        bank_integrity.append(chk)
+                    except Exception as _exc:
+                        get_logger("imara.pipeline").warning("statement_integrity_skipped", error=str(_exc))
 
             business_data = merge_parsed_data(parsed_files)
 
@@ -1461,6 +1484,12 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             _ar = build_audit_risk(report)
             if _ar.get("available"):
                 report["audit_risk"] = _ar
+            if bank_integrity:
+                _worst = ("elevated" if any(b.get("overall") == "elevated" for b in bank_integrity)
+                          else "review" if any(b.get("overall") == "review" for b in bank_integrity)
+                          else "clean")
+                report["bank_statement_integrity"] = {"overall": _worst, "statements": bank_integrity,
+                                                      "count": len(bank_integrity)}
             from services.governance import decision_support_notice
             report["decision_support"] = decision_support_notice()
             from services.supplier_benchmark import run_supplier_benchmark

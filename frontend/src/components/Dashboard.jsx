@@ -172,7 +172,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
     ...(allFindingsFlat.some(f => f.quick_win) ? [{ id: 'quickwins', label: 'Quick Wins' }] : []),
     { id: 'findings', label: 'All Findings' },
     { id: 'roadmap', label: 'Roadmap' },
-    ...((report.credit_score > 0 || (report.fraud_risk_level && report.fraud_risk_level !== 'unknown')) ? [{ id: 'credit', label: 'Credit & Fraud' }] : []),
+    ...((report.credit_score > 0 || (report.fraud_risk_level && report.fraud_risk_level !== 'unknown') || report.bank_statement_integrity?.statements?.length > 0) ? [{ id: 'credit', label: 'Credit & Fraud' }] : []),
     ...((report.valuation_mid > 0 || report.forecast_base_12m > 0) ? [{ id: 'valuation', label: 'Valuation & Forecast' }] : []),
     ...(report.cashflow_13week?.available ? [{ id: 'cashflow', label: '13-Week Cash Flow' }] : []),
     ...((report.market_search_performed || report.market_visibility_score > 0) ? [{ id: 'market', label: 'Market Intelligence' }] : []),
@@ -268,7 +268,7 @@ export default function Dashboard({ report, analysisId, onNewAnalysis, showToast
       </Section>
 
       {/* Credit Readiness & Fraud Risk */}
-      {(report.credit_score > 0 || (report.fraud_risk_level && report.fraud_risk_level !== 'unknown')) && (
+      {(report.credit_score > 0 || (report.fraud_risk_level && report.fraud_risk_level !== 'unknown') || report.bank_statement_integrity?.statements?.length > 0) && (
         <Section
              id="credit"
           title="Credit Readiness & Fraud Risk"
