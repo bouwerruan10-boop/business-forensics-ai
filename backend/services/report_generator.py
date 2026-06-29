@@ -168,6 +168,80 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
     return buffer.getvalue()
 
 
+def generate_reason_letter_pdf(report: dict) -> bytes:
+    """Standalone one-page adverse-action / reason letter (PDF) the SME receives — the principal
+    Score factors + strengths + right to contest. Decision-support; supports a lender's own NCA s62
+    notice, not an Imara-issued decision. Reuses build_reason_letter (deterministic)."""
+    from services.report_safety import normalize_report
+    from services.reason_letter import build_reason_letter
+    report = normalize_report(report)
+    L = build_reason_letter(report)
+
+    def _esc(t):
+        return str(t if t is not None else "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN,
+                            topMargin=1.5 * cm, bottomMargin=1.8 * cm,
+                            title="Imara Score — Explanation of Principal Factors", author="Imara")
+    story = []
+    if not L.get("available"):
+        story.append(_para("No Imara Score factors are available to explain for this analysis.",
+                           _style(fontSize=10, textColor=MID_GRAY)))
+        doc.build(story)
+        return buffer.getvalue()
+
+    story.append(_para('<font name="Helvetica-Bold" size="9" color="#{}">IMARA</font>'.format(_hex(GOLD)),
+                       _style(leading=12)))
+    story.append(_para(_esc(L["title"]), _style(fontSize=16, fontName="Helvetica-Bold", textColor=NAVY, leading=19)))
+    story.append(_para("{}  -  {}".format(_esc(L["business_name"]), _esc(L["generated_on"])),
+                       _style(fontSize=9, textColor=MID_GRAY)))
+    story.append(HRFlowable(width="100%", thickness=1, color=GOLD))
+    story.append(Spacer(1, 0.3 * cm))
+
+    story.append(_para(_esc(L["intro"]), _style(fontSize=9.5, textColor=DARK_GRAY, leading=13)))
+    band = "  (band {})".format(_esc(L["band"])) if L.get("band") else ""
+    story.append(_para('<font name="Helvetica-Bold" size="12" color="#{}">Imara Score: {}{}</font>'.format(
+        _hex(NAVY), _esc(L["score"]), band), _style(leading=16, spaceBefore=8)))
+    story.append(Spacer(1, 0.15 * cm))
+
+    story.append(_para("PRINCIPAL FACTORS (in order of impact)",
+                       _style(fontSize=8, fontName="Helvetica-Bold", textColor=ORANGE, letterSpacing=1)))
+    reasons = L["principal_reasons"][:6]
+    if reasons:
+        for r in reasons:
+            story.append(_para('<font name="Helvetica-Bold">{}</font>  ({}/100)  -  {}'.format(
+                _esc(r.get("factor"))[:48], _esc(r.get("score")), _esc(r.get("detail"))[:170]),
+                _style(fontSize=9, textColor=NAVY, leading=12)))
+    else:
+        story.append(_para("No single factor is materially holding the score back.",
+                           _style(fontSize=9, textColor=GREEN)))
+    story.append(Spacer(1, 0.15 * cm))
+
+    if L["strengths"]:
+        line = "What is supporting the score:  " + "   ".join(
+            "{} ({}/100)".format(_esc(s.get("factor"))[:32], _esc(s.get("score"))) for s in L["strengths"][:4])
+        story.append(_para(line, _style(fontSize=9, textColor=GREEN, fontName="Helvetica-Bold", leading=12)))
+        story.append(Spacer(1, 0.15 * cm))
+
+    if L.get("how_to_contest"):
+        box = Table([[_para('<font name="Helvetica-Bold" size="9" color="#{}">Your right to contest.</font> '
+                            '<font name="Helvetica" size="8.5" color="#{}">{}</font>'.format(
+                                _hex(NAVY), _hex(DARK_GRAY), _esc(L["how_to_contest"])), _style(leading=11))]],
+                    colWidths=[CONTENT_W])
+        box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), GREEN_BG), ("BOX", (0, 0), (-1, -1), 0.7, GREEN),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+        story.append(box)
+        story.append(Spacer(1, 0.2 * cm))
+
+    story.append(_para(_esc(L["basis"]), _style(fontSize=8, textColor=MID_GRAY, leading=11)))
+    story.append(_para(_esc(L["disclaimer"]), _style(fontSize=7.5, textColor=MID_GRAY, leading=10)))
+    doc.build(story)
+    return buffer.getvalue()
+
+
 # ── Page callbacks ────────────────────────────────────────────────
 
 def _footer(canvas, doc):

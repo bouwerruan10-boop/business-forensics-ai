@@ -705,6 +705,29 @@ def get_pdf(analysis_id: str, audience: str = "owner"):
     )
 
 
+@app.get("/api/report/{analysis_id}/reason-letter.pdf")
+def get_reason_letter_pdf(analysis_id: str):
+    """Adverse-action / reason letter (PDF) the SME receives — principal Score factors + right to
+    contest. Decision-support; supports a lender's own NCA s62 notice, not an Imara-issued decision."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found or still processing")
+    from services.report_generator import generate_reason_letter_pdf
+    biz_name = result.get("business_name", "report").replace(" ", "_")
+    return Response(content=generate_reason_letter_pdf(result), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{biz_name}_score_factors.pdf"'})
+
+
+@app.get("/api/report/{analysis_id}/reason-letter.html")
+def get_reason_letter_html(analysis_id: str):
+    """Adverse-action / reason letter as self-contained HTML (emailable)."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found or still processing")
+    from services.reason_letter import render_reason_letter_html
+    return Response(content=render_reason_letter_html(result), media_type="text/html")
+
+
 @app.get("/api/report/{analysis_id}/html")
 def get_html_report(analysis_id: str):
     """Download self-contained interactive HTML report."""
