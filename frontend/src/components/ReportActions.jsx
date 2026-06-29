@@ -11,6 +11,7 @@ const AUDIENCE_OPTIONS = [
 export default function ReportActions({ analysisId, businessName, onNewAnalysis, showToast }) {
   const [pdfLoading, setPdfLoading]     = useState(false)
   const [htmlLoading, setHtmlLoading]   = useState(false)
+  const [letterLoading, setLetterLoading] = useState(false)
   const [audience, setAudience]         = useState('owner')
   const [showAudiencePicker, setShowAudiencePicker] = useState(false)
   const [showShare, setShowShare]       = useState(false)
@@ -53,6 +54,25 @@ export default function ReportActions({ analysisId, businessName, onNewAnalysis,
       showToast('Download failed: ' + e.message, 'error')
     } finally {
       setHtmlLoading(false)
+    }
+  }
+
+  const downloadReasonLetter = async () => {
+    setLetterLoading(true)
+    showToast('Generating score-factors letter…')
+    try {
+      const res = await fetch(`${API_BASE}/api/report/${analysisId}/reason-letter.pdf`)
+      if (!res.ok) throw new Error('Letter generation failed')
+      const blob = await res.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = `${slug}_score_factors.pdf`
+      link.click()
+      showToast('Score-factors letter downloaded!')
+    } catch (e) {
+      showToast('Download failed: ' + e.message, 'error')
+    } finally {
+      setLetterLoading(false)
     }
   }
 
@@ -117,6 +137,11 @@ export default function ReportActions({ analysisId, businessName, onNewAnalysis,
           <button type="button" onClick={downloadHtml} disabled={htmlLoading}
             className="flex items-center gap-1.5 border border-gold/30 text-gold hover:bg-gold/10 disabled:opacity-50 font-bold text-xs px-4 py-2 rounded-lg transition-colors hidden sm:flex">
             ⬡ {htmlLoading ? 'Building…' : 'Interactive'}
+          </button>
+
+          <button type="button" onClick={downloadReasonLetter} disabled={letterLoading} title="Adverse-action / score-factors letter (supports a lender's NCA s62 notice)"
+            className="flex items-center gap-1.5 border border-white/10 text-slate-300 hover:border-gold/40 hover:text-gold disabled:opacity-50 text-xs px-3 py-2 rounded-lg transition-colors hidden md:flex">
+            ✉ {letterLoading ? 'Generating…' : 'Score factors'}
           </button>
 
           {/* Share dropdown — permanent or expiring links */}
