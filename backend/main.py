@@ -1608,6 +1608,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["assurance"] = assess_assurance(headcount=report.get("headcount") or 0, annual_revenue=report.get("annual_revenue") or 0, financial_figures=report.get("financial_figures") or {}, entity_type=report.get("entity_type") or "", cipc_number=report.get("cipc_number") or "")
             from services.bank_signals import analyze_bank_statement
             report["bank_signals"] = analyze_bank_statement(memory.uploaded_bank_text)
+            from services.altdata_signals import analyze_altdata_statement
+            report["altdata_signals"] = analyze_altdata_statement(memory.uploaded_bank_text)  # thin-file overlay (M2), NOT a Score input
             from services.normalization import normalize_earnings
             report["normalization"] = normalize_earnings(report.get("financial_figures") or {}, memory.uploaded_financial_text, getattr(memory, "uploaded_legal_text", ""))
             from services.lender_view import run_lender_view

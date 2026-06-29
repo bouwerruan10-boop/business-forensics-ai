@@ -17,6 +17,7 @@ _DICT_FIELDS = {
     "normalization", "lender_view", "funding_fit", "cross_agent_consistency",
     "supplier_benchmark", "bank_signals", "distress_score", "cashflow_13week",
     "audit", "decision_support", "llm_usage", "document_coverage",
+    "affordability", "altdata_signals",
 }
 
 # Fields the renderers iterate as lists.
