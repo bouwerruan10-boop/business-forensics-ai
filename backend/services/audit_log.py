@@ -41,8 +41,10 @@ def build_audit_record(report: dict, inputs_text: str = "") -> dict:
     figs = report.get("financial_figures")
     figs = figs if isinstance(figs, dict) else {}
     findings = report.get("all_findings_ranked")
+    from services.affordability import affordability_stamp
     return {
         "audit_schema_version": AUDIT_SCHEMA_VERSION,
+        "affordability": affordability_stamp(report.get("affordability")),
         "score_schema_version": SCORE_SCHEMA_VERSION,
         "engine_version": IMARA_ENGINE_VERSION,
         "analysis_id": report.get("analysis_id"),

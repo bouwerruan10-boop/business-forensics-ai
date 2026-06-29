@@ -866,6 +866,20 @@ def report_evidence_pack(analysis_id: str):
     return build_evidence_pack(result)
 
 
+@app.get("/api/report/{analysis_id}/affordability")
+def report_affordability(analysis_id: str, proposed_annual_instalment: float = None):
+    """NCA / Reg 23A-shaped affordability record: income available for debt service,
+    existing obligations, discretionary surplus, max new debt capacity, and — if a
+    proposed instalment is supplied — the DSCR verdict. Decision-support, not a credit
+    decision; supports the credit provider's own affordability assessment."""
+    result = analyses.get(analysis_id) or get_report(analysis_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    from services.affordability import assess_affordability
+    return assess_affordability(result.get("financial_figures") or {}, result.get("normalization") or {},
+                                result.get("bank_signals") or {}, proposed_annual_instalment)
+
+
 @app.get("/api/report/{analysis_id}/score-disclosure")
 def report_score_disclosure(analysis_id: str):
     """POPIA s71(3) disclosure for the Imara Score: the underlying logic (weighted
@@ -1566,6 +1580,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["normalization"] = normalize_earnings(report.get("financial_figures") or {}, memory.uploaded_financial_text, getattr(memory, "uploaded_legal_text", ""))
             from services.lender_view import run_lender_view
             report["lender_view"] = run_lender_view(report.get("financial_figures") or {}, report.get("bank_signals") or {}, report.get("normalization") or {}, report.get("annual_revenue") or 0)
+            from services.affordability import assess_affordability
+            report["affordability"] = assess_affordability(report.get("financial_figures") or {}, report.get("normalization") or {}, report.get("bank_signals") or {})
             from services.funding_fit import recommend_funding
             report["funding_fit"] = recommend_funding(report)
             from services.owner_risk import analyze_owner_risk
