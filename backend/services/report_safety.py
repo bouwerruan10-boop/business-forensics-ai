@@ -78,6 +78,21 @@ def normalize_report(report) -> dict:
     for k in _LIST_OF_DICT_FIELDS:
         if isinstance(r.get(k), list):
             r[k] = [e for e in r[k] if isinstance(e, dict)]
+    # Score components feed round()/arithmetic on value+weight — keep those numeric or absent.
+    # Rebuild with copies (shallow r=dict(report) shares the nested dicts) so we never mutate caller state.
+    if isinstance(r.get("imara_components"), list):
+        comps = []
+        for c in r["imara_components"]:
+            c = dict(c)
+            for nk in ("value", "weight"):
+                if nk in c:
+                    n = _as_number(c[nk])
+                    if n is None:
+                        del c[nk]
+                    else:
+                        c[nk] = n
+            comps.append(c)
+        r["imara_components"] = comps
     # Coerce numeric scalar fields; drop (use default) if not number-able.
     for k in _NUM_FIELDS:
         if k in r:

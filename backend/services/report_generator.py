@@ -1316,8 +1316,8 @@ def _imara_score_block(story, report):
     ]
     ri = 1
     for c in components:
-        v = int(round(c.get("value", 0)))
-        wpct = int(round(c.get("weight", 0) * 100))
+        v = int(round(c.get("value") or 0))          # value/weight may be None (dict.get trap)
+        wpct = int(round((c.get("weight") or 0) * 100))
         vc = GREEN if v >= 70 else AMBER if v >= 40 else RED
         rows.append([
             _para(str(c.get("label", "")), _style(fontSize=8, textColor=DARK_GRAY)),

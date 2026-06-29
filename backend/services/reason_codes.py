@@ -16,6 +16,16 @@ def _num(d, k, default=None):
     return v if isinstance(v, (int, float)) else default
 
 
+def _f(x):
+    """Coerce to a finite float; junk/None/non-finite -> 0.0 (a component value/weight can be hostile)."""
+    import math
+    try:
+        v = float(x)
+        return v if math.isfinite(v) else 0.0
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _driver_for(label, report):
     """A concrete, specific driver string for a component, from the report."""
     ratios = report.get("financial_ratios") or {}
@@ -66,8 +76,8 @@ def reason_codes(report: dict, top_n: int = 4) -> dict:
 
     enriched = []
     for c in comps:
-        w = float(c.get("weight") or 0)
-        v = max(0.0, min(100.0, float(c.get("value") or 0)))
+        w = _f(c.get("weight"))
+        v = max(0.0, min(100.0, _f(c.get("value"))))
         enriched.append({
             "factor": c.get("label"), "score": round(v), "weight": round(w, 3),
             "_shortfall": w * (100 - v), "_strength": w * v,

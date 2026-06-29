@@ -13,7 +13,7 @@ half, recorded immutably in the tamper-evident decision-audit hash chain.
 Decision-support, not a credit decision or adverse-action notice under the NCA.
 """
 
-from services.reason_codes import reason_codes
+from services.reason_codes import reason_codes, _f
 
 # The 8 possible Imara Score components (must mirror ceo_agent._calculate_imara_score),
 # so the disclosure can show the data subject which inputs were and were NOT used.
@@ -34,8 +34,8 @@ def build_disclosure(report) -> dict:
 
     contributions = []
     for c in comps:
-        w = float(c.get("weight") or 0)
-        v = max(0.0, min(100.0, float(c.get("value") or 0)))
+        w = _f(c.get("weight"))
+        v = max(0.0, min(100.0, _f(c.get("value"))))
         contributions.append({
             "factor": c.get("label"), "value": int(round(v)), "weight_pct": round(w * 100, 1),
             "contribution": round(v * w, 1),   # points this factor adds to the 0-100 score
