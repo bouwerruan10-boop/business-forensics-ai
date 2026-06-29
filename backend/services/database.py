@@ -166,6 +166,10 @@ def init_db():
             conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_analysis ON decision_audit (analysis_id)")
             _add_owner_column(conn, "analyses")
             _add_owner_column(conn, "shares")
+            # shadow flag on outcomes (C1): distinguish shadow-mode runs from live decisions.
+            _oc = [r[0] for r in conn.execute("SELECT name FROM pragma_table_info('outcomes')").fetchall()]
+            if "shadow" not in _oc:
+                conn.execute("ALTER TABLE outcomes ADD COLUMN shadow INTEGER NOT NULL DEFAULT 0")
             conn.commit()
         finally:
             conn.close()
@@ -452,19 +456,21 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     return d
 
 
-def record_outcome(analysis_id, outcome_type, label=None, value=None, note="", source=""):
+def record_outcome(analysis_id, outcome_type, label=None, value=None, note="", source="", shadow=False):
     """Record a real-world outcome for an analysis (the raw material for calibration):
     outcome_type e.g. 'default'|'repaid'|'funded'|'declined'|'external_score'; label is a
-    binary 1=bad/default / 0=good when applicable; value carries a numeric (e.g. bureau score)."""
+    binary 1=bad/default / 0=good when applicable; value carries a numeric (e.g. bureau score).
+    shadow=True marks a shadow-mode run (Imara scored in parallel, the partner's decision
+    unchanged) so shadow evidence can be filtered distinctly from live decisions."""
     from datetime import datetime, timezone
     with _lock:
         conn = _get_conn()
         try:
             conn.execute(
-                "INSERT INTO outcomes (analysis_id, outcome_type, label, value, note, source, recorded_at) "
-                "VALUES (?,?,?,?,?,?,?)",
+                "INSERT INTO outcomes (analysis_id, outcome_type, label, value, note, source, recorded_at, shadow) "
+                "VALUES (?,?,?,?,?,?,?,?)",
                 (analysis_id, outcome_type, label, value, note, source,
-                 datetime.now(timezone.utc).isoformat()))
+                 datetime.now(timezone.utc).isoformat(), 1 if shadow else 0))
             conn.commit()
         finally:
             conn.close()
@@ -477,7 +483,7 @@ def list_outcomes(limit=100):
         conn = _get_conn()
         try:
             rows = conn.execute(
-                "SELECT id, analysis_id, outcome_type, label, value, note, source, recorded_at "
+                "SELECT id, analysis_id, outcome_type, label, value, note, source, recorded_at, shadow "
                 "FROM outcomes ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
         finally:
             conn.close()

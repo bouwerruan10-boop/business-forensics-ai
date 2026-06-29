@@ -315,6 +315,7 @@ class OutcomeIn(BaseModel):
     value: float | None = None # numeric (e.g. external bureau score)
     note: str = ""
     source: str = ""
+    shadow: bool = False       # True = shadow-mode run (partner decision unchanged)
 
 
 class OutcomeBulkIn(BaseModel):
@@ -1341,8 +1342,8 @@ def admin_record_outcome(body: OutcomeIn, _admin: None = Depends(verify_admin_ke
     from services.database import record_outcome, get_report
     if not get_report(body.analysis_id):
         raise HTTPException(status_code=404, detail="Analysis not found")
-    record_outcome(body.analysis_id, body.outcome_type, body.label, body.value, body.note, body.source)
-    return {"recorded": True, "analysis_id": body.analysis_id, "outcome_type": body.outcome_type}
+    record_outcome(body.analysis_id, body.outcome_type, body.label, body.value, body.note, body.source, body.shadow)
+    return {"recorded": True, "analysis_id": body.analysis_id, "outcome_type": body.outcome_type, "shadow": body.shadow}
 
 
 @app.post("/api/admin/outcomes/bulk")
@@ -1357,7 +1358,7 @@ def admin_record_outcomes_bulk(body: OutcomeBulkIn, _admin: None = Depends(verif
             if not get_report(row.analysis_id):
                 errors.append({"row": i, "analysis_id": row.analysis_id, "error": "analysis not found"})
                 continue
-            record_outcome(row.analysis_id, row.outcome_type, row.label, row.value, row.note, row.source)
+            record_outcome(row.analysis_id, row.outcome_type, row.label, row.value, row.note, row.source, row.shadow)
             recorded += 1
         except Exception as e:
             errors.append({"row": i, "error": str(e)[:120]})
