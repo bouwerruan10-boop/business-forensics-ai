@@ -1165,6 +1165,14 @@ def report_audit(analysis_id: str):
     return {"available": bool(a), "records": ([a] if a else [])}
 
 
+@app.get("/api/admin/fairness")
+def admin_fairness(_admin: None = Depends(verify_admin_key)):
+    """Admin: proxy-based disparate-impact (four-fifths rule) on the Imara band across the
+    captured proxies (industry, region). Score-distribution monitoring, not an outcome audit."""
+    from services.fairness import fairness_report
+    return fairness_report()
+
+
 @app.get("/api/admin/audit")
 def admin_audit(limit: int = 100, _admin: None = Depends(verify_admin_key)):
     """Admin: recent decision audit records + a tamper-evidence check of the hash chain."""

@@ -49,7 +49,10 @@ def model_card() -> dict:
             "known_proxy_risks": ("Industry and region carry indirect signal and are monitored. "
                                   "Alternative-data inputs (e.g. bank statements) are surfaced as "
                                   "decision-support, not silent Score inputs."),
-            "disparate_impact_testing": "Deferred until enough real outcomes accumulate (needs labelled data).",
+            "disparate_impact_testing": ("Proxy-based four-fifths-rule monitoring on the Score band across "
+                                         "industry and region is computed on demand at GET /api/admin/fairness. "
+                                         "Outcome-validated disparate-impact (on funding/repayment) is deferred "
+                                         "until enough real labelled outcomes accumulate."),
         },
         "limitations": [
             ("Weights are AHP/expert-derived and the LLM components are NOT YET calibrated against real "
