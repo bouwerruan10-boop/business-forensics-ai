@@ -28,9 +28,39 @@ _LIST_FIELDS = {
     "market_opportunities", "market_risks", "agent_timings", "critical_findings_list",
 }
 
+# List fields whose elements the renderers access as dicts (``elem.get(...)``).
+# A junk element (None / int / str) would crash that access, so filter to dicts.
+_LIST_OF_DICT_FIELDS = {
+    "imara_components", "all_findings_ranked", "quick_wins", "implementation_roadmap",
+    "top_priority_issues", "forecast_monthly", "market_competitors", "critical_findings_list",
+}
+
+# Scalar fields the renderers compare (``>=``) or do arithmetic on — must be real numbers.
+_NUM_FIELDS = {
+    "imara_score", "credit_score", "valuation_low", "valuation_mid", "valuation_high",
+    "forecast_base_12m", "forecast_bull_12m", "forecast_bear_12m", "annual_revenue", "headcount",
+}
+
+
+def _as_number(v):
+    """Return v as a finite number, or None if it cannot be one (str digits coerce; junk drops)."""
+    import math
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return v if math.isfinite(v) else None
+    if isinstance(v, str):
+        try:
+            n = float(v.strip().replace(",", ""))
+            return n if math.isfinite(n) else None
+        except (ValueError, AttributeError):
+            return None
+    return None
+
 
 def normalize_report(report) -> dict:
-    """Return a render-safe copy of ``report`` (always a dict; no None/wrong-typed containers)."""
+    """Return a render-safe copy of ``report`` (always a dict; no None/wrong-typed containers,
+    no junk list elements, no non-numeric scalars where the renderers expect numbers)."""
     if not isinstance(report, dict):
         return {}
     r = dict(report)
@@ -44,4 +74,33 @@ def normalize_report(report) -> dict:
     for k in _LIST_FIELDS:
         if k in r and not isinstance(r[k], list):
             r[k] = []
+    # Drop non-dict elements from list-of-dict fields (renderers call elem.get()).
+    for k in _LIST_OF_DICT_FIELDS:
+        if isinstance(r.get(k), list):
+            r[k] = [e for e in r[k] if isinstance(e, dict)]
+    # Coerce numeric scalar fields; drop (use default) if not number-able.
+    for k in _NUM_FIELDS:
+        if k in r:
+            n = _as_number(r[k])
+            if n is None:
+                del r[k]
+            else:
+                r[k] = n
+    # Sanitise nested numeric ratio values so a bad value/benchmark can't crash arithmetic.
+    fr = r.get("financial_ratios")
+    if isinstance(fr, dict):
+        clean = {}
+        for key, entry in fr.items():
+            if not isinstance(entry, dict):
+                continue
+            e = dict(entry)
+            for nk in ("value", "benchmark"):
+                if nk in e:
+                    n = _as_number(e[nk])
+                    if n is None:
+                        del e[nk]
+                    else:
+                        e[nk] = n
+            clean[key] = e
+        r["financial_ratios"] = clean
     return r

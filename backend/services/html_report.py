@@ -224,12 +224,14 @@ def generate_html_report(report: dict) -> str:
     _led = report.get("claim_ledger") if isinstance(report.get("claim_ledger"), dict) else {}
     verification_html = ""
     if _led.get("available"):
-        _va = _led.get("assurance") or {}
+        _va = _led.get("assurance")
+        _va = _va if isinstance(_va, dict) else {}   # corrupted ledger may carry a non-dict
         _ov = _led.get("overall")
         _vcol, _state = ((RED, "NEEDS REVIEW") if _ov == "conflicts_present"
                          else (AMBER, "SOME ESTIMATES") if _ov == "unverified_present"
                          else (GREEN, "VERIFIED"))
-        _vclaims = (_led.get("narrative_claims") or []) + (_led.get("finding_figure_claims") or [])
+        _nc = _led.get("narrative_claims"); _ff = _led.get("finding_figure_claims")
+        _vclaims = (_nc if isinstance(_nc, list) else []) + (_ff if isinstance(_ff, list) else [])
         _vconf = [c for c in _vclaims if isinstance(c, dict) and c.get("verification") == "conflict"]
         _vest = [c for c in _vclaims if isinstance(c, dict) and c.get("verification") == "unverified"]
         _cov, _ac = _va.get("coverage_pct"), _va.get("avg_confidence")

@@ -12,6 +12,7 @@ that contradicts the computed ratio is `conflict` (the killer case - an LLM stat
 when the statements compute 33%). Pure deterministic code; reuses the faithfulness engine.
 """
 
+import math
 import re
 
 from services.faithfulness import _METRICS, _first_number_after
@@ -190,7 +191,9 @@ def verify_finding_figures(report) -> dict:
                 continue
             for m in _CUR_RE.finditer(text):
                 amt = _to_amount(m.group(1), m.group(2))
-                if amt is None or amt < 1000 or round(amt) in seen_amts:
+                # finiteness guard: a huge run of digits parses to float('inf'),
+                # which would blow up round()/int() — treat as not-a-figure.
+                if amt is None or not math.isfinite(amt) or amt < 1000 or round(amt) in seen_amts:
                     continue
                 seen_amts.add(round(amt))
                 status, explanation, src = verify_currency(amt, known)

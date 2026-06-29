@@ -1000,7 +1000,8 @@ def _verification_section(story, report):
     led = report.get("claim_ledger")
     if not isinstance(led, dict) or not led.get("available"):
         return
-    a = led.get("assurance") or {}
+    a = led.get("assurance")
+    a = a if isinstance(a, dict) else {}   # a corrupted ledger may carry a non-dict here
 
     def _esc(t):
         return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -1036,7 +1037,8 @@ def _verification_section(story, report):
     story.append(box)
     story.append(Spacer(1, 0.25 * cm))
 
-    claims = (led.get("narrative_claims") or []) + (led.get("finding_figure_claims") or [])
+    _nc = led.get("narrative_claims"); _ff = led.get("finding_figure_claims")
+    claims = (_nc if isinstance(_nc, list) else []) + (_ff if isinstance(_ff, list) else [])
     conflicts = [c for c in claims if isinstance(c, dict) and c.get("verification") == "conflict"]
     estimates = [c for c in claims if isinstance(c, dict) and c.get("verification") == "unverified"]
 
