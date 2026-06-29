@@ -1554,6 +1554,8 @@ async def _run_analysis(analysis_id: str, file_data: list, profile: dict):
             report["finding_quality"] = critique_report(report)  # deterministic per-finding critique
             from services.claim_ledger import build_claim_ledger
             report["claim_ledger"] = build_claim_ledger(report)  # verify every narrative number vs computed data
+            from services.reason_codes import reason_codes as _reason_codes
+            report["reason_codes"] = _reason_codes(report)  # principal score-drivers, embedded so token-shared links render them without an analysis id
             from services.distress_score import altman_z_em
             report["distress_score"] = altman_z_em(report.get("financial_figures") or {}, report.get("imara_band", ""))
             from services.assurance import assess as assess_assurance

@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import InfoTip from './InfoTip'
 
-export default function ScoreReasons({ analysisId }) {
-  const [data, setData] = useState(null)
+export default function ScoreReasons({ analysisId, report }) {
+  // Prefer the reasons embedded in the report (self-contained — works on token-shared
+  // links that carry no analysis id); fall back to the on-demand endpoint when present.
+  const embedded = report && report.reason_codes
+  const [data, setData] = useState(embedded || null)
   const [contesting, setContesting] = useState(false)
   const [cFactor, setCFactor] = useState('')
   const [cStatement, setCStatement] = useState('')
@@ -11,11 +14,12 @@ export default function ScoreReasons({ analysisId }) {
   const [cErr, setCErr] = useState(null)
 
   useEffect(() => {
+    if (embedded || !analysisId) { if (embedded) setData(embedded); return }
     let on = true
     import('../api/client').then(({ getReasons }) => getReasons(analysisId))
       .then(d => { if (on) setData(d) }).catch(() => { if (on) setData(null) })
     return () => { on = false }
-  }, [analysisId])
+  }, [analysisId, embedded])
 
   const submitContest = async () => {
     setCErr(null)
@@ -68,8 +72,8 @@ export default function ScoreReasons({ analysisId }) {
       )}
       <p className="text-slate-600 text-[11px] mt-3 leading-relaxed italic">{data.disclaimer}</p>
 
-      {/* POPIA s71(3) — right to make representations against the score */}
-      <div className="mt-3 pt-3 border-t border-white/[0.06]">
+      {/* POPIA s71(3) — right to make representations against the score (needs an analysis id to lodge) */}
+      {analysisId && <div className="mt-3 pt-3 border-t border-white/[0.06]">
         {cDone ? (
           <div className="text-[11px] text-emerald-400">✓ Your representation was lodged and recorded in the tamper-evident audit log. A human will review it.</div>
         ) : !contesting ? (
@@ -99,7 +103,7 @@ export default function ScoreReasons({ analysisId }) {
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   )
 }
