@@ -116,6 +116,9 @@ def generate_pdf_report(report: dict, audience: str = "owner") -> bytes:
     #    now travelling onto the exported artifact the recipient receives ──
     _verification_section(story, report)
 
+    # ── Why this score: principal reasons + rights (ECOA / NCA s62 / POPIA s71) ──
+    _adverse_action_section(story, report)
+
     # ── Traffic light scorecard (all audiences) ────────────────────
     _traffic_light_section(story, report)
     _financial_ratios_section(story, report)
@@ -1067,6 +1070,78 @@ def _verification_section(story, report):
         "narrative disagrees with the computed figure (review it); 'unverified' = an estimate that cannot "
         "be traced to a computed figure. Imara never silently presents an unverified number as fact.",
         _style(fontSize=7.5, textColor=MID_GRAY, leading=10)))
+    story.append(Spacer(1, 0.2 * cm))
+
+
+def _adverse_action_section(story, report):
+    """'Why this score', on the exported artifact — the principal reasons the Imara Score
+    isn't higher (ordered by impact), the supporting strengths, and the recipient's rights.
+
+    This is the adverse-action / 'dominant reason' panel a lender's credit committee needs to
+    discharge its OWN duties (ECOA / Reg B; NCA s62 dominant-reason; EU AI Act Art 86 explanation;
+    POPIA s71(3) underlying logic + contestability). Reuses build_disclosure (pure/deterministic,
+    derived from the score's own weighted components); no-op if there are no score components.
+    Decision-support — not a credit decision or adverse-action notice under the NCA."""
+    from services.score_disclosure import build_disclosure
+    try:
+        d = build_disclosure(report)
+    except Exception:
+        return
+    if not isinstance(d, dict) or not d.get("available"):
+        return
+
+    def _esc(t):
+        return str(t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    _section_header(story, "WHY THIS SCORE  -  PRINCIPAL REASONS & YOUR RIGHTS")
+
+    score = d.get("score")
+    band = d.get("band")
+    head = (
+        '<font name="Helvetica-Bold" size="11" color="#{}">Imara Score {}{}</font>'.format(
+            _hex(NAVY), score if score is not None else "n/a",
+            "  (band {})".format(_esc(band)) if band else "")
+        + '<font name="Helvetica" size="8.5" color="#{}">     principal factors, ordered by impact '
+          '(ECOA / NCA s62 dominant-reason)</font>'.format(_hex(MID_GRAY)))
+    story.append(_para(head, _style(leading=14)))
+    story.append(Spacer(1, 0.2 * cm))
+
+    reasons = [r for r in (d.get("principal_reasons") or []) if isinstance(r, dict)]
+    if reasons:
+        story.append(_para("WHAT IS HOLDING THE SCORE BACK:",
+                           _style(fontSize=8, fontName="Helvetica-Bold", textColor=ORANGE, letterSpacing=1)))
+        for r in reasons[:5]:
+            story.append(_para(
+                'v  <font name="Helvetica-Bold">{}</font>  ({}/100)  -  {}'.format(
+                    _esc(r.get("factor"))[:48], r.get("score"), _esc(r.get("detail"))[:150]),
+                _style(fontSize=8.5, textColor=NAVY, leading=11)))
+        story.append(Spacer(1, 0.2 * cm))
+
+    strengths = [s for s in (d.get("strengths") or []) if isinstance(s, dict)]
+    if strengths:
+        line = "What is supporting the score:  " + "   ".join(
+            "{} ({}/100)".format(_esc(s.get("factor"))[:32], s.get("score")) for s in strengths[:4])
+        story.append(_para(line, _style(fontSize=8.5, textColor=GREEN, fontName="Helvetica-Bold", leading=11)))
+        story.append(Spacer(1, 0.2 * cm))
+
+    rights = d.get("your_rights") or {}
+    ds = _esc(rights.get("decision_support"))
+    mr = _esc(rights.get("make_representations"))
+    if ds or mr:
+        body = ('<font name="Helvetica-Bold" size="8.5" color="#{}">YOUR RIGHTS</font><br/>'.format(_hex(NAVY))
+                + ('<font name="Helvetica" size="8" color="#{}">{}</font><br/>'.format(_hex(DARK_GRAY), ds) if ds else "")
+                + ('<font name="Helvetica" size="8" color="#{}">{}</font>'.format(_hex(DARK_GRAY), mr) if mr else ""))
+        rb = Table([[_para(body, _style(leading=11))]], colWidths=[CONTENT_W])
+        rb.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), GREEN_BG),
+            ("BOX", (0, 0), (-1, -1), 0.7, GREEN),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story.append(rb)
+        story.append(Spacer(1, 0.2 * cm))
+
+    story.append(_para(_esc(d.get("disclaimer")), _style(fontSize=7.5, textColor=MID_GRAY, leading=10)))
     story.append(Spacer(1, 0.2 * cm))
 
 

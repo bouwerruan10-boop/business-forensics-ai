@@ -1,7 +1,7 @@
 """The PDF + HTML exporters carry the 'prove it' verification/evidence contract onto the
 artifact the recipient receives (lender/investor), and omit it cleanly when absent."""
 from services.html_report import generate_html_report
-from services.report_generator import generate_pdf_report, _verification_section
+from services.report_generator import generate_pdf_report, _verification_section, _adverse_action_section
 from services.claim_ledger import build_claim_ledger
 
 _BASE = {
@@ -82,3 +82,54 @@ def test_html_escapes_injection_in_claim_text():
 def test_html_robust_to_hostile_ledger():
     for bad in ("x", None, {"available": False}):
         assert isinstance(generate_html_report({**_BASE, "claim_ledger": bad}), str)
+
+
+# ── Adverse-action / "dominant reason" panel (ECOA / NCA s62 / POPIA s71) ──
+
+# A scored report WITH Imara Score components, so build_disclosure has something to disclose.
+_SCORED = {**_BASE, "imara_score": 58, "imara_band": "B",
+           "imara_components": [
+               {"label": "Profitability", "weight": 0.30, "value": 40},
+               {"label": "Credit Readiness", "weight": 0.25, "value": 50},
+               {"label": "Risk & Compliance", "weight": 0.20, "value": 80},
+               {"label": "Operational Efficiency", "weight": 0.25, "value": 70}]}
+
+
+def test_pdf_adverse_action_renders_with_components():
+    story = []
+    _adverse_action_section(story, _SCORED)
+    assert len(story) > 0                                   # principal-reasons panel rendered
+    assert generate_pdf_report(_SCORED, audience="banker")[:4] == b"%PDF"
+
+
+def test_pdf_adverse_action_noop_without_components():
+    story = []
+    _adverse_action_section(story, dict(_BASE))             # _BASE has no components
+    assert story == []
+
+
+def test_pdf_adverse_action_robust_to_hostile_report():
+    for bad in ({"imara_components": "x"}, {"imara_components": [None, 1]},
+                {"imara_score": None}, {}):
+        story = []
+        _adverse_action_section(story, {**_BASE, **bad})    # must not raise
+
+
+def test_html_includes_why_this_score_and_rights():
+    h = generate_html_report(_SCORED)
+    assert "Why this score" in h
+    assert "What is holding the score back" in h
+    assert "Your rights" in h
+    assert "NCA s62" in h
+
+
+def test_html_adverse_action_omitted_without_components():
+    assert "Why this score" not in generate_html_report(dict(_BASE))
+
+
+def test_html_adverse_action_escapes_injection_in_factor():
+    hostile = {**_SCORED, "imara_components": [
+        {"label": "<script>alert(1)</script>", "weight": 0.5, "value": 10},
+        {"label": "Profitability", "weight": 0.5, "value": 90}]}
+    h = generate_html_report(hostile)
+    assert "<script>alert(1)</script>" not in h and "&lt;script&gt;" in h

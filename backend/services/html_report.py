@@ -254,6 +254,51 @@ def generate_html_report(report: dict) -> str:
     <div style="font-size:10.5px;color:{GRAY};margin-top:10px">Every number in Imara&rsquo;s narrative is checked against its own deterministically-computed values. &lsquo;Verified&rsquo; = matches the computation; &lsquo;conflict&rsquo; = the narrative disagrees with the computed figure; &lsquo;unverified&rsquo; = an estimate that cannot be traced to a computed figure. Imara never silently presents an unverified number as fact.</div>
   </div>"""
 
+    # ── Why this score: principal reasons + rights (ECOA / NCA s62 / POPIA s71) ──
+    adverse_action_html = ""
+    try:
+        from services.score_disclosure import build_disclosure
+        _disc = build_disclosure(report)
+    except Exception:
+        _disc = {"available": False}
+    if isinstance(_disc, dict) and _disc.get("available"):
+        _ar = [r for r in (_disc.get("principal_reasons") or []) if isinstance(r, dict)]
+        _as = [s for s in (_disc.get("strengths") or []) if isinstance(s, dict)]
+        _rights = _disc.get("your_rights") or {}
+        _aband = _disc.get("band")
+        _reason_rows = ""
+        for r in _ar[:5]:
+            _reason_rows += (f'<li style="color:{NAVY}"><b style="color:{ORANGE}">&#9660; {_e(str(r.get("factor",""))[:48])}</b> '
+                             f'({_e(r.get("score"))}/100) &mdash; {_e(str(r.get("detail",""))[:150])}</li>')
+        if not _reason_rows:
+            _reason_rows = f'<li style="color:{GREEN}">No single factor is materially holding the score back.</li>'
+        _strength_html = ""
+        if _as:
+            _strength_html = ('<div style="font-size:12px;color:' + GREEN + ';font-weight:700;margin-top:8px">'
+                              + "What is supporting the score: "
+                              + ", ".join(f'{_e(str(s.get("factor",""))[:32])} ({_e(s.get("score"))}/100)' for s in _as[:4])
+                              + "</div>")
+        _ds = _e(_rights.get("decision_support"))
+        _mr = _e(_rights.get("make_representations"))
+        _rights_html = ""
+        if _ds or _mr:
+            _rights_html = (f'<div style="background:{GREEN}11;border:1px solid {GREEN}55;border-radius:8px;'
+                            f'padding:10px 12px;margin-top:10px;font-size:11.5px;color:{DARK};line-height:1.55">'
+                            f'<b style="color:{NAVY}">Your rights.</b> '
+                            f'{_ds} {_mr}</div>')
+        adverse_action_html = f"""
+  <div class="section-block" style="background:#fff;border:1px solid {ORANGE}55;border-radius:12px;padding:16px;margin-bottom:22px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:15px;font-weight:800;color:{NAVY}">Why this score &mdash; principal reasons</span>
+      <span style="font-size:11.5px;color:{GRAY}">Imara Score {_e(_disc.get("score"))}{(" &middot; band " + _e(_aband)) if _aband else ""} &middot; ordered by impact (ECOA / NCA s62)</span>
+    </div>
+    <div style="font-size:12px;color:{DARK};margin:8px 0 4px;font-weight:700">What is holding the score back:</div>
+    <ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">{_reason_rows}</ul>
+    {_strength_html}
+    {_rights_html}
+    <div style="font-size:10.5px;color:{GRAY};margin-top:10px">{_e(_disc.get("disclaimer"))}</div>
+  </div>"""
+
     # ── Valuation bar SVG ─────────────────────────────────────────
     def _val_bar_svg() -> str:
         if not val_mid:
@@ -846,6 +891,7 @@ def generate_html_report(report: dict) -> str:
 <div id="page-overview" class="page active">
   {imara_html}
   {verification_html}
+  {adverse_action_html}
   {ratios_html}
   <div class="metrics-grid">
     <div class="metric-card">
