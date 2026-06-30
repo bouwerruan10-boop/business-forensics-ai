@@ -6,6 +6,7 @@ Returns a structured dict that agents can query.
 """
 import io
 import re
+import zipfile
 import pandas as pd
 import pdfplumber
 from pathlib import Path
@@ -19,6 +20,23 @@ MAX_SHEETS = 20
 MAX_PDF_PAGES = 30
 MAX_CONTENT_BYTES = 25 * 1024 * 1024   # 25 MB — financial docs are small; bounds memory/time on pathological uploads
 _MAX_CELL_CHARS = 2000                 # truncate absurdly long individual cell values (prompt-bloat + DoS guard)
+# Decompression-bomb guard for xlsx (which is a zip): the 25 MB cap is on the COMPRESSED bytes,
+# but deflate hits ~1000x, so a 25 MB workbook can declare ~24 GB uncompressed and OOM the worker
+# when openpyxl loads the sheet. A real financial workbook is well under this; bombs are far above.
+_MAX_XLSX_UNCOMPRESSED_BYTES = 300 * 1024 * 1024   # 300 MB
+
+
+def _xlsx_decompression_bomb(content: bytes):
+    """Return the declared total uncompressed size if `content` is a zip (xlsx) whose entries
+    sum to more than the cap, else None. Reads only the central directory — NO decompression —
+    so it's instant and itself bomb-safe. Python's zipfile never yields more than each entry's
+    declared file_size, so this sum is a sound upper bound on what openpyxl can load."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as z:
+            total = sum(zi.file_size for zi in z.infolist())
+    except Exception:
+        return None   # not a valid zip -> let the normal parser surface any error
+    return total if total > _MAX_XLSX_UNCOMPRESSED_BYTES else None
 
 
 def parse_file(filename: str, content: bytes) -> dict:
@@ -60,6 +78,13 @@ def _parse_excel(filename: str, content: bytes) -> dict:
         "sheets": {},
         "_meta": {"source_file": filename, "type": "excel"},
     }
+    bomb = _xlsx_decompression_bomb(content)
+    if bomb is not None:
+        result["general"]["error"] = ("spreadsheet rejected: declares {:.0f} MB uncompressed "
+                                      "(max {:.0f} MB) — possible zip bomb").format(
+            bomb / 1e6, _MAX_XLSX_UNCOMPRESSED_BYTES / 1e6)
+        result["error"] = result["general"]["error"]
+        return result
     try:
         xf = pd.ExcelFile(io.BytesIO(content))
         sheet_names = xf.sheet_names[:MAX_SHEETS]
