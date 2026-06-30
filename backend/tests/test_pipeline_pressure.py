@@ -52,9 +52,9 @@ class _EmptyClient:
 
 
 _HOSTILE_CSV = (
-    "Item,Amount\nRevenue," + _INJECT + "\nCost of Sales,-99999999999999\nGross Profit,NaN\n"
+    "Item,Amount\nRevenue," + "9" * 400 + "\nCost of Sales,-99999999999999\nGross Profit,NaN\n"
     "Operating Profit,inf\nNet Profit,not_a_number\nAccounts Receivable,2300000\n"
-    "Total Debt,99999999999999999999\nEquity,0\n" + "Junk row,1\n" * 80).encode()
+    "Total Debt," + "9" * 400 + "\nEquity,0\nInterest,inf\n" + "Junk row," + _INJECT + "\n" * 80).encode()
 
 _MOMO = ("\n".join(
     ["2026-0%d-05 MoMo settlement received R 1,200.00" % m for m in (1, 2, 3)]

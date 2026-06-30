@@ -83,6 +83,37 @@ def test_claim_ledger_safe_on_overflow_amount():
     assert isinstance(led, dict)
 
 
+def test_assembly_services_survive_nonfinite_figures():
+    """Regression for the round(inf)/int(inf) bug CLASS: services that round() arithmetic on
+    financial_figures must not OverflowError when figures carry inf/NaN (a corrupted/adversarial
+    document can produce them). Caught macro_data's annual_revenue-fallback inf-leak."""
+    import json as _json
+    INF, NAN = float("inf"), float("nan")
+    figs = {"revenue": INF, "operating_profit": NAN, "total_debt": INF, "equity": 0, "interest": INF,
+            "net_profit": -INF, "ebitda": INF, "current_assets": INF, "current_liabilities": NAN,
+            "payables": INF, "inventory": INF, "accounts_receivable": INF, "gross_profit": INF}
+    rep = {"financial_figures": figs, "annual_revenue": INF, "industry_key": "retail",
+           "imara_score": INF, "imara_band": "B", "currency": "ZAR"}
+    from services.macro_data import firm_macro_sensitivity
+    from services.lender_view import run_lender_view
+    from services.affordability import assess_affordability
+    from services.credit_memo import build_credit_memo
+    from services.working_capital import build_working_capital
+    from services.distress_score import altman_z_em
+    # must not raise (a crash here = the analysis fails end-to-end)
+    cases = {
+        "macro": firm_macro_sensitivity(rep),
+        "lender_view": run_lender_view(figs, {}, {}, INF),
+        "affordability": assess_affordability(figs, {"adjusted_ebitda_low": INF}),
+        "credit_memo": build_credit_memo(rep),
+        "working_capital": build_working_capital(rep),
+        "distress": altman_z_em(figs, "B"),
+    }
+    for name, out in cases.items():
+        assert isinstance(out, dict), name
+    _json.dumps(cases["macro"], allow_nan=False)   # the fixed path is strict-JSON safe
+
+
 def test_narrative_currency_overflow_safe():
     # the _currency_claims twin of the overflow guard: a huge amount in NARRATIVE prose
     # (not a finding) previously crashed verify_narrative -> the whole pipeline (caught by

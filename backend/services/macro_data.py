@@ -70,7 +70,7 @@ def firm_macro_sensitivity(report: dict) -> dict:
     figs = dict(report.get("financial_figures") or {})
     industry = (report.get("industry_key") or "general")
     prof = SECTOR_PROFILE.get(industry, SECTOR_PROFILE["general"])
-    rev = _num(figs, "revenue") or float(report.get("annual_revenue") or 0)
+    rev = _num(figs, "revenue") or _num(report, "annual_revenue")  # _num finite-guards (drops inf/NaN)
     gp = _num(figs, "gross_profit")
     op = _num(figs, "operating_profit")
     opex = max(0.0, gp - op) if (gp or op) else _num(figs, "opex")
