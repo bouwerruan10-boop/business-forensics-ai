@@ -5,11 +5,34 @@ Thread-safe via a module-level lock (FastAPI runs background tasks in a thread p
 """
 import sqlite3
 import json
+import math
 import threading
 import os
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
+
+
+def _finite_float(v, default=0.0):
+    """Coerce to a FINITE float for storage in a numeric column. A profile's annual_revenue
+    arrives as a pydantic float, which accepts inf/NaN ('1e400' -> inf); persisting that into
+    a REAL column is a latent landmine for any later arithmetic/aggregation. Store-clean DNA:
+    non-finite or non-numeric -> default."""
+    try:
+        f = float(v or 0)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+
+def _safe_int(v, default=0):
+    """Coerce to a non-negative int for storage; inf/NaN/huge-float -> default (int(inf) raises
+    OverflowError). Mirrors _finite_float for headcount-style integer columns."""
+    try:
+        f = float(v or 0)
+    except (TypeError, ValueError):
+        return default
+    return int(f) if math.isfinite(f) else default
 
 
 # Database file location — resolved at startup, first writable wins:
@@ -201,8 +224,8 @@ def create_analysis(analysis_id: str, profile: dict, file_count: int = 0, owner:
                 analysis_id,
                 profile.get("company_name", "Unknown"),
                 profile.get("industry_key", "general"),
-                float(profile.get("annual_revenue") or 0),
-                int(profile.get("headcount") or 0),
+                _finite_float(profile.get("annual_revenue")),
+                _safe_int(profile.get("headcount")),
                 profile.get("currency", "ZAR"),
                 profile.get("country", ""),
                 profile.get("primary_concern", ""),

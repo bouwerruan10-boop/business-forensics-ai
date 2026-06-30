@@ -181,6 +181,26 @@ def test_public_tax_endpoint_rate_limited():
         main.limiter.enabled = prev
 
 
+def test_create_analysis_stores_only_finite_numerics():
+    """The write boundary must never persist inf/NaN into the numeric columns. A profile's
+    annual_revenue arrives as a pydantic float, which ACCEPTS inf/NaN ('1e400' -> inf), so
+    without a finite guard the analyses table would hold a non-finite REAL — a landmine for
+    any later arithmetic/aggregation that reads the column directly (the response layer's
+    SafeJSONResponse strips it on the way out, but the stored value would still be poisoned)."""
+    import json
+    import math
+    from services.database import init_db, create_analysis, get_analysis
+    init_db()
+    for i, bad in enumerate((float("inf"), float("nan"), "1e400", "abc", None)):
+        aid = "finite_guard_%d" % i
+        create_analysis(aid, {"company_name": "X", "annual_revenue": bad, "headcount": bad})
+        row = get_analysis(aid)
+        ar, hc = row.get("annual_revenue"), row.get("headcount")
+        assert isinstance(ar, (int, float)) and math.isfinite(ar), "non-finite annual_revenue stored: %r" % ar
+        assert isinstance(hc, int), "non-int headcount stored: %r" % hc
+        json.dumps(row, allow_nan=False)   # row is strict-JSON safe even bypassing SafeJSONResponse
+
+
 def test_public_tax_endpoints_survive_raw_nonfinite_body():
     """A non-browser client (curl/fuzzer) can POST raw JSON number tokens that Python's
     json.loads turns into inf/NaN — `1e400` -> inf, the literal `Infinity`/`NaN` tokens.
