@@ -181,6 +181,36 @@ def test_public_tax_endpoint_rate_limited():
         main.limiter.enabled = prev
 
 
+def test_public_tax_endpoints_survive_raw_nonfinite_body():
+    """A non-browser client (curl/fuzzer) can POST raw JSON number tokens that Python's
+    json.loads turns into inf/NaN — `1e400` -> inf, the literal `Infinity`/`NaN` tokens.
+    Browsers can't send these (JSON.stringify(Infinity) === 'null'), but curl can, so the
+    public tax endpoints must NOT 500: every numeric input has to be finite-guarded and the
+    response stay strict-JSON safe (Starlette renders with allow_nan=False -> inf in the
+    response body would itself be a 500). Pins that guard so the class can't regress."""
+    import json
+    import main
+    from fastapi.testclient import TestClient
+    H = {"content-type": "application/json"}
+    bodies = [
+        ('/api/tax/income', '{"annual_income": 1e400, "gross_salary": 1e400, "taxable_income": 1e400, '
+                            '"medical_members": 1e400, "age": 1e400, "travel_allowance": 1e400}'),
+        ('/api/tax/income', '{"annual_income": Infinity, "vat_output": NaN, "vat_input": -1e400}'),
+        ('/api/tax/relocation', '{"net_worth": 1e400, "capital_gain": Infinity, "assets": NaN}'),
+        ('/api/tax/audit-trail', '{"annual_income": 1e400, "taxable_income": Infinity}'),
+    ]
+    bad = []
+    with TestClient(main.app, raise_server_exceptions=False) as c:
+        for ep, body in bodies:
+            r = c.post(ep, content=body, headers=H)
+            if r.status_code >= 500:
+                bad.append((ep, r.status_code))
+                continue
+            if "application/json" in r.headers.get("content-type", ""):
+                json.dumps(r.json(), allow_nan=False)  # raises if inf/NaN leaked into the response
+    assert not bad, "5xx on tax endpoints with raw non-finite body: " + repr(bad)
+
+
 def test_bulk_outcomes_partial_tolerant():
     """Bulk outcome import records valid rows and skips unknown analyses (partial batch still lands)."""
     import uuid, main
