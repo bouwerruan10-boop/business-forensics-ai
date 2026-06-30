@@ -224,9 +224,6 @@ class SharedMemory:
     def post_message(self, from_agent, to_agent, message):
         self.messages.append({"from": from_agent, "to": to_agent, "message": message})
 
-    def get_findings_by_agent(self, agent_name):
-        return [f for f in self.findings if f.agent == agent_name]
-
     def get_findings_by_severity(self, severity):
         return [f for f in self.findings if f.severity == severity]
 

@@ -117,10 +117,6 @@ def industry_display_name(industry_key: str) -> str:
     return get_benchmarks(industry_key).get("display_name") or "General Business"
 
 
-def get_thresholds() -> dict:
-    return _load().get('universal_thresholds', {})
-
-
 def format_benchmark_context(industry_key: str,
                               annual_revenue: Optional[float] = None,
                               currency: str = 'USD') -> str:
@@ -234,50 +230,3 @@ def format_benchmark_context(industry_key: str,
     ]
 
     return '\n'.join(lines)
-
-
-def calculate_gap(client_value: float, benchmark_value: float,
-                  metric_name: str, higher_is_better: bool = True,
-                  currency: str = '', annual_revenue: float = 0) -> dict:
-    """
-    Calculate the gap between client and benchmark.
-    Returns a dict with gap analysis for use in agent responses.
-    """
-    gap = client_value - benchmark_value
-    # For ratio metrics (< 2), express as percentage points
-    gap_pp = gap * 100 if benchmark_value < 2 else gap
-
-    status = 'on_par'
-    if higher_is_better:
-        if gap < -0.05:
-            status = 'critical'
-        elif gap < -0.02:
-            status = 'warning'
-        elif gap > 0.05:
-            status = 'above_benchmark'
-    else:
-        if gap > 0.05:
-            status = 'critical'
-        elif gap > 0.02:
-            status = 'warning'
-        elif gap < -0.05:
-            status = 'above_benchmark'
-
-    result = {
-        'metric': metric_name,
-        'client_value': client_value,
-        'benchmark_value': benchmark_value,
-        'gap': gap,
-        'gap_pp': gap_pp,
-        'status': status,
-    }
-
-    if annual_revenue > 0 and benchmark_value < 2:
-        financial_impact = abs(gap) * annual_revenue
-        result['annual_financial_impact'] = financial_impact
-        result['impact_formatted'] = (
-            "{} {:,.0f}".format(currency, financial_impact) if currency
-            else "{:,.0f}".format(financial_impact)
-        )
-
-    return result

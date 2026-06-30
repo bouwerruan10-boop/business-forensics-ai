@@ -132,7 +132,9 @@ def _currency_claims(text, known):
     claims, seen = [], set()
     for m in _CUR_RE.finditer(text):
         amt = _to_amount(m.group(1), m.group(2))
-        if amt is None or amt < 1000 or round(amt) in seen:
+        # finiteness guard: a huge digit run parses to float('inf'), which blows up round() —
+        # treat as not-a-figure (mirrors verify_finding_figures).
+        if amt is None or not math.isfinite(amt) or amt < 1000 or round(amt) in seen:
             continue
         seen.add(round(amt))
         status, explanation, src = verify_currency(amt, known)

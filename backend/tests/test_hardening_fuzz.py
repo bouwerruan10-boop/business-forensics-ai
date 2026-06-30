@@ -83,6 +83,16 @@ def test_claim_ledger_safe_on_overflow_amount():
     assert isinstance(led, dict)
 
 
+def test_narrative_currency_overflow_safe():
+    # the _currency_claims twin of the overflow guard: a huge amount in NARRATIVE prose
+    # (not a finding) previously crashed verify_narrative -> the whole pipeline (caught by
+    # the full-pipeline pressure test). Pin it at the unit level too.
+    from services.narrative_claims import verify_narrative
+    rep = {"executive_summary": "An upside of R" + "9" * 400 + " exists.",
+           "financial_ratios": {}, "financial_figures": {}}
+    assert isinstance(verify_narrative(rep), dict)
+
+
 # ── exporters: corrupted claim_ledger sub-shapes ─────────────────────────────
 
 _BASE = {"business_name": "Acme", "industry": "retail", "currency": "ZAR", "imara_score": 58,
