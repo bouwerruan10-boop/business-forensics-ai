@@ -72,10 +72,20 @@ def db_persistence_status() -> dict:
                      "(or set BF_DB_PATH) or analyses are lost on redeploy.")}
 
 
+# How long a connection waits to acquire a lock before raising "database is locked".
+# The process-wide _lock serializes intra-process DB ops, but connections opened OUTSIDE
+# it (services/backup.py's online-backup API holds a SHARED read-lock on the live DB during
+# a snapshot) can collide with a write commit. Without a busy timeout that collision raises
+# instantly and the write (e.g. save_report / append_audit) is lost; with it the writer waits
+# for the short-lived read-lock to clear. Backups of an SME-sized DB finish well inside this.
+_BUSY_TIMEOUT_MS = 5000
+
+
 def _get_conn() -> sqlite3.Connection:
     """Return a connection with row_factory set for dict-like access."""
     conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = {}".format(_BUSY_TIMEOUT_MS))
     return conn
 
 

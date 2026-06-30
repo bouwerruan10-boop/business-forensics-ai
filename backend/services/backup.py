@@ -23,6 +23,15 @@ from services.database import get_db_path
 _TS_FMT = "%Y%m%dT%H%M%SZ"
 _PREFIX = "analyses-"
 _SUFFIX = ".db"
+_BUSY_TIMEOUT_MS = 5000   # wait for a concurrent write commit to clear instead of failing fast
+
+
+def _connect(path):
+    """A connection that waits (rather than raising 'database is locked') when the live DB
+    is momentarily write-locked by a concurrent analysis commit."""
+    conn = sqlite3.connect(str(path))
+    conn.execute("PRAGMA busy_timeout = {}".format(_BUSY_TIMEOUT_MS))
+    return conn
 
 
 def get_backup_dir():
@@ -36,9 +45,9 @@ def _online_backup(src_path, dst_path):
     """Consistent snapshot src_path -> dst_path via the sqlite3 online backup API."""
     dst_path = Path(dst_path)
     dst_path.parent.mkdir(parents=True, exist_ok=True)
-    src = sqlite3.connect(str(src_path))
+    src = _connect(src_path)
     try:
-        dst = sqlite3.connect(str(dst_path))
+        dst = _connect(dst_path)
         try:
             with dst:
                 src.backup(dst)
@@ -104,7 +113,7 @@ def restore_backup(src, db_path=None):
     db_path = Path(db_path) if db_path else get_db_path()
     if not src.exists():
         raise FileNotFoundError("backup not found: {}".format(src))
-    chk = sqlite3.connect(str(src))
+    chk = _connect(src)
     try:
         row = chk.execute("PRAGMA integrity_check").fetchone()
         if not row or row[0] != "ok":
