@@ -64,6 +64,19 @@ _MOMO = ("\n".join(
 _GOOD_CSV = (b"Item,Amount\nRevenue,12000000\nCost of Sales,8700000\nOperating Profit,300000\n"
              b"Interest,180000\nNet Profit,120000\nTotal Debt,2200000\nEquity,1800000\n")
 
+_BIG = "9" * 400   # parses to float('inf')
+_HOSTILE_TAX = (
+    "VAT201 return. Output VAT R" + _INJECT + ", input VAT R-99999999999999.\n"
+    "Turnover R" + _BIG + " exceeds the R1m threshold. PAYE EMP201 R inf. Penalty NaN.\n"
+    "Provisional IRP6 R-50000000000000. Tax clearance 中文 أمان.\n").encode()
+_HOSTILE_LEGAL = (
+    "Memorandum of Incorporation. Companies Act 71 of 2008. POPIA 4 of 2013.\n"
+    "Director: " + _INJECT + ". Share capital R" + _BIG + ". BBBEE Level inf.\n"
+    "CIPC reg 9999/999999/07. Beneficial owners: 中文.\n").encode()
+_HOSTILE_HR = (
+    "Payroll register. Headcount 99999999999999. Total salaries R-inf.\n"
+    "Employee " + _INJECT + ". UIF R NaN. Leave days " + _BIG + ".\n").encode()
+
 
 @contextmanager
 def _pipeline(client_cls, tmp_path, monkeypatch):
@@ -164,3 +177,58 @@ def test_altdata_path_lights_up_in_full_report(tmp_path, monkeypatch):
         alt = rep.get("altdata_signals") or {}
         assert alt.get("available") is True and alt.get("channel") == "mobile_money"
         assert 0 <= alt.get("altdata_health_score", -1) <= 100
+
+
+def test_hostile_multizone_upload_degrades_safely(tmp_path, monkeypatch):
+    # financial + tax + legal + hr uploads, ALL hostile (injection / 400-digit / NaN / unicode) —
+    # exercises the SATax (2c), SALegal (2d) and HR agent paths, not just financial/bank.
+    with _pipeline(_HostileClient, tmp_path, monkeypatch) as c:
+        files = [
+            ("files", ("fin.csv", _GOOD_CSV, "text/csv")),
+            ("files", ("tax.txt", _HOSTILE_TAX, "text/plain")),
+            ("files", ("legal.txt", _HOSTILE_LEGAL, "text/plain")),
+            ("files", ("hr.txt", _HOSTILE_HR, "text/plain")),
+        ]
+        data = {"company_name": "Acme", "industry_key": "retail", "annual_revenue": "12000000",
+                "headcount": "12", "currency": "ZAR", "country": "South Africa", "primary_concern": "tax",
+                "entity_type": "Private Company (Pty) Ltd", "vat_registered": "yes", "years_in_business": "6",
+                "consent": "true", "consent_at": "2026-06-21T00:00:00Z",
+                "file_categories": json.dumps(["financial", "tax", "legal", "hr"])}
+        r = c.post("/api/analyze", files=files, data=data)
+        assert r.status_code == 200, r.text
+        aid = r.json()["analysis_id"]
+        status = None
+        for _ in range(180):
+            status = c.get(f"/api/status/{aid}").json().get("status")
+            if status in ("complete", "error"):
+                break
+            time.sleep(0.1)
+        assert status == "complete", f"multizone pipeline did not complete: {status}"
+        _assert_report_sane(c, aid)
+
+
+def test_hostile_endpoint_params_never_500(tmp_path, monkeypatch):
+    with _pipeline(_HostileClient, tmp_path, monkeypatch) as c:
+        aid, status = _analyze(c, {"files": ("fin.csv", _GOOD_CSV, "text/csv")})
+        assert status == "complete"
+        # hostile query params on report endpoints must never 500 (422/200/404 are all fine)
+        probes = [
+            f"/api/report/{aid}/affordability?proposed_annual_instalment=inf",
+            f"/api/report/{aid}/affordability?proposed_annual_instalment=nan",
+            f"/api/report/{aid}/affordability?proposed_annual_instalment=-100",
+            f"/api/report/{aid}/affordability?proposed_annual_instalment=1e400",
+            f"/api/report/{aid}/pdf?audience=" + _INJECT,
+            f"/api/report/{aid}/pdf?audience=" + "x" * 500,
+            f"/api/report/{aid}/optimize?objective=" + _INJECT,
+            f"/api/report/{aid}/optimize?objective=garbage",
+            "/api/admin/outcomes?limit=-1",
+            "/api/admin/outcomes?limit=999999999",
+            "/api/admin/audit?limit=-5",
+        ]
+        for url in probes:
+            assert c.get(url).status_code != 500, f"500 on {url}"
+        # hostile POST bodies on the score-contest + outcomes endpoints
+        assert c.post(f"/api/report/{aid}/contest",
+                      json={"factor": _INJECT, "statement": "x" * 100000, "contact": _INJECT}).status_code != 500
+        assert c.post("/api/admin/outcomes",
+                      json={"analysis_id": aid, "outcome_type": _INJECT, "label": 99, "value": "inf"}).status_code != 500
